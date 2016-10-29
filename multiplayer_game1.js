@@ -44,6 +44,9 @@ const MovementForce = 1;//sets the movement force from dpad
 //Input Controller
 var GAMEPAD = new ABUDLR({left:{callback:GAMEPAD_left_callback}});
 
+//create the synchronizer to merge local and server side physics
+synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
+		
 			
 /************SERVER HOOKUPS*******************/
 //coding values for data sent to server
@@ -207,7 +210,7 @@ var socket = io();
 
 //GLOBAL Graphics variables
 var camera, scene, renderer;//primary components of displaying in three.js
-var controls;
+
 //RAYCASTER  is a project that renders a 3D world based on a 2D map
 var raycaster = new THREE.Raycaster();//http://threejs.org/docs/api/core/Raycaster.html
 
@@ -269,10 +272,7 @@ function initPhysics() {
 		return true;
 };
 
-function initInput() {
-    controls = new THREE.OrbitControls( camera );
-	 controls.target.y = 2;
-};
+
 
 
 function createBoxObject(object,returnObj) {
@@ -808,8 +808,6 @@ function animate() {
 			physicsWorld.stepSimulation( deltaTime,10);
 
 		  updateGraphics( deltaTime );
-
-		  controls.update( deltaTime );//view control
 		  
 		  //check what buttons are pressed
 	      GAMEPADpolling();   
@@ -1163,10 +1161,8 @@ function init() {
 
 		initGraphics();
 		initPhysics();
-		initInput();
-		//create the synchronizer to merge local and server side physics
-		synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
-		
+	
+
 		//the DefineDataStructure method isn't actually used as of 10/24/16.  Arg passed
 		//is an object that is supposed to come from the server telling client how to read ALL update data
 		//synchronizer.DefineDataStructure({x:0,y:1,z:2});
