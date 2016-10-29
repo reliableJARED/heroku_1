@@ -45,7 +45,7 @@ const MovementForce = 1;//sets the movement force from dpad
 var GAMEPAD = new ABUDLR({left:{callback:GAMEPAD_left_callback}});
 
 //create the synchronizer to merge local and server side physics
-var synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
+var synchronizer; 
 		
 			
 /************SERVER HOOKUPS*******************/
@@ -1161,7 +1161,11 @@ function init() {
 
 		initGraphics();
 		initPhysics();
-	
+		
+		//create the synchronizer to merge local and server side physics
+		 synchronizer; = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
+		
+			
 
 		//the DefineDataStructure method isn't actually used as of 10/24/16.  Arg passed
 		//is an object that is supposed to come from the server telling client how to read ALL update data
