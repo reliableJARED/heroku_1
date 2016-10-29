@@ -1,0 +1,8 @@
+{
+  "name": "Game Demo",
+  "description": "Example multiplayer game using Node, Ammo.js, socket.io",
+  "repository": "https://github.com/reliableJARED/heroku",
+  "logo": "http://node-js-sample.herokuapp.com/node.svg",
+  "keywords": ["heroku", "ammojs", "node","mulitplayer"],
+  "image": "heroku/nodejs"
+}
