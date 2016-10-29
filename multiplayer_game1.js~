@@ -45,7 +45,7 @@ const MovementForce = 1;//sets the movement force from dpad
 var GAMEPAD = new ABUDLR({left:{callback:GAMEPAD_left_callback}});
 
 //create the synchronizer to merge local and server side physics
-var synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
+synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
 		
 			
 /************SERVER HOOKUPS*******************/
