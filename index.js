@@ -19,7 +19,7 @@ var port = process.env.PORT || 5000;
 
 //required for serving locally when testing
 var serveStatic = require('serve-static');
-
+app.use(serveStatic(__dirname))
 app.use(serveStatic(__dirname + '/static/images/'))
 
 //GLOBAL Physics variables
