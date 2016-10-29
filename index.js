@@ -21,8 +21,7 @@ var port = process.env.PORT || 5000;
 var serveStatic = require('serve-static');
 app.use(serveStatic(__dirname+'/'))
 app.use(serveStatic(__dirname + '/static/images/'))
-app.use(serveStatic(__dirname + '/static/three.js/'))
-app.use(serveStatic(__dirname + '/static/build/three.js/'))
+app.use(serveStatic(__dirname + '/static/three.js/build/'))
 
 //GLOBAL Physics variables
 var physicsWorld;
