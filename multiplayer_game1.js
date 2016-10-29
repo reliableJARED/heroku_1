@@ -1163,7 +1163,7 @@ function init() {
 		initPhysics();
 		
 		//create the synchronizer to merge local and server side physics
-		 synchronizer; = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
+		 synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
 		
 			
 
