@@ -639,11 +639,6 @@ initPhysics();
 createObjects();
 
 
-//serve HTML to initial get request
-app.get('/', function(request, response){
-	response.sendFile(__dirname+'/node_static/mulitplayer_game1.html');
-});
-
 /*
 Good resource:
 http://buildnewgames.com/optimizing-websockets-bandwidth/
@@ -730,6 +725,12 @@ var aNumber = 123;
 var anObj = new Object();
 anObj[aNumber] = 'test';
 console.log(anObj)
+
+//serve HTML to initial get request
+app.get('/', function(request, response){
+	response.sendFile(__dirname+'mulitplayer_game1.html');
+});
+
 
 http.listen(port, function(){
 	console.log('listening on port: '+port);
