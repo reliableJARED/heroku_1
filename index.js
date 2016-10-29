@@ -728,7 +728,7 @@ console.log(anObj)
 
 //serve HTML to initial get request
 app.get('/', function(request, response){
-	response.sendFile(__dirname+'mulitplayer_game1.html');
+	response.sendFile(__dirname+'/mulitplayer_game1.html');
 });
 
 
