@@ -333,10 +333,10 @@ function emitWorldUpdate() {
 	dataToSend.unshift(propsPerObj);
 	
 	//set the data as Float32
-//	var binaryData = new Float32Array(dataToSend);
-var binaryData = Float32Array.from(dataToSend);
-	
-	console.log('!!!!!!!!!  new Float32Array !!!!!!!!!');
+	var binaryData = new Float32Array(dataToSend);
+
+	console.log(binaryData);
+	console.log(binaryData.buffer)
 	//create a data buffer of the underlying array
 	var buff = Buffer.from(binaryData.buffer)
 
@@ -684,21 +684,7 @@ io.on('connection', function(socket){
 		socket.emit('yourObj',PlayerIndex[this.id].id)
 	});
 
-	socket.on('S',function (msg) {	
-		
-		var player = PlayerIndex[this.id];
 
-		//slow velocity
-		vector3Aux1.setValue(msg.LVx,msg.LVy,msg.LVz);
-		player.physics.setLinearVelocity(vector3Aux1);
-	
-		//slow rotation
-		vector3Aux1.setValue(msg.AVx,msg.AVy,msg.AVz);
-		player.physics.setAngularVelocity(vector3Aux1)
-		
-		//tell everyone of the change
-		 io.emit('S',{[player.id]:msg});
-	});
 	
 	socket.on('resetMe',function(){
 		playerResetFromCrash(this.id);
