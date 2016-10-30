@@ -337,8 +337,10 @@ function emitWorldUpdate() {
 
 	console.log(binaryData);
 	console.log(binaryData.buffer)
+	console.log(binaryData.byteLength)
 	//create a data buffer of the underlying array
-	var buff = Buffer.from(binaryData.buffer)
+	//var buff = Buffer.from(binaryData.buffer)
+	var buff = Buffer.from(new Float32Array(dataToSend).buffer)
 
 	//send out he data with a time stamp in UTC time
 	io.emit('U', {time:clock.oldTime,data:buff} );

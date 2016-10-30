@@ -333,13 +333,14 @@ function emitWorldUpdate() {
 	dataToSend.unshift(propsPerObj);
 	
 	//set the data as Float32
-	var binaryData = new Float32Array(dataToSend);
+	//var binaryData = new Float32Array(dataToSend);
 
-	console.log(binaryData);
-	console.log(binaryData.buffer)
-	console.log(binaryData.byteLength)
+//	console.log(binaryData);
+//	console.log(binaryData.buffer)
+//	console.log(binaryData.byteLength)
 	//create a data buffer of the underlying array
-	var buff = Buffer.from(binaryData.buffer)
+	//var buff = Buffer.from(binaryData.buffer)
+	var buff = Buffer.from(new Float32Array(dataToSend).buffer)
 
 	//send out he data with a time stamp in UTC time
 	io.emit('U', {time:clock.oldTime,data:buff} );
