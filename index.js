@@ -333,7 +333,8 @@ function emitWorldUpdate() {
 	dataToSend.unshift(propsPerObj);
 	
 	//set the data as Float32
-	var binaryData = new Float32Array(dataToSend);
+	//	var binaryData = new Float32Array(dataToSend);
+	var binaryData = Float32Array.from(dataToSend);
 	
 	console.log('!!!!!!!!!  new Float32Array !!!!!!!!!');
 	//create a data buffer of the underlying array
