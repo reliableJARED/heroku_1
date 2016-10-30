@@ -339,8 +339,9 @@ function emitWorldUpdate() {
 	console.log(binaryData.buffer)
 	console.log(binaryData.byteLength)
 	//create a data buffer of the underlying array
+	var buff = Buffer.from(binaryData)
 	//var buff = Buffer.from(binaryData.buffer)
-	var buff = Buffer.from(new Float32Array(dataToSend).buffer)
+	//var buff = Buffer.from(new Float32Array(dataToSend).buffer)
 
 	//send out he data with a time stamp in UTC time
 	io.emit('U', {time:clock.oldTime,data:buff} );
@@ -505,10 +506,12 @@ function FireShot(ID,data){
 		AddToRigidBodiesIndex(cube);
 
 		//prepare binary data for shipping
-		var dataBuffer = Buffer.from(binaryData.buffer)
-		var headersBuffer = Buffer.from(headers.buffer);
-		//console.log(dataBuffer.byteLength)
-		//console.log(headers.byteLength);
+		//var dataBuffer = Buffer.from(binaryData.buffer)
+		//var headersBuffer = Buffer.from(headers.buffer);
+		
+		var dataBuffer = Buffer.from(binaryData)
+		var headersBuffer = Buffer.from(headers);
+		
 		
 		var binaryShot = Buffer.concat([headersBuffer,dataBuffer],(dataBuffer.byteLength+headers.byteLength));
 		//console.log(ship.byteLength)

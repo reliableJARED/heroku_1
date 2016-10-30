@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Example multiplayer game using Node, Ammo.js, socket.io",
   "engines": {
-    "node": "6.0.0"
+    "node": "5.9.1"
   },
   "main": "index.js",
   "scripts": {
