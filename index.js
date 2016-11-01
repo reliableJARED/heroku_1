@@ -119,7 +119,7 @@ function createObjects() {
 			d : 2000,
 			shape:'box',
 			color: "rgb(100%, 100%, 100%)",
-			texture:'moon.png',
+			texture:'snow.png',
 			x: 0,
 			y: 0,
 			z: 0,
@@ -141,7 +141,90 @@ function createObjects() {
 		//add ground to our index used to update clients about objects that have moved
 		/*IMPORTANT: AddToRigidBodiesIndex expects that obj.physics is an Ammo object.  NOT the values sent used in the blueprint to build the object*/
 		AddToRigidBodiesIndex(ground);
+		
+		//create a tower
+		createCubeTower();
 }
+
+
+function createCubeTower(height,width,depth){
+	//defaults if no args passed for the TOWER, not the blocks
+	var height = height || 10;
+	var width = width || 2;
+	var depth = depth || 2;
+	
+	//create random location for our tower, near other blocks
+	var randX =  Math.floor(Math.random() * 20);
+	var randZ =  Math.floor(Math.random() * 20) - 10;
+	randX = randX - 110;//used to place it near the center of the world
+	
+	var pos =  new Ammo.btVector3(randX,1,randZ);
+	
+	var ObjBlueprint = {
+			mass : 1, //zero mass makes objects static.  Objects can hit them but they dont move or fall 
+			w : 2,
+			h : 2,
+			d : 2,
+			shape:'box',
+			color: "rgb(0%, 0%, 100%)",// blue color
+			x: 0,
+			y: 0,
+			z: 0,
+			Rx: 0,
+			Ry: 0,
+			Rz: 0
+		}
+		
+	//three nested loops will create the tower
+	//inner loop lays blocks in a row
+	//mid loop starts a new column
+	//outer loop starts next new layer up 
+	/*IMPORTANT: the number 2 is hard coded because CreateCube() creates 2x2x2 cubes.  bad form... but be aware!*/
+	for (var h=0;h<height;h++) {
+		
+		for (var w=0;w<width;w++) {
+		
+			for(var d =0; d<depth;d++){
+			   console.log("195:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
+				ObjBlueprint.x = pos.x();
+				ObjBlueprint.y = pos.y();
+				ObjBlueprint.z = pos.z();
+
+				//MAJOR FLAW. ccreatePhysicalCube alters the object passed to it!.  need to send a copy
+				 var block = createPhysicalCube(Object.assign({},ObjBlueprint));
+				 block.physics.setActivationState(1);
+				rigidBodies.push( block.physics );
+				physicsWorld.addRigidBody( block.physics );
+				AddToRigidBodiesIndex(block);
+
+				//add to pos, used in the placement for our next block being created	
+				pos.setX(ObjBlueprint.x+pos.x()) //+X dimention
+			}
+			//reset for next column
+			pos = new Ammo.btVector3(randX,1,randZ)
+
+			//Start our new row shifted over depth of our object
+			pos.setY((ObjBlueprint.z*h)+pos.y())
+			pos.setZ(pos.z()+2);//+Z dimention;
+			
+			ObjBlueprint.x = pos.x();
+			ObjBlueprint.y = pos.y();
+			ObjBlueprint.z = pos.z();
+		}
+		//reset our Z axis
+		//start the new grid up one level
+		//reset for next column
+		pos = new Ammo.btVector3(randX,1,randZ)
+			
+		//Start our new layer by moving up the height of our cubes
+		pos.setY(1+(ObjBlueprint.y*h)+pos.y())
+		ObjBlueprint.x = pos.x();
+		ObjBlueprint.y = pos.y();
+		ObjBlueprint.z = pos.z();
+	}
+}
+
+
 
 function AddToRigidBodiesIndex(obj){
 	
@@ -456,7 +539,7 @@ function FireShot(ID,data){
 		binaryData[1] = 0.5;//height
 		binaryData[2] = 0.5;//depth
 		binaryData[3] = 10;//mass
-		binaryData[4] = 0xff0000  //color, hex for RED
+		binaryData[4] = 0x7997A1  //color, hex for gray/blue
 		binaryData[5] = data.readFloatLE(4);//x
 		binaryData[6] = data.readFloatLE(8);//y
 		binaryData[7] = data.readFloatLE(12);//z
