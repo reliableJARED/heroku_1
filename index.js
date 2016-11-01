@@ -30,7 +30,7 @@ var rigidBodies =  new Array();
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
 const updateFrequency = 3;//Seconds	
-
+const HEADER_PROPERTY_PER_OBJECT = 8; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 					
 GameClock = function () {
 	this.startTime = Date.now();
@@ -345,7 +345,7 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 
 function emitWorldUpdate() {
 		
-		var propsPerObj = 8;//IMPORTANT PROPERTY!!! change if LV and AV are going to be used
+		var propsPerObj = HEADER_PROPERTY_PER_OBJECT;
 		var objectCount = 0;
 		var dataToSend = new Array();
 		
