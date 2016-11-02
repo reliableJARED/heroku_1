@@ -47,7 +47,12 @@ var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right
 //create the synchronizer to merge local and server side physics
 var synchronizer; 
 		
-			
+		//GLOBAL Graphics variables
+var camera, scene, renderer;//primary components of displaying in three.js
+
+//RAYCASTER  is a project that renders a 3D world based on a 2D map
+var raycaster = new THREE.Raycaster();//http://threejs.org/docs/api/core/Raycaster.html
+	
 /************SERVER HOOKUPS*******************/
 //coding values for data sent to server
 const applyCentralImpulse = 1;         
@@ -181,40 +186,36 @@ var socket = io();
 		
 		//**** PLAYER INPUT HANDLER
 		socket.on('I',function(msg){
+			//ID is a players ID
 			var ID = Object.keys(msg)[0];
-			//msg[ID] is a binary buffer
-			//first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
-			//next bytes are for the 3 float32 (4bytes each) that code x,y,z data
+			
+			//msg[ID] is an ArrayBuffer with structure:
+		   //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
+		   //remaining bytes are for all float32 (4bytes each) that code movement commands
+		   
+			
+			//determine what player object should be used, node that local player is called PlayerCube
+			var player = (PlayerCube.userData.id === ID)? PlayerCube.userData.physics:rigidBodiesLookUp[ID].userData.physics
+		
+			//parse our binary data from server into readable formats
 			var dataArray = new Float32Array(msg[ID],4);
 			var header   = new Uint8Array(msg[ID],0,4);
-			
-		//	console.log(ID)
-		//	console.log(header,dataArray)
-			
+		
 			//Shot
 			if (fireBullet & header[0]) {
-			//do something with ID here? tells us who is firing this shot Could be YOU!
+				//do something with ID here? it tells us who is firing this shot Could be YOU!
 				createBullet(header,dataArray);
 				}
 			
 			//Movement
-			else if(PlayerCube.userData.id !== ID){
-				
-				EnemyInput(ID,header,dataArray)
+			else{
+				MovementInput(player,header[0],dataArray)
 			};
+			;
 			
 		});
 
 /*******************************/
-
-
-//GLOBAL Graphics variables
-var camera, scene, renderer;//primary components of displaying in three.js
-
-//RAYCASTER  is a project that renders a 3D world based on a 2D map
-var raycaster = new THREE.Raycaster();//http://threejs.org/docs/api/core/Raycaster.html
-
-
 
 
 function initGraphics() {
@@ -279,7 +280,6 @@ function BackgroundEnvGraphics() {
 
 };
 
-
 /*********CLIENT SIDE PHYSICS ************/
 function initPhysics() {
 		// Physics World configurations
@@ -298,9 +298,6 @@ function initPhysics() {
 		
 		return true;
 };
-
-
-
 
 function createBoxObject(object,returnObj) {
 		//console.log('building',object)
@@ -424,53 +421,49 @@ function createBullet(type,data){
 }
 
 
-function EnemyInput(ID,type,data){
+function MovementInput(EnemyObject,type,data){
 
-	//type is a two element array, 0=force type, 1=button pressed
-	//data is a three element array [x,y,z] of floats
-	var EnemyObject = rigidBodiesLookUp[ID].userData.physics;
-	
 	//set the object to active so that updates take effect
-	EnemyObject.setActivationState(1);
+	PlayerObject.setActivationState(1);
 	
 	//use bit operators for comparisons to speed things up
 	if(applyCentralImpulse & type[0] ){
 				
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				EnemyObject.applyCentralImpulse(vector3Aux1);
+				PlayerObject.applyCentralImpulse(vector3Aux1);
 		
 	}else if (applyTorque & type[0]) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				EnemyObject.applyTorque(vector3Aux1);
+				PlayerObject.applyTorque(vector3Aux1);
 		
 	}else if (applyTorqueImpulse & type[0]) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				EnemyObject.applyTorqueImpulse(vector3Aux1);
+				PlayerObject.applyTorqueImpulse(vector3Aux1);
 	
 	}else if (applyCentralForce & type[0]) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				EnemyObject.applyCentralForce(vector3Aux1);
+				PlayerObject.applyCentralForce(vector3Aux1);
 				
 	}else if (changeALLvelocity & type[0]) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				EnemyObject.setLinearVelocity(vector3Aux1);
+				PlayerObject.setLinearVelocity(vector3Aux1);
 	
 				vector3Aux1.setValue(data[3],data[4],data[5]);
-				EnemyObject.setAngularVelocity(vector3Aux1);
+				PlayerObject.setAngularVelocity(vector3Aux1);
 				
 	}else if (changeLinearVelocity & type[0]) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				EnemyObject.setLinearVelocity(vector3Aux1);
+				PlayerObject.setLinearVelocity(vector3Aux1);
 				
 	}else if (changeAngularVelocity & type[0]) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				EnemyObject.setAngularVelocity(vector3Aux1);
+				PlayerObject.setAngularVelocity(vector3Aux1);
 	}
 	
 }
@@ -495,8 +488,11 @@ function moveClose(bit) {
 	
 	thrustZ = thrustZ*Zquad
 	
-	vector3Aux1.setValue(-thrustX,0,thrustZ);
-	PlayerCube.userData.physics.applyCentralImpulse(vector3Aux1);
+	/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
+	//	vector3Aux1.setValue(-thrustX,0,thrustZ);
+	//PlayerCube.userData.physics.applyCentralImpulse(vector3Aux1);
+	*/
+	
 	
 	//SEND TO SERVER you want to apply a central impulse
 	//socket.emit('ACI',{x:-thrustX, y:0 ,z:thrustZ});
@@ -542,9 +538,10 @@ function moveLeft(bit) {
 		//Rotate
 		var rot = RF + (boost*boost);
 		
-		vector3Aux1.setValue(0,rot,0);
-		P.applyTorque(vector3Aux1);
-		
+		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
+		//vector3Aux1.setValue(0,rot,0);
+		//P.applyTorque(vector3Aux1);
+		*/
 		//SEND TO SERVER you want to apply a torque
 		//socket.emit('AT',{x:0, y:rot ,z:0});
 	//need 2 bytes to encode u,d,l,r, etc.
@@ -586,8 +583,11 @@ function moveRight(bit) {
 		//Rotate
 		var rot = (RF + (boost*boost)) * -1;
 		
+		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
 		vector3Aux1.setValue(0,rot,0);
 		P.applyTorque(vector3Aux1);
+		*/
+		
 		
 		//SEND TO SERVER you want to apply a torque
 	//	socket.emit('AT',{x:0, y:rot ,z:0});
@@ -637,8 +637,10 @@ function moveAway(bit) {
 	
 	thrustZ = thrustZ*Zquad;
 	
+	/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
 	vector3Aux1.setValue(thrustX,0,thrustZ);
 	PlayerCube.userData.physics.applyCentralImpulse(vector3Aux1);
+	*/
 	
 	//SEND TO SERVER you want to apply a central impulse
 
@@ -681,9 +683,10 @@ function moveBrake(bit) {
 		
 		vector3Aux1.setValue(LVx,LVy,LVz);	//r
 		
+		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
 		//slow linear Velocity
 		player.setLinearVelocity(vector3Aux1);
-	
+	*/
 		//slow rotation
 	    var Av = player.getAngularVelocity();
 	 	var AVx = (Av.x());//breaking doesn't work for Z or X
@@ -691,8 +694,9 @@ function moveBrake(bit) {
 		var AVz = (Av.y()*BrakeRotation);
 		vector3Aux1.setValue(AVx,AVy,AVz);
 		
+		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
 		player.setAngularVelocity(vector3Aux1)
-		
+		*/
 		
 		//4 bytes header, 24bytes data
 		var buffer = new ArrayBuffer(28);
