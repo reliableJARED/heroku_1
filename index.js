@@ -29,7 +29,7 @@ var gravityConstant = -9.8
 var rigidBodies =  new Array();
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
-const updateFrequency = 3;//Seconds	
+const updateFrequency = 1;//Seconds	
 const HEADER_PROPERTY_PER_OBJECT = 8; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 					
 GameClock = function () {
@@ -332,14 +332,17 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	if (timeForUpdate){
 		//tell users to grab a world state because update is coming next tick
 		io.emit('QC');
-		//by setting this for nextTick the the lag it takes QC to reach client should equal
+		//by setting this for nextTick the lag it takes QC to reach client should equal
 		//the required offset so that the server and client will be comparing the world state
-		//in the EXACT same time reference
+		//in the EXACT same time reference.
+		/*
+		The time delta of QC msg and the update will be ~equal to user lag.  The update will have a timestamp that is very near the SENDING time of QC.
+		*/
 		process.nextTick(function (){emitWorldUpdate()} );
 	}
 	
-	//use setTimeout()To schedule execution of a one-time callback after delay milliseconds.
-	setTimeout( TickPhysics, 15 );//milisecond callback timer
+	//loop our physics at about 30fps
+	setTimeout( TickPhysics, 33);//milisecond callback timer
 };
 
 

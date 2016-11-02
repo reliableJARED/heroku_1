@@ -421,33 +421,34 @@ function createBullet(type,data){
 }
 
 
-function MovementInput(EnemyObject,type,data){
-
+function MovementInput(PlayerObject,type,data){
+	
 	//set the object to active so that updates take effect
 	PlayerObject.setActivationState(1);
 	
+	
 	//use bit operators for comparisons to speed things up
-	if(applyCentralImpulse & type[0] ){
+	if(applyCentralImpulse & type ){
 				
 				vector3Aux1.setValue(data[0],data[1],data[2]);
 				PlayerObject.applyCentralImpulse(vector3Aux1);
 		
-	}else if (applyTorque & type[0]) {
+	}else if (applyTorque & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
 				PlayerObject.applyTorque(vector3Aux1);
 		
-	}else if (applyTorqueImpulse & type[0]) {
+	}else if (applyTorqueImpulse & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
 				PlayerObject.applyTorqueImpulse(vector3Aux1);
 	
-	}else if (applyCentralForce & type[0]) {
+	}else if (applyCentralForce & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
 				PlayerObject.applyCentralForce(vector3Aux1);
 				
-	}else if (changeALLvelocity & type[0]) {
+	}else if (changeALLvelocity & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
 				PlayerObject.setLinearVelocity(vector3Aux1);
@@ -455,12 +456,12 @@ function MovementInput(EnemyObject,type,data){
 				vector3Aux1.setValue(data[3],data[4],data[5]);
 				PlayerObject.setAngularVelocity(vector3Aux1);
 				
-	}else if (changeLinearVelocity & type[0]) {
+	}else if (changeLinearVelocity & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
 				PlayerObject.setLinearVelocity(vector3Aux1);
 				
-	}else if (changeAngularVelocity & type[0]) {
+	}else if (changeAngularVelocity & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
 				PlayerObject.setAngularVelocity(vector3Aux1);
@@ -469,46 +470,51 @@ function MovementInput(EnemyObject,type,data){
 }
 
 
+function LinearVelocityCalculator(RotationAngle){
+	//RotationAngle is the angle of rotation about the Y axis.
+	 var Z = TopSpeed* Math.cos(RotationAngle);
+	 var X = TopSpeed* Math.sin(RotationAngle);
+	 /*
+					 /| 
+					/ | 
+	rotationAngle /___|
+	recall "SOHCAHTOA"? we are calculating Adjacent ( var X) and Opposite (var Z)
+	When we apply a linear velocity (X,0,Z) to our object the result will be travel along the hypotenuse
+	 */
+	 
+	 return {x:X,z:Z};
+}
 
-function moveClose(bit) {
-	//check MAX Speed 
-	if(TopSpeed < PlayerCube.userData.physics.getLinearVelocity().length())return;
+function moveBackward(bit) {
 	
-	 var yRot = PlayerCube.rotation._y
-	 var thrustZ = movementSpeed* Math.cos(yRot);
-	 var thrustX = movementSpeed* Math.sin(yRot);
-				   
-	 //used to determine if thrust in the x or z should be pos or neg
-	 var Zquad ;
-	 var QUAT = PlayerCube.quaternion._y;
+	//returns a 1 to -1 rotation value around Y axis
+	//Counter Clockwise 0 to 1
+	//Clockwise 0 to -1
+	var yRot =  PlayerCube.userData.physics.getWorldTransform().getRotation().y();
+	
+	//returns what our X and Z linear velocity components should be
+	var thrust = LinearVelocityCalculator(yRot);
+	
+	 //adjuster depending on if z should be pos or neg
+	 var Zsign;
 
-	/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
-	if( QUAT < 0.75  || QUAT < -0.75 ){Zquad=-1}
-	else {Zquad=1}
+	/*determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
+	if( yRot < 0.5  || yRot < -0.5 ){Zsign=-1}
+	else {Zsign=1}
 	
-	thrustZ = thrustZ*Zquad
-	
-	/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
-	//	vector3Aux1.setValue(-thrustX,0,thrustZ);
-	//PlayerCube.userData.physics.applyCentralImpulse(vector3Aux1);
-	*/
-	
-	
-	//SEND TO SERVER you want to apply a central impulse
-	//socket.emit('ACI',{x:-thrustX, y:0 ,z:thrustZ});
-	//need 2 bytes to encode u,d,l,r, etc.
-	//need 12 bytes for the 3 float32 (4bytes each) x,y,z data
-	//total is 16 because of offset, have dead space from byte 3 to 4, could
-	//encode for Right or Left controler there
+	//apply Z thrust direction sign correction
+	thrust.z *= Zsign
+
 	var buffer = new ArrayBuffer(16);
-	var vectorBinary   = new Float32Array(buffer,4);
-	vectorBinary[0] = -thrustX;
-	vectorBinary[1] = 0;
-	vectorBinary[2] = thrustZ;
+	
+	var vectorBinary = new Float32Array(buffer,4);
+	vectorBinary[0] = thrust.x;
+	vectorBinary[1] = 0;// this is a waste... but server expects [0,1,2]
+	vectorBinary[2] = thrust.z;
 	
 	//only coding FIRST TWO bytes
 	var headerBytes   = new Uint8Array(buffer,0,4);
-	headerBytes[0] = applyCentralImpulse;//type of action
+	headerBytes[0] = changeLinearVelocity;//type of action
 	headerBytes[1] = bit;//represents button being pressed
 	headerBytes[2] = 0;//empty for now
 	headerBytes[3] = 0;//empty for now
@@ -615,13 +621,13 @@ function moveRight(bit) {
 }
 
 
-function moveAway(bit) {
+function moveForward(bit) {
 	
 	//This function is called from the dpad on the RIGHT gui for the gamepad
 	
 	//check MAX Speed 
 	if(TopSpeed < PlayerCube.userData.physics.getLinearVelocity().length())return;
-	
+	console.log(PlayerCube.userData.physics.getLinearVelocity().x(),PlayerCube.userData.physics.getLinearVelocity().z())
 	 var yRot =PlayerCube.rotation._y
 	 var thrustZ = movementSpeed* Math.cos(yRot);
 	 var thrustX = movementSpeed* Math.sin(yRot);
@@ -641,7 +647,7 @@ function moveAway(bit) {
 	vector3Aux1.setValue(thrustX,0,thrustZ);
 	PlayerCube.userData.physics.applyCentralImpulse(vector3Aux1);
 	*/
-	
+	console.log(PlayerCube.userData.physics.getLinearVelocity().x(),PlayerCube.userData.physics.getLinearVelocity().z())
 	//SEND TO SERVER you want to apply a central impulse
 
 //	socket.emit('ACI',{x:thrustX,y:0 ,z:thrustZ});
@@ -672,57 +678,6 @@ function moveAway(bit) {
 	
 }
 
-function moveBrake(bit) {	
-
-		var player = PlayerCube.userData.physics;
-		
-		var Lv = player.getLinearVelocity();
-	    var LVx = (Lv.x()*BrakeVelocity);
-	    var LVy = (Lv.z()*BrakeVelocity);
-	    var LVz = (Lv.y());//breaking doesn't work for UP/DOWN
-		
-		vector3Aux1.setValue(LVx,LVy,LVz);	//r
-		
-		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
-		//slow linear Velocity
-		player.setLinearVelocity(vector3Aux1);
-	*/
-		//slow rotation
-	    var Av = player.getAngularVelocity();
-	 	var AVx = (Av.x());//breaking doesn't work for Z or X
-		var AVy = (Av.z());//breaking doesn't work for Z or X
-		var AVz = (Av.y()*BrakeRotation);
-		vector3Aux1.setValue(AVx,AVy,AVz);
-		
-		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
-		player.setAngularVelocity(vector3Aux1)
-		*/
-		
-		//4 bytes header, 24bytes data
-		var buffer = new ArrayBuffer(28);
-	
-		//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
-		//create a dataview so we can manipulate our arraybuffer
-		//offset 4 bytes to make room for headers
-		var vectorBinary   = new Float32Array(buffer,4);
-		vectorBinary[0] = LVx;
-		vectorBinary[1] = LVy;
-		vectorBinary[2] = LVz;
-		vectorBinary[3] = AVx;
-		vectorBinary[4] = AVy;
-		vectorBinary[5] = AVz;
-	
-
-		//only coding FIRST TWO bytes
-		var headerBytes   = new Uint8Array(buffer,0,4);
-		headerBytes[0] = changeALLvelocity;//type of action
-		headerBytes[1] = bit;//represents button being pressed
-		headerBytes[2] = 0;//empty for now
-		headerBytes[3] = 0;//empty for now
-		
-		//binary mode
-		socket.emit('I',buffer);
-};
 
 
 function clickShootCube(bit) {
@@ -802,19 +757,105 @@ function thrustON(bit){
 	socket.emit('I',buffer);
 };
 
-function GAMEPADpolling() {
+
+
+function getBinaryToSend(headerArray,dataArray){
 	
-	   if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.up.bit ){moveAway(GAMEPAD.rightGUI.up.bit)};
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.down.bit){moveClose(GAMEPAD.rightGUI.down.bit)};
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.left.bit){moveLeft(GAMEPAD.rightGUI.left.bit)};
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.right.bit){moveRight(GAMEPAD.rightGUI.right.bit)};  
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.center.bit){moveBrake(GAMEPAD.rightGUI.center.bit)};  
-		if(GAMEPAD.leftGUI.bits & GAMEPAD.leftGUI.button1.bit ){thrustON(GAMEPAD.leftGUI.button1.bit)}//thrust on
+	//prepare binary data to be sent to server
+	var buffer = new ArrayBuffer(dataArray.length + 4);
+	
+	//The float data
+	var vectorBinary   = new Float32Array(buffer,4);
+	for(var i=0; i<dataArray.length; i++){
+		
+		vectorBinary[i] = dataArray[i];
+	}
+	
+	//the headers
+	var headerBinary   = new Uint8Array(buffer,0,4);
+	for(var i=0; i<headerArray.length; i++){
+		
+		headerBinary[i] = headerArray[i];
+	}
+	return buffer;
+}
+
+
+//dpad button names:
+//'upLeft','up','upRight','left','center','right','downLeft','down','downRight'
+		
+//A and B button names:
+//button1, button2
+		
+function GAMEPADpolling() {
+		//turning and moving needs to be based on Polling.  we have to keep updating our rotation angle, to adjust
+		//the direction we are moving.
+	   if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.upRight.bit ||
+		  GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.upLeft.bit ){
+				moveForward(GAMEPAD.rightGUI.up.bit)};
+				
+	   if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.downRight.bit ||
+	      GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.downLeft.bit ){
+				moveBackward(GAMEPAD.rightGUI.down.bit)};
+				
+		//thrust on
+	   if(GAMEPAD.leftGUI.bits & GAMEPAD.leftGUI.button1.bit ){thrustON(GAMEPAD.leftGUI.button1.bit)}
 }
 
 function GAMEPAD_left_callback(){
-	//shoot a cube	
+	    //shoot a cube	
 		if(GAMEPAD.leftGUI.bits & GAMEPAD.leftGUI.button2.bit ){clickShootCube(GAMEPAD.leftGUI.button2.bit)}
+}
+
+function GAMEPAD_right_callback(){
+		//dpad button names:
+		//'upLeft','up','upRight','left','center','right','downLeft','down','downRight'
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.up.bit ){moveForward(GAMEPAD.rightGUI.up.bit)}
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.down.bit){moveBackward(GAMEPAD.rightGUI.down.bit)};
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.left.bit){moveLeft(GAMEPAD.rightGUI.left.bit)};
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.right.bit){moveRight(GAMEPAD.rightGUI.right.bit)}; 
+
+		//no dpad buttons are down clear angular and linear velocity
+		if(GAMEPAD.rightGUI.bits & 0){
+			
+			PlayerCube.userData.physics.setLinearVelocity(vector3Aux1.setValue(0,0,0));
+			PlayerCube.userData.physics.setAngularVelocity(vector3Aux1.setValue(0,0,0));
+			
+			//prepare binary data
+			var buffer = getBinaryToSend([changeALLvelocity],[0,0,0,0,0,0])
+		
+			//send binary data
+			socket.emit('I',buffer);
+		}
+		//If no movment buttons are down, set linear velocity to 0
+		else if(GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.up.bit && 
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.upRight.bit &&
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.upLeft.bit && 
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.down.bit &&
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downLeft.bit &&
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downRight.bit){
+				
+				PlayerCube.userData.physics.setLinearVelocity(vector3Aux1.setValue(0,0,0));
+				
+				//prepare binary data
+				var buffer = getBinaryToSend([changeLinearVelocity],[0,0,0])
+		
+				//send binary data
+				socket.emit('I',buffer);
+			}  
+		
+		//If no rotation buttons are down, set angular velocity to 0
+		else if(GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.left.bit && 
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.right.bit ){
+				
+				PlayerCube.userData.physics.setAngularVelocity(vector3Aux1.setValue(0,0,0));
+				
+				//prepare binary data
+				var buffer = getBinaryToSend([changeAngularVelocity],[0,0,0])
+		
+				//send binary data
+				socket.emit('I',buffer);
+			};  
 }
 
 
