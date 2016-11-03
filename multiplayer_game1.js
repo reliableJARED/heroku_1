@@ -11,7 +11,7 @@ var PlayerCube;
 
 
 /**** Player specific vars that shouldn't be global **********/
-const MovementSpeed = 10;
+const MovementSpeed = 15;
 const LiftSpeed = 15;
 const shotFireForce = 500;
 const RotationSpeed = .5;
@@ -67,13 +67,11 @@ var socket = io();
 
 		
 		socket.on('connect',function(msg){
-			connection = true;
-		//	console.log(msg);
-			
+			connection = true;			
 		});
 		
 		socket.on('newPlayer',function(msg){
-			//console.log(msg);
+
 		   //don't build player if server is talking about you!
 		   var NewID = Object.keys(msg)[0];
 		   
@@ -88,17 +86,18 @@ var socket = io();
 		   });
 		
 		socket.on('playerID',function(msg){
-			console.log(msg);
 			//server assigned uniqueID
 			UNIQUE_ID = msg;
 			socket.emit('getMyObj','get');
 		});
 
+		
 		socket.on('yourObj',function(msg){
-		  	console.log(msg);
+			//Server assigning you to a rigidBody
 			PlayerCube = rigidBodiesLookUp[msg];
-			console.log(PlayerCube)
-			PlayerCube.userData.physics.setActivationState(4);//ALLWAYS ACTIVEATE
+			
+			//PlayerCube is ALLWAYS ACTIVEATE
+			PlayerCube.userData.physics.setActivationState(4);
 			
 			//assign your player to the physics synchronizer
 			synchronizer.assignPlayer(rigidBodiesLookUp[msg]);
@@ -108,12 +107,9 @@ var socket = io();
 		});		
 		
 		socket.on('setup', function(msg){
-			console.log(msg);
-
 			//msg is an object with an array of JSON with each root key the ID of an object
 			if(newPlayer){
 				var timeStamp = Object.keys(msg)[0];
-			  //  console.log(Date.now()- timeStamp )
 				//sync clocks
 				clock = new GameClock(timeStamp);
 				synchronizer.linkGameClock(clock);
@@ -128,7 +124,7 @@ var socket = io();
 						}					
 					};
 					
-				newPlayer = false;//prevent rebuild to 'setup' msg intended for new players
+				newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
 			};
 			
 		});
@@ -141,7 +137,7 @@ var socket = io();
 			//this will be our key to understanding the data array in from the server during
 			//the game
 			synchronizer.DefineDataStructure(instructions);
-		})
+		});
 		
 		socket.on('QC', function(){
 			//this is sent ahead of a server synce update 'U' message.  It tells clients to take grab a world state to be used to compare to the servers update.  The reason to do this is TIME DELAY.  A server notification will always be from the past.  So synchronizer is checking that local and server past framse are OK.
@@ -177,13 +173,17 @@ var socket = io();
 			//console.log(msg);
 			//msg is an ID for an object
 			//remove it
+			try{
 			scene.remove( rigidBodiesLookUp[msg] )
 			physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
 			delete rigidBodiesLookUp[msg];
+			}
+			catch(err){console.log(err)}
 		});
 		
 		//**** PLAYER INPUT HANDLER
 		socket.on('I',function(msg){
+			try{
 			//ID is a players ID
 			var ID = Object.keys(msg)[0];
 			
@@ -209,7 +209,8 @@ var socket = io();
 			else{
 				ApplyMovementToAPlayer(player,header[0],dataArray)
 			};
-			;
+			}
+			catch(err){console.log(err)}
 			
 		});
 
@@ -499,14 +500,18 @@ function moveBackward() {
 	 //adjuster depending on if z should be pos or neg
 	 var Zsign;
 
-	/*determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
+	/*determine what direction our player is facing and the correction neg/pos for applied movementForce*/	  
 	if( quat < 0.75  || quat < -0.75 ){Zsign=-1}
 	else {Zsign=1}
 	
 	//apply Z thrust direction sign correction
 	thrust.z *= Zsign
+	
+	//keep the Y portion of the velocity what it currently is
+	//keep y velocity what it currently is
+	var Y = PlayerCube.userData.physics.getLinearVelocity().y();
 
-	var buffer = getBinaryToSend([changeLinearVelocity],[-thrust.x,0,thrust.z]);
+	var buffer = getBinaryToSend([changeLinearVelocity],[-thrust.x,Y,thrust.z]);
 	
 	//binary mode
 	socket.emit('I',buffer);
@@ -524,7 +529,7 @@ function moveLeft() {
 function moveRight() {
 	
 		var buffer = getBinaryToSend([changeAngularVelocity],[0,-RotationSpeed,0]);	
-			
+				
 		//binary mode
 		socket.emit('I',buffer);
 };
@@ -568,7 +573,7 @@ function clickShootCube() {
 	 var QUAT = PlayerCube.quaternion._y;
 
 	/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
-	 if( (QUAT > 0.74 && QUAT < 1.0) || (QUAT > -1  && QUAT < -0.74 )  ){Zquad=-1}
+	 if( (QUAT > 0.75 && QUAT < 1.0) || (QUAT > -1  && QUAT < -0.75 )  ){Zquad=-1}
 	else {Zquad=1}
 	
 	thrustZ = thrustZ*Zquad
@@ -608,7 +613,7 @@ function thrust(active){
 	if (active) {
 		 y = LiftSpeed 
 	}else {
-		 y = 0
+		 y = 0;
 	}
 	var z = LV.z();
 	
@@ -670,9 +675,9 @@ function GAMEPAD_left_callback(){
 }
 
 function GAMEPAD_right_callback(){
-
+		
 		//no dpad buttons are down clear angular and linear velocity
-		if(GAMEPAD.rightGUI.bits & 0){
+		if(GAMEPAD.rightGUI.bits === 0){
 			
 			PlayerCube.userData.physics.setLinearVelocity(vector3Aux1.setValue(0,0,0));
 			PlayerCube.userData.physics.setAngularVelocity(vector3Aux1.setValue(0,0,0));
@@ -683,6 +688,7 @@ function GAMEPAD_right_callback(){
 			//send binary data
 			socket.emit('I',buffer);
 		}
+		
 		//If no movment buttons are down, set linear velocity to 0
 		else if(GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.up.bit && 
 		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.upRight.bit &&

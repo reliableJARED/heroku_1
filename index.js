@@ -793,11 +793,6 @@ io.on('connection', function(socket){
 	});
 	
 });
-/*******  TEST  */
-var aNumber = 123;
-var anObj = new Object();
-anObj[aNumber] = 'test';
-console.log(anObj)
 
 //serve HTML to initial get request
 app.get('/', function(request, response){
