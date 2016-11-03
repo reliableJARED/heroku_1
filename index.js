@@ -29,8 +29,8 @@ var gravityConstant = -9.8
 var rigidBodies =  new Array();
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
-const updateFrequency = 1;//Seconds	
-const HEADER_PROPERTY_PER_OBJECT = 8; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
+const updateFrequency = 3;//Seconds	
+const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 					
 GameClock = function () {
 	this.startTime = Date.now();
@@ -143,20 +143,25 @@ function createObjects() {
 		AddToRigidBodiesIndex(ground);
 		
 		//create a tower
-		createCubeTower();
+		for (var i = 0; i<10; i++) {
+			createCubeTower();
+		}
 }
 
 
 function createCubeTower(height,width,depth){
+	/*TODO:
+	set mass to 0 and you'll see the logic is WRONG
+	FIX IT
+	*/
 	//defaults if no args passed for the TOWER, not the blocks
 	var height = height || 10;
 	var width = width || 2;
 	var depth = depth || 2;
 	
 	//create random location for our tower, near other blocks
-	var randX =  Math.floor(Math.random() * 20);
-	var randZ =  Math.floor(Math.random() * 20) - 10;
-	randX = randX - 110;//used to place it near the center of the world
+	var randX =  Math.floor(Math.random() * 200);
+	var randZ =  Math.floor(Math.random() * 200) - 100;
 	
 	var pos =  new Ammo.btVector3(randX,1,randZ);
 	
@@ -166,7 +171,7 @@ function createCubeTower(height,width,depth){
 			h : 2,
 			d : 2,
 			shape:'box',
-			color: "rgb(0%, 0%, 100%)",// blue color
+			color: Math.random() * 0xffffff, //random
 			x: 0,
 			y: 0,
 			z: 0,
@@ -185,7 +190,7 @@ function createCubeTower(height,width,depth){
 		for (var w=0;w<width;w++) {
 		
 			for(var d =0; d<depth;d++){
-			   console.log("195:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
+		//	   console.log("195:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
 				ObjBlueprint.x = pos.x();
 				ObjBlueprint.y = pos.y();
 				ObjBlueprint.z = pos.z();
@@ -217,7 +222,7 @@ function createCubeTower(height,width,depth){
 		pos = new Ammo.btVector3(randX,1,randZ)
 			
 		//Start our new layer by moving up the height of our cubes
-		pos.setY(1+(ObjBlueprint.y*h)+pos.y())
+		pos.setY(2+ObjBlueprint.y)
 		ObjBlueprint.x = pos.x();
 		ObjBlueprint.y = pos.y();
 		ObjBlueprint.z = pos.z();
@@ -348,7 +353,6 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 
 function emitWorldUpdate() {
 		
-		var propsPerObj = HEADER_PROPERTY_PER_OBJECT;
 		var objectCount = 0;
 		var dataToSend = new Array();
 		
@@ -363,12 +367,15 @@ function emitWorldUpdate() {
 			var obj = rigidBodies[ i ];
 			var ms =  obj.getMotionState();
 	  
-
 			if ( ms ) {
+
+				//get the angularvelocity of the object
+				var Av = obj.getAngularVelocity();				
+				
+				if (Av.length() > .001) {
 				
 				//assign obj's ID to it's starting index position
-				dataToSend[objectCount*propsPerObj] = obj.ptr;
-				
+				dataToSend[objectCount*PROPERTY_PER_OBJECT] = obj.ptr;
 				
 				//Bullet calls getWorldTransform with a reference to the variable it wants you to fill with transform information
 				ms.getWorldTransform( transformAux1 );//note: transformAux1 =  Ammo.btTransform();
@@ -376,52 +383,44 @@ function emitWorldUpdate() {
 				//get the physical location of our object
 				var p = transformAux1.getOrigin();
 				//assign position info to it's proper index location relative to objs data start point
-				dataToSend[(objectCount*propsPerObj)+1] = p.x();
-				dataToSend[(objectCount*propsPerObj)+2] = p.y();
-				dataToSend[(objectCount*propsPerObj)+3] = p.z();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+1] = p.x();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+2] = p.y();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+3] = p.z();
 				
 
 				//get the physical orientation of our object
 				var q = transformAux1.getRotation();
 				//assign orientation info to it's proper index location relative to objs data start point
-				dataToSend[(objectCount*propsPerObj)+4] = q.x();
-				dataToSend[(objectCount*propsPerObj)+5] = q.y();
-				dataToSend[(objectCount*propsPerObj)+6] = q.z();
-				dataToSend[(objectCount*propsPerObj)+7] = q.w();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+4] = q.x();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+5] = q.y();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+6] = q.z();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+7] = q.w();
 
-				/**********************************************************************/
-				/* NOT SENDING Angular or Linear velocity right now */
-				//get the angularvelocity of the object
-				//var Av = obj.getAngularVelocity();
-				//Av.x()
-				//Av.y()
-				//Av.z()
+				//get the angular velocity of the object
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+8] = Av.x();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+9] = Av.y();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+10] = Av.z();
 
 				//get the linearvelocity of the object
-				//var Lv = obj.getLinearVelocity();
-				//Lv.x()
-				//Lv.y()
-				//Lv.z()	
-				/**********************************************************************/				
+				var Lv = obj.getLinearVelocity();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+11] = Lv.x();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+12] = Lv.y();
+				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+13] = Lv.z();
+				/**********************************************************************/		
+						
 				objectCount++;
-				
+				}
 			}
 	};
 	
-	//we need: 8 Float32(4 bytes) PER Object.  dataToSend.length x 4 gives total bytes needed
-	//var byteCount = dataToSend.length *4;
-	
-	//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
-	//var buffer = new ArrayBuffer(byteCount);
+	//we need: PROPERTY_PER_OBJECT number of Float32(4 bytes) PER Object,  dataToSend.length x 4 gives total bytes needed
 
-	//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray#Syntax
 	//put a header in first index to indicate how many props per object are being sent
-	dataToSend.unshift(propsPerObj);
+	dataToSend.unshift(PROPERTY_PER_OBJECT);
 	
 	//set the data as Float32
 	var binaryData = new Float32Array(dataToSend);
-
-
+	
 	//create a data buffer of the underlying array
 	var buff = Buffer.from(binaryData.buffer)
 

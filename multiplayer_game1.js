@@ -11,13 +11,11 @@ var PlayerCube;
 
 
 /**** Player specific vars that shouldn't be global **********/
-const movementSpeed = 2;
-const thrustForce = 5;
+const MovementSpeed = 10;
+const LiftSpeed = 15;
 const shotFireForce = 500;
-const TopSpeed = 25;
-const RotationForce = 3;
-const BrakeVelocity = .95;
-const BrakeRotation = .95;
+const RotationSpeed = .5;
+
 //add rate of fire, health, items, etc.
 /**********************************************************/
 
@@ -42,7 +40,7 @@ const MovementForce = 1;//sets the movement force from dpad
 
 
 //Input Controller
-var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50}});
+var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50,callback:GAMEPAD_right_callback}});
 
 //create the synchronizer to merge local and server side physics
 var synchronizer; 
@@ -209,7 +207,7 @@ var socket = io();
 			
 			//Movement
 			else{
-				MovementInput(player,header[0],dataArray)
+				ApplyMovementToAPlayer(player,header[0],dataArray)
 			};
 			;
 			
@@ -421,7 +419,7 @@ function createBullet(type,data){
 }
 
 
-function MovementInput(PlayerObject,type,data){
+function ApplyMovementToAPlayer(PlayerObject,type,data){
 	
 	//set the object to active so that updates take effect
 	PlayerObject.setActivationState(1);
@@ -472,12 +470,12 @@ function MovementInput(PlayerObject,type,data){
 
 function LinearVelocityCalculator(RotationAngle){
 	//RotationAngle is the angle of rotation about the Y axis.
-	 var Z = TopSpeed* Math.cos(RotationAngle);
-	 var X = TopSpeed* Math.sin(RotationAngle);
+	 var Z = MovementSpeed* Math.cos(RotationAngle);
+	 var X = MovementSpeed* Math.sin(RotationAngle);
 	 /*
-					 /| 
-					/ | 
-	rotationAngle /___|
+					    /| 
+					   / | 
+	rotationAngle /__|
 	recall "SOHCAHTOA"? we are calculating Adjacent ( var X) and Opposite (var Z)
 	When we apply a linear velocity (X,0,Z) to our object the result will be travel along the hypotenuse
 	 */
@@ -485,12 +483,15 @@ function LinearVelocityCalculator(RotationAngle){
 	 return {x:X,z:Z};
 }
 
-function moveBackward(bit) {
+function moveBackward() {
 	
-	//returns a 1 to -1 rotation value around Y axis
+	//returns a 1 to -1 rotation eular angle around Y axis
 	//Counter Clockwise 0 to 1
 	//Clockwise 0 to -1
-	var yRot =  PlayerCube.userData.physics.getWorldTransform().getRotation().y();
+	var yRot = PlayerCube.rotation._y
+	
+	//quat is a pi to -pi rotation angle
+	var quat =  PlayerCube.userData.physics.getWorldTransform().getRotation().y();
 	
 	//returns what our X and Z linear velocity components should be
 	var thrust = LinearVelocityCalculator(yRot);
@@ -499,192 +500,64 @@ function moveBackward(bit) {
 	 var Zsign;
 
 	/*determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
-	if( yRot < 0.5  || yRot < -0.5 ){Zsign=-1}
+	if( quat < 0.75  || quat < -0.75 ){Zsign=-1}
 	else {Zsign=1}
 	
 	//apply Z thrust direction sign correction
 	thrust.z *= Zsign
 
-	var buffer = new ArrayBuffer(16);
+	var buffer = getBinaryToSend([changeLinearVelocity],[-thrust.x,0,thrust.z]);
 	
-	var vectorBinary = new Float32Array(buffer,4);
-	vectorBinary[0] = thrust.x;
-	vectorBinary[1] = 0;// this is a waste... but server expects [0,1,2]
-	vectorBinary[2] = thrust.z;
-	
-	//only coding FIRST TWO bytes
-	var headerBytes   = new Uint8Array(buffer,0,4);
-	headerBytes[0] = changeLinearVelocity;//type of action
-	headerBytes[1] = bit;//represents button being pressed
-	headerBytes[2] = 0;//empty for now
-	headerBytes[3] = 0;//empty for now
-		
-		
 	//binary mode
 	socket.emit('I',buffer);
 	
 }
 
-function moveLeft(bit) {
+function moveLeft() {
 		
-	var P = PlayerCube.userData.physics;
-	var Pv = P.getAngularVelocity().y();
-	var RF = RotationForce;
-	
-	//check MAX rotation 
-	if(Pv > 1){return}
-	else{
-		//boost is used to add an exponentially powerful reverse rotation so that if player can change direction more quickly
-		var boost;
-		
-		if(Pv<0){
-				boost = Math.abs(RF*Pv );
-			}else{boost = 1};
-		
-		//Rotate
-		var rot = RF + (boost*boost);
-		
-		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
-		//vector3Aux1.setValue(0,rot,0);
-		//P.applyTorque(vector3Aux1);
-		*/
-		//SEND TO SERVER you want to apply a torque
-		//socket.emit('AT',{x:0, y:rot ,z:0});
-	//need 2 bytes to encode u,d,l,r, etc.
-	//need 12 bytes for the 3 float32 (4bytes each) x,y,z data
-	//total is 16 because of offset, have dead space from byte 3 to 4, could
-	//encode for Right or Left controler there
-		var buffer = new ArrayBuffer(16);
-		var vectorBinary   = new Float32Array(buffer,4);
-		vectorBinary[0] = 0;
-		vectorBinary[1] = rot;
-		vectorBinary[2] = 0;
-	
-		//only coding FIRST TWO bytes
-		var headerBytes   = new Uint8Array(buffer,0,4);
-		headerBytes[0] = applyTorque;//type of action
-		headerBytes[1] = bit;//represents button being pressed
-		headerBytes[2] = 0;//empty for now
-		headerBytes[3] = 0;//empty for now
-		
+		var buffer = getBinaryToSend([changeAngularVelocity],[0,RotationSpeed,0]);	
+			
 		//binary mode
 		socket.emit('I',buffer);
-	};	
 };
 
-function moveRight(bit) {
+function moveRight() {
 	
-	var P = PlayerCube.userData.physics;
-	var Pv = P.getAngularVelocity().y();
-	var RF = RotationForce;
-	
-	//check MAX rotation 
-	if(Pv < -1){return}
-	else{
-		//boost is used to add an exponentially powerful reverse rotation so that if player can change direction more quickly
-		var boost;
-		if(Pv>0){
-					boost = Math.abs(RF*Pv );
-			}else{boost = 1};
-		//Rotate
-		var rot = (RF + (boost*boost)) * -1;
-		
-		/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
-		vector3Aux1.setValue(0,rot,0);
-		P.applyTorque(vector3Aux1);
-		*/
-		
-		
-		//SEND TO SERVER you want to apply a torque
-	//	socket.emit('AT',{x:0, y:rot ,z:0});
-		//need 2 bytes to encode u,d,l,r, etc.
-	//need 12 bytes for the 3 float32 (4bytes each) x,y,z data
-	//total is 16 because of offset, have dead space from byte 3 to 4, could
-	//encode for Right or Left controler there
-		var buffer = new ArrayBuffer(16);
-	
-		var vectorBinary   = new Float32Array(buffer,4);
-		vectorBinary[0] = 0;
-		vectorBinary[1] = rot;
-		vectorBinary[2] = 0;
-
-		//only coding FIRST TWO bytes
-		var headerBytes   = new Uint8Array(buffer,0,4);
-		headerBytes[0] = applyTorque;//type of action
-		headerBytes[1] = bit;//represents button being pressed
-		headerBytes[2] = 0;//empty for now
-		headerBytes[3] = 0;//empty for now
-		
+		var buffer = getBinaryToSend([changeAngularVelocity],[0,-RotationSpeed,0]);	
+			
 		//binary mode
 		socket.emit('I',buffer);
-	};	
-}
+};
 
+function moveForward() {
+	
+	var quat =  PlayerCube.userData.physics.getWorldTransform().getRotation().y();
+	var yRot = PlayerCube.rotation._y
+	
+	//returns what our X and Z linear velocity components should be
+	var thrust = LinearVelocityCalculator(yRot);
+	
+	 //adjuster depending on if z should be pos or neg
+	 var Zsign;
 
-function moveForward(bit) {
+	/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
+	 if( (quat > 0.75 && quat < 1.0) || (quat > -1  && quat < -0.75 )  ){Zsign=-1}
+	 else {Zsign=1}
 	
-	//This function is called from the dpad on the RIGHT gui for the gamepad
+	thrust.z *= Zsign;
 	
-	//check MAX Speed 
-	if(TopSpeed < PlayerCube.userData.physics.getLinearVelocity().length())return;
-	console.log(PlayerCube.userData.physics.getLinearVelocity().x(),PlayerCube.userData.physics.getLinearVelocity().z())
-	 var yRot =PlayerCube.rotation._y
-	 var thrustZ = movementSpeed* Math.cos(yRot);
-	 var thrustX = movementSpeed* Math.sin(yRot);
-				   
-				   //used to determine if thrust in the x or z should be pos or neg
-	var Zquad ;
-
-	var QUAT = PlayerCube.quaternion._y;
-
-				/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
-	 if( (QUAT > 0.75 && QUAT < 1.0) || (QUAT > -1  && QUAT < -0.75 )  ){Zquad=-1}
-				 else {Zquad=1}
+	//keep y velocity what it currently is
+	var Y = PlayerCube.userData.physics.getLinearVelocity().y();
 	
-	thrustZ = thrustZ*Zquad;
+	var buffer = getBinaryToSend([changeLinearVelocity],[thrust.x,Y,thrust.z]);	
 	
-	/**** COMMENTED BELLOW MEANS YOU ONLY MOVE WHEN SERVER TELLS YOU
-	vector3Aux1.setValue(thrustX,0,thrustZ);
-	PlayerCube.userData.physics.applyCentralImpulse(vector3Aux1);
-	*/
-	console.log(PlayerCube.userData.physics.getLinearVelocity().x(),PlayerCube.userData.physics.getLinearVelocity().z())
-	//SEND TO SERVER you want to apply a central impulse
-
-//	socket.emit('ACI',{x:thrustX,y:0 ,z:thrustZ});
-	
-	//need 2 bytes to encode u,d,l,r, etc.
-	//need 12 bytes for the 3 float32 (4bytes each) x,y,z data
-	//total is 16 because of offset, have dead space from byte 3 to 4, could
-	//encode for Right or Left controler there
-	var buffer = new ArrayBuffer(16);
-	
-	//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
-	//create a dataview so we can manipulate our arraybuffer
-	//ONLY for the xyz, that's why there is an offset
-	var vectorBinary   = new Float32Array(buffer,4);
-	vectorBinary[0] = thrustX;
-	vectorBinary[1] = 0;
-	vectorBinary[2] = thrustZ;
-	
-	//only coding FIRST TWO bytes
-	var headerBytes   = new Uint8Array(buffer,0,4);
-	headerBytes[0] = applyCentralImpulse;//type of action
-	headerBytes[1] = bit;//represents button being pressed
-	headerBytes[2] = 0;//empty for now
-	headerBytes[3] = 0;//empty for now
-		
 	//binary mode
 	socket.emit('I',buffer);
 	
-}
+};
 
+function clickShootCube() {
 
-
-function clickShootCube(bit) {
-	
-	/*TODO: Convert this to the binary, not JSON protocol */
-	
-//	console.log('shot')
 	 var pos = PlayerCube.position;
 	 var yRot = PlayerCube.rotation._y
 	 var thrustZ = shotFireForce* Math.cos(yRot);
@@ -718,54 +591,41 @@ function clickShootCube(bit) {
 		//only coding FIRST TWO bytes
 		var headerBytes   = new Uint8Array(buffer,0,4);
 		headerBytes[0] = fireBullet;//type of action
-		headerBytes[1] = bit;//represents button being pressed
+		headerBytes[1] = 0;//empty for now
 		headerBytes[2] = 0;//empty for now
 		headerBytes[3] = 0;//empty for now
 		
 		//ONLY server approves instance of a shot right now.  see handler for 'shot' inbound msg from server.
 		//binary mode
 		socket.emit('I',buffer);
-}
+};
 
-function thrustON(bit){
+function thrust(active){
+	var LV = PlayerCube.userData.physics.getLinearVelocity();
 	
-
-	vector3Aux1.setValue(0,thrustForce,0);
-	PlayerCube.userData.physics.applyCentralImpulse(vector3Aux1);	
+	var x = LV.x();
+	var y;
+	if (active) {
+		 y = LiftSpeed 
+	}else {
+		 y = 0
+	}
+	var z = LV.z();
 	
-	//SEND TO SERVER you want to apply a central impulse
-	//socket.emit('ACI',{x:0,y:thrustForce ,z:0});
-	//need 2 bytes to encode u,d,l,r, etc.
-	//need 12 bytes for the 3 float32 (4bytes each) x,y,z data
-	//total is 16 because of offset, have dead space from byte 3 to 4, could
-	//encode for Right or Left controler there
-	var buffer = new ArrayBuffer(16);
-	
-	//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
-	//create a dataview so we can manipulate our arraybuffer
-	//ONLY for the xyz, that's why there is an offset
-	var vectorBinary   = new Float32Array(buffer,4);
-	vectorBinary[0] = 0;
-	vectorBinary[1] = thrustForce;
-	vectorBinary[2] = 0;
-	
-	//only coding FIRST FOUR bytes
-	var buttonBit   = new Uint8Array(buffer,0,4);
-	buttonBit[0] = applyCentralImpulse;//type of action, this case applyCentralImpulse()
-	buttonBit[1] = bit;//represents button being pressed
+	var buffer = getBinaryToSend([changeLinearVelocity],[x,y,z]);	
+			
 	//binary mode
 	socket.emit('I',buffer);
 };
 
-
-
 function getBinaryToSend(headerArray,dataArray){
 	
 	//prepare binary data to be sent to server
-	var buffer = new ArrayBuffer(dataArray.length + 4);
+	//dataArray will be 4byte float32 and header will be 4 Uint8
+	var buffer = new ArrayBuffer((dataArray.length*4) + 4);
 	
 	//The float data
-	var vectorBinary   = new Float32Array(buffer,4);
+	var vectorBinary  = new Float32Array(buffer,4);
 	for(var i=0; i<dataArray.length; i++){
 		
 		vectorBinary[i] = dataArray[i];
@@ -777,6 +637,7 @@ function getBinaryToSend(headerArray,dataArray){
 		
 		headerBinary[i] = headerArray[i];
 	}
+	
 	return buffer;
 }
 
@@ -788,32 +649,27 @@ function getBinaryToSend(headerArray,dataArray){
 //button1, button2
 		
 function GAMEPADpolling() {
-		//turning and moving needs to be based on Polling.  we have to keep updating our rotation angle, to adjust
-		//the direction we are moving.
-	   if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.upRight.bit ||
-		  GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.upLeft.bit ){
-				moveForward(GAMEPAD.rightGUI.up.bit)};
-				
-	   if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.downRight.bit ||
-	      GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.downLeft.bit ){
-				moveBackward(GAMEPAD.rightGUI.down.bit)};
-				
+	   //dpad button names:
+		//'upLeft','up','upRight','left','center','right','downLeft','down','downRight'
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.up.bit ){moveForward()}
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.down.bit){moveBackward()};
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.left.bit){moveLeft()};
+		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.right.bit){moveRight()}; 
+		
 		//thrust on
-	   if(GAMEPAD.leftGUI.bits & GAMEPAD.leftGUI.button1.bit ){thrustON(GAMEPAD.leftGUI.button1.bit)}
+	   if(GAMEPAD.leftGUI.bits & GAMEPAD.leftGUI.button1.bit ){thrust(true)}
+
 }
 
 function GAMEPAD_left_callback(){
 	    //shoot a cube	
-		if(GAMEPAD.leftGUI.bits & GAMEPAD.leftGUI.button2.bit ){clickShootCube(GAMEPAD.leftGUI.button2.bit)}
+		if(GAMEPAD.leftGUI.bits & GAMEPAD.leftGUI.button2.bit ){clickShootCube()}
+		
+		//thrust on
+	   if(GAMEPAD.leftGUI.bits ^ GAMEPAD.leftGUI.button1.bit ){thrust(false);}
 }
 
 function GAMEPAD_right_callback(){
-		//dpad button names:
-		//'upLeft','up','upRight','left','center','right','downLeft','down','downRight'
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.up.bit ){moveForward(GAMEPAD.rightGUI.up.bit)}
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.down.bit){moveBackward(GAMEPAD.rightGUI.down.bit)};
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.left.bit){moveLeft(GAMEPAD.rightGUI.left.bit)};
-		if(GAMEPAD.rightGUI.bits & GAMEPAD.rightGUI.right.bit){moveRight(GAMEPAD.rightGUI.right.bit)}; 
 
 		//no dpad buttons are down clear angular and linear velocity
 		if(GAMEPAD.rightGUI.bits & 0){
@@ -1154,9 +1010,9 @@ ServerPhysicsSync.prototype.GetLocalWorldState = function(){
 			if ( ms ) {
 			
 				//get the location and orientation of our object
-				ms.getWorldTransform( transformAux1 );
-				var p = transformAux1.getOrigin();
-				var q = transformAux1.getRotation();
+				ms.getWorldTransform( this.transformAux1 );
+				var p = this.transformAux1.getOrigin();
+				var q = this.transformAux1.getRotation();
 		
 				//update our comparisons
 				this.ObjectsData[id] = new Array();
@@ -1182,43 +1038,68 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 		 for(var i=0;i<this.ServerUpdates.length; i+= this.propsPerObject){
 			 
 			var id = 'id'+this.ServerUpdates[i].toString();
-			var objectPhysics = this.ObjectsData[id];
 			
-			  /* 	** 	RUN A DIVERGENCE CHECK ON POSITION** */
+			/*if (id === PlayerCube.userData.id) {
+				console.log('player:',this.ObjectsData[id]);
+				console.log('server:',this.ServerUpdates[i],
+				this.ServerUpdates[i+1],
+				this.ServerUpdates[i+2],
+				this.ServerUpdates[i+3],
+				this.ServerUpdates[i+4],
+				this.ServerUpdates[i+5],
+				this.ServerUpdates[i+6],
+				this.ServerUpdates[i+7],
+				this.ServerUpdates[i+8],
+				this.ServerUpdates[i+9],
+				this.ServerUpdates[i+10],
+				this.ServerUpdates[i+11],
+				this.ServerUpdates[i+12],
+				this.ServerUpdates[i+13]);
+				}
+
+			var objectPhysics = this.ObjectsData[id];*/
+			
 			try{
-				if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[0]) > this.divergenceThreshold ||
-					Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[1]) > this.divergenceThreshold ||
-					Math.abs(this.ServerUpdates[i+this.z] -objectPhysics[2]) > this.divergenceThreshold ){
-		//				console.log('out of sync',id)
+			/*	if(   Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[0]) > this.divergenceThreshold ||
+				   	Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[1]) > this.divergenceThreshold ||
+				   	Math.abs(this.ServerUpdates[i+this.z] -objectPhysics[2]) > this.divergenceThreshold ){
+		      
+		      	//replace everything locally with what the server says						
+						
 						var objPhys = this.rigidBodiesLookUp[id].userData.physics;
 					
 						//vector for position update
 						this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
+						
 						//apply to transform
 						this.transformAux1.setOrigin(this.vector3Aux1);
-				
-						/*currently ONLY APPLY ROTATION CORRECTION FOR NON PLAYER*/
-						//reason has to do with steering the player, may be able to skip this
-						if(this.PlayerCube.userData.id === id){
-							//current orientation
-							var quat = objPhys.getWorldTransform().getRotation();
-							//sets the quaternion based on players LOCAL physics
-							this.quaternionAux1.setValue(quat.x(),quat.y(),quat.z(),quat.w());
-						}else{
-							//sets the quaternion based on objects SEVER physics
-							this.quaternionAux1.setValue(this.ServerUpdates[i+this.Rx],this.ServerUpdates[i+this.Ry],this.ServerUpdates[i+this.Rz],this.ServerUpdates[i+this.Rw]);
-						};
-	
-						//build update
+					
+						//sets the quaternion based on objects SEVER physics
+						this.quaternionAux1.setValue(this.ServerUpdates[i+this.Rx],this.ServerUpdates[i+this.Ry],this.ServerUpdates[i+this.Rz],this.ServerUpdates[i+this.Rw]);	
+				   	//this.quaternionAux1.setEulerZYX(this.ServerUpdates[i+this.Rz],this.ServerUpdates[i+this.Ry],this.ServerUpdates[i+this.Rx]);	
+
+						//apply to transform
 						this.transformAux1.setRotation(this.quaternionAux1);
-						
-						//apply update
+													
+						//apply position rotation update
 						objPhys.setWorldTransform(this.transformAux1);
 					
-					}
+						//vector for angular velocity
+						this.vector3Aux1.setValue(this.ServerUpdates[i+this.AVx],this.ServerUpdates[i+this.AVy],this.ServerUpdates[i+this.AVz])						
+						
+						//apply angular velocity
+						objPhys.setAngularVelocity(this.vector3Aux1);
+						
+						//vector for linear velocity
+						this.vector3Aux1.setValue(this.ServerUpdates[i+this.LVx],this.ServerUpdates[i+this.LVy],this.ServerUpdates[i+this.LVz])
+						
+						//apply angular velocity
+						objPhys.setLinearVelocity(this.vector3Aux1);		
+				
+					}// IF statment closeure
 
 
-			}catch(err){console.log(err)}		  
+			*/}catch(err){console.log(err)}		  
 			
 		 };
 		
