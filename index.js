@@ -29,7 +29,7 @@ var gravityConstant = -9.8
 var rigidBodies =  new Array();
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
-const updateFrequency = 3;//Seconds	
+const updateFrequency = .5;//Seconds	
 const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 					
 GameClock = function () {
@@ -171,7 +171,7 @@ function createCubeTower(height,width,depth){
 			h : 2,
 			d : 2,
 			shape:'box',
-			color: Math.random() * 0xffffff, //random
+			color: Math.random() * 0x0000ff, //random blues
 			x: 0,
 			y: 0,
 			z: 0,
@@ -346,8 +346,8 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 		process.nextTick(function (){emitWorldUpdate()} );
 	}
 	
-	//loop our physics at about 30fps
-	setTimeout( TickPhysics, 33);//milisecond callback timer
+	//loop our physics at about X fps
+	setTimeout( TickPhysics, 20);//milisecond callback timer
 };
 
 

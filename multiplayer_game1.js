@@ -154,7 +154,7 @@ var socket = io();
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
 		   //console.log(msg.data.byteLength)
 			var dataArray = new Float32Array(msg.data);
-		//	console.log(dataArray.buffer.byteLength)
+			//console.log(msg.data.byteLength)
 			//after msg.data is loaded in to a typed array, pass to synchronizer
 			synchronizer.queUpdates({time:msg.time,data:dataArray})
 
@@ -940,7 +940,13 @@ ServerPhysicsSync = function (physicsWorld,rigidBodiesLookUp) {
 	this.Ry = 5;//prop 6
 	this.Rz = 6;//prop 7
 	this.Rw = 7;//prop 8
-	this.propsPerObject = 8; // 8 props default, server sends this each time
+	this.AVx = 8;
+	this.AVy = 9;
+	this.AVz = 10;
+	this.LVx = 11;
+	this.LVy = 12;
+	this.LVz = 13;
+	this.propsPerObject = 14; // 8 props default, server sends this each time
 	this.byteBase = 4; //32bit float from Float32Array()
 	this.bytesPerObject = this.byteBase * this.propsPerObject; // 8 props, 4 bytes per prop: 8x4 = 32
 };
@@ -1038,33 +1044,17 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 		 for(var i=0;i<this.ServerUpdates.length; i+= this.propsPerObject){
 			 
 			var id = 'id'+this.ServerUpdates[i].toString();
-			
-			/*if (id === PlayerCube.userData.id) {
-				console.log('player:',this.ObjectsData[id]);
-				console.log('server:',this.ServerUpdates[i],
-				this.ServerUpdates[i+1],
-				this.ServerUpdates[i+2],
-				this.ServerUpdates[i+3],
-				this.ServerUpdates[i+4],
-				this.ServerUpdates[i+5],
-				this.ServerUpdates[i+6],
-				this.ServerUpdates[i+7],
-				this.ServerUpdates[i+8],
-				this.ServerUpdates[i+9],
-				this.ServerUpdates[i+10],
-				this.ServerUpdates[i+11],
-				this.ServerUpdates[i+12],
-				this.ServerUpdates[i+13]);
-				}
 
-			var objectPhysics = this.ObjectsData[id];*/
+			var objectPhysics = this.ObjectsData[id];
 			
+			
+			/* 	** 	RUN A DIVERGENCE CHECK ON POSITION** */
 			try{
-			/*	if(   Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[0]) > this.divergenceThreshold ||
-				   	Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[1]) > this.divergenceThreshold ||
-				   	Math.abs(this.ServerUpdates[i+this.z] -objectPhysics[2]) > this.divergenceThreshold ){
+			 if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[0]) > this.divergenceThreshold ||
+					Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[1]) > this.divergenceThreshold ||
+					Math.abs(this.ServerUpdates[i+this.z] -objectPhysics[2]) > this.divergenceThreshold ){
 		      
-		      	//replace everything locally with what the server says						
+		      	//DIVERGENCE check failed! replace everything locally with what the server says						
 						
 						var objPhys = this.rigidBodiesLookUp[id].userData.physics;
 					
@@ -1088,18 +1078,15 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 						this.vector3Aux1.setValue(this.ServerUpdates[i+this.AVx],this.ServerUpdates[i+this.AVy],this.ServerUpdates[i+this.AVz])						
 						
 						//apply angular velocity
-						objPhys.setAngularVelocity(this.vector3Aux1);
+						//objPhys.setAngularVelocity(this.vector3Aux1);
 						
 						//vector for linear velocity
 						this.vector3Aux1.setValue(this.ServerUpdates[i+this.LVx],this.ServerUpdates[i+this.LVy],this.ServerUpdates[i+this.LVz])
 						
-						//apply angular velocity
+						//apply linear velocity
 						objPhys.setLinearVelocity(this.vector3Aux1);		
-				
-					}// IF statment closeure
-
-
-			*/}catch(err){console.log(err)}		  
+				}
+			}catch(err){console.log(err)}		  
 			
 		 };
 		
