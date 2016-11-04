@@ -8,7 +8,7 @@ var clock;
 var UNIQUE_ID; //assigned by the server
 var camX =0;var camY = 5; var camZ = -20;//Set the initial perspective for the user
 var PlayerCube;
-
+var PlayerCube_local;
 
 /**** Player specific vars that shouldn't be global **********/
 const MovementSpeed = 15;
@@ -95,6 +95,8 @@ var socket = io();
 		socket.on('yourObj',function(msg){
 			//Server assigning you to a rigidBody
 			PlayerCube = rigidBodiesLookUp[msg];
+			
+			PlayerCube_local = new PlayerObjectConstructor(msg, rigidBodiesLookUp);
 			
 			//PlayerCube is ALLWAYS ACTIVEATE
 			PlayerCube.userData.physics.setActivationState(4);
@@ -474,8 +476,8 @@ function LinearVelocityCalculator(RotationAngle){
 	 var Z = MovementSpeed* Math.cos(RotationAngle);
 	 var X = MovementSpeed* Math.sin(RotationAngle);
 	 /*
-					    /| 
-					   / | 
+					/| 
+				   / | 
 	rotationAngle /__|
 	recall "SOHCAHTOA"? we are calculating Adjacent ( var X) and Opposite (var Z)
 	When we apply a linear velocity (X,0,Z) to our object the result will be travel along the hypotenuse
@@ -486,16 +488,14 @@ function LinearVelocityCalculator(RotationAngle){
 
 function moveBackward() {
 	
-	//returns a 1 to -1 rotation eular angle around Y axis
-	//Counter Clockwise 0 to 1
-	//Clockwise 0 to -1
-	var yRot = PlayerCube.rotation._y
-	
 	//quat is a pi to -pi rotation angle
-	var quat =  PlayerCube.userData.physics.getWorldTransform().getRotation().y();
+	var quat = PlayerCube_local.quanternionY();
+	
+	//headingAngle is a pi/2 to -pi/2 rotation eular angle around Y axis
+	var headingAngle = PlayerCube_local.heading();
 	
 	//returns what our X and Z linear velocity components should be
-	var thrust = LinearVelocityCalculator(yRot);
+	var thrust = LinearVelocityCalculator(headingAngle);
 	
 	 //adjuster depending on if z should be pos or neg
 	 var Zsign;
@@ -508,8 +508,7 @@ function moveBackward() {
 	thrust.z *= Zsign
 	
 	//keep the Y portion of the velocity what it currently is
-	//keep y velocity what it currently is
-	var Y = PlayerCube.userData.physics.getLinearVelocity().y();
+	var Y = PlayerCube_local.LVy();
 
 	var buffer = getBinaryToSend([changeLinearVelocity],[-thrust.x,Y,thrust.z]);
 	
@@ -536,11 +535,12 @@ function moveRight() {
 
 function moveForward() {
 	
-	var quat =  PlayerCube.userData.physics.getWorldTransform().getRotation().y();
-	var yRot = PlayerCube.rotation._y
+	var quat = PlayerCube_local.quanternionY();
 	
+	var headingAngle = PlayerCube_local.heading();
+
 	//returns what our X and Z linear velocity components should be
-	var thrust = LinearVelocityCalculator(yRot);
+	var thrust = LinearVelocityCalculator(headingAngle);
 	
 	 //adjuster depending on if z should be pos or neg
 	 var Zsign;
@@ -552,7 +552,7 @@ function moveForward() {
 	thrust.z *= Zsign;
 	
 	//keep y velocity what it currently is
-	var Y = PlayerCube.userData.physics.getLinearVelocity().y();
+	var Y = PlayerCube_local.LVy();
 	
 	var buffer = getBinaryToSend([changeLinearVelocity],[thrust.x,Y,thrust.z]);	
 	
@@ -564,6 +564,7 @@ function moveForward() {
 function clickShootCube() {
 
 	 var pos = PlayerCube.position;
+	 console.log(pos.x,PlayerCube.userData.physics.getWorldTransform().getOrigin().x())
 	 var yRot = PlayerCube.rotation._y
 	 var thrustZ = shotFireForce* Math.cos(yRot);
 	 var thrustX = shotFireForce* Math.sin(yRot);
@@ -1100,6 +1101,12 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 		this.pendingUpdates = false;	
 };
 
+
+
+
+
+	
+
 //MAIN
 init();// start world building
 
@@ -1112,7 +1119,7 @@ function init() {
 		 synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
 		
 			
-
+		
 		//the DefineDataStructure method isn't actually used as of 10/24/16.  Arg passed
 		//is an object that is supposed to come from the server telling client how to read ALL update data
 		//synchronizer.DefineDataStructure({x:0,y:1,z:2});

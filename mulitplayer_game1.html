@@ -7,6 +7,15 @@ https://github.com/rauchg/chat-example
     <title>Socket.IO Game1</title>
 
   </head>
+  
+  <style>
+	body{
+		margin:0;
+	}
+	#container{
+		position:fixed;
+	}
+	</style>
   <body>
   <!-- NOTE! nodejs is being served locally to test so files have no path, all directory locations are included with node package 'serve-static' -->
 		<script src="three.js"></script>
@@ -14,11 +23,13 @@ https://github.com/rauchg/chat-example
 		<script src="ammo.js"></script>
 		<!-- GAMEPAD GUI -->
 		<script src="ABUDLR.js"></script> 
+		<!-- PLAYER OBJECTS -->
+		<script src="PlayerObjectConstructor.js"></script> 
 		
 		
 	<!-- Now the good stuff -->
   <!-- CONTAINER WILL HOLD OUR CANVAS -->
-		<div id="container" style="position: relative;">
+		<div id="container">
 		</div>
 
 		<script src="multiplayer_game1.js"></script><!-- KEEP AT BOTTOM -->
