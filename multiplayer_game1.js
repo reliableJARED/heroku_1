@@ -39,7 +39,7 @@ var transformAux1 = new Ammo.btTransform();
 var vector3Aux1 = new Ammo.btVector3();
 var quaternionAux1 = new Ammo.btQuaternion();
 var PHYSICS_ON = true;
-const INTERPOLATE_AMT = .7;//sets % to merge with server updates
+const INTERPOLATE_AMT = .6;//sets % to merge with server updates
 
 //Input Controller
 var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50,callback:GAMEPAD_right_callback}});
@@ -183,6 +183,7 @@ var socket = io();
 		
 		//**** PLAYER INPUT HANDLER
 		socket.on('I',function(msg){
+			
 			try{
 			//ID is a players ID
 			var ID = Object.keys(msg)[0];
@@ -191,6 +192,7 @@ var socket = io();
 		   //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
 		   //remaining bytes are for all float32 (4bytes each) that code movement commands
 		   
+			
 			
 			//determine what player object should be used
 			var player = rigidBodiesLookUp[ID];
@@ -307,7 +309,7 @@ function createBox(object,returnObj) {
 		an object.  This way server doesn't need to send a JSON for world
 		building.  Use a 16bit to encode textures, pass array of strings for texture names inside images directory
 		*/
-		var material;//consider passing mat types to flag basic, phong, etc...
+		var material=[];//consider passing mat types to flag basic, phong, etc...
 	
 		var texture = null;
 		
@@ -323,13 +325,27 @@ function createBox(object,returnObj) {
 		if (object.hasOwnProperty('texture') ){ 
 				var textureFile = object.texture;
 			//	console.log(textureFile)
+			
 			    texture = textureLoader.load(textureFile);
 			 
-  /*todo: PASS FLAGS FOR WRAPPING */
+  /*todo: 11/4/16 JMN PASS FLAGS FOR WRAPPING */
 			   //set texture to tile the gound (don't do this if you want it to stretch to fit)			   
 			//	texture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
 			//	texture.repeat.set( 50, 50 );// 20x20 tiles of image
-				material = new THREE.MeshBasicMaterial( { color: color, map:texture} );
+				var mat = new THREE.MeshBasicMaterial( { color: color, map:texture} );
+				var a = new THREE.MeshBasicMaterial( { color: color} );
+				var b = 	new THREE.MeshBasicMaterial( { color: color} );
+				var c = new THREE.MeshBasicMaterial( { color: color} );
+				var d =new THREE.MeshBasicMaterial( { color: color} );
+				var e = new THREE.MeshBasicMaterial( { color: color} );
+				//0 -left
+				//1 - right
+				//2 - top
+				//3 - bottom
+				//4 - front
+				//5 - back
+				material =new THREE.MeshFaceMaterial( [a,b,c,d,mat,e]);
+				
 			}else{
 				material = new THREE.MeshBasicMaterial( { color: color} );
 			}
@@ -396,7 +412,7 @@ function createBoxPhysicsObject (object){
 }
 
 function createBullet(type,data){
-	console.log(type,data)
+	
 	var bulletBlueprint = {
 			id: 'id'+data[11].toString(),
 			w :data[0],
@@ -407,7 +423,7 @@ function createBullet(type,data){
 			x: data[5],
 			y: data[6],
 			z: data[7] ,
-			texture:textures[0],
+		//	texture:textures[0],
 			Rx: 0,
 			Ry: 0,
 			Rz: 0,
@@ -429,6 +445,8 @@ function createBullet(type,data){
 
 
 function ApplyMovementToAPlayer(PlayerObject,type,data){
+	
+	PlayerObject.userData.physics.setActivationState(1);
 	
 	//use bit operators for comparisons to speed things up
 	if(applyCentralImpulse & type ){
@@ -567,7 +585,7 @@ function clickShootCube() {
 	 var QUAT = PlayerCube.quanternionY();
 
 	/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
-	 if( (QUAT > 0.74 && QUAT < 1.0) || (QUAT > -1  && QUAT < -0.74 )  ){
+	 if( (QUAT > 0.74 && QUAT < 1) || (QUAT > -1  && QUAT < -0.75 )  ){
 		 thrust.z *=-1}
 	else {thrust.z*=1}
 	
@@ -592,7 +610,7 @@ function clickShootCube() {
 		headerBytes[2] = 0;//empty for now
 		headerBytes[3] = 0;//empty for now
 		
-		console.log(headerBytes,vectorBinary)
+		
 		//ONLY server approves instance of a shot.  see handler for 'shot' inbound msg from server.
 		//binary mode
 		socket.emit('I',buffer);
@@ -1069,6 +1087,7 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 					
 						//vector for position update
 						this.vector3Aux1.setValue(interpolateX,interpolateY,interpolateZ);
+						//	this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
 						
 						//apply to transform
 						this.transformAux1.setOrigin(this.vector3Aux1);
@@ -1095,7 +1114,9 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 						 interpolateY = objectPhysics[i+this.LVy] +(this.ServerUpdates[i+this.LVy]  - objectPhysics[i+this.LVy])* INTERPOLATE_AMT;						
 						
 						 interpolateZ = objectPhysics[i+this.LVz] +(this.ServerUpdates[i+this.LVz]  - objectPhysics[i+this.LVz])* INTERPOLATE_AMT;
-						this.vector3Aux1.setValue(this.ServerUpdates[i+this.LVx],this.ServerUpdates[i+this.LVy],this.ServerUpdates[i+this.LVz])
+						
+					//	this.vector3Aux1.setValue(this.ServerUpdates[i+this.LVx],this.ServerUpdates[i+this.LVy],this.ServerUpdates[i+this.LVz])
+						this.vector3Aux1.setValue(interpolateX,interpolateY,interpolateZ);
 						
 						//apply linear velocity
 						objPhys.setLinearVelocity(this.vector3Aux1);		

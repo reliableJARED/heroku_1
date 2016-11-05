@@ -154,6 +154,7 @@ function createCubeTower(height,width,depth){
 	/*TODO:
 	set mass to 0 and you'll see the logic is WRONG
 	FIX IT
+	
 	*/
 	//defaults if no args passed for the TOWER, not the blocks
 	var height = height || 10;
@@ -191,7 +192,7 @@ function createCubeTower(height,width,depth){
 		for (var w=0;w<width;w++) {
 		
 			for(var d =0; d<depth;d++){
-		//	   console.log("195:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
+			   console.log("195:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
 				ObjBlueprint.x = pos.x();
 				ObjBlueprint.y = pos.y();
 				ObjBlueprint.z = pos.z();
@@ -204,13 +205,13 @@ function createCubeTower(height,width,depth){
 				AddToRigidBodiesIndex(block);
 
 				//add to pos, used in the placement for our next block being created	
-				pos.setX(ObjBlueprint.x+pos.x()) //+X dimention
+				pos.setX(ObjBlueprint.x+d) //+X dimention
 			}
 			//reset for next column
 			pos = new Ammo.btVector3(randX,1,randZ)
 
 			//Start our new row shifted over depth of our object
-			pos.setY((ObjBlueprint.z*h)+pos.y())
+			pos.setY((pos.y()*h));
 			pos.setZ(pos.z()+2);//+Z dimention;
 			
 			ObjBlueprint.x = pos.x();
@@ -493,7 +494,8 @@ function AddPlayer(uniqueID){
 			d : 2,
 			mass : 10,
 			shape:'box',
-			color: Math.random() * 0xffffff,
+			color: Math.random() * 0x00ff00,//random GREEN
+			texture:'playerFace.png',
 			x: randX,
 			y: 10,
 			z: randZ,
