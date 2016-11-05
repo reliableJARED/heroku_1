@@ -1,0 +1,1 @@
+Images should be powers of 2.  for example 64x32

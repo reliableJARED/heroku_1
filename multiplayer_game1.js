@@ -396,7 +396,7 @@ function createBoxPhysicsObject (object){
 }
 
 function createBullet(type,data){
-	
+	console.log(type,data)
 	var bulletBlueprint = {
 			id: 'id'+data[11].toString(),
 			w :data[0],
@@ -474,11 +474,13 @@ function ApplyMovementToAPlayer(PlayerObject,type,data){
 
 
 function LinearVelocityCalculator(RotationAngle,magnitude){
+	
 	//RotationAngle is the angle of rotation about the Y axis.
 	 var magnitude = magnitude || PlayerCube.TopHorizontalSpeed;
 	 
 	 var Z = magnitude* Math.cos(RotationAngle);
 	 var X = magnitude* Math.sin(RotationAngle);
+	 
 	 /*
 					/| 
 				   / | 
@@ -560,14 +562,14 @@ function moveForward() {
 function clickShootCube() {
 
 	 var headingAngle = PlayerCube.heading();
-     var thrust = LinearVelocityCalculator(headingAngle);
+     var thrust = LinearVelocityCalculator(headingAngle,PlayerCube.ShotSpeed);
 
 	 var QUAT = PlayerCube.quanternionY();
 
 	/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
 	 if( (QUAT > 0.74 && QUAT < 1.0) || (QUAT > -1  && QUAT < -0.74 )  ){
 		 thrust.z *=-1}
-	else {thrust.z=1}
+	else {thrust.z*=1}
 	
 	//4 bytes header, 24bytes data
 	var buffer = new ArrayBuffer(28);
@@ -576,12 +578,12 @@ function clickShootCube() {
 		//create a dataview so we can manipulate our arraybuffer
 		//offset 4 bytes to make room for headers
 		var vectorBinary   = new Float32Array(buffer,4);
-		vectorBinary[0] = PlayerCube.x;
-		vectorBinary[1] = PlayerCube.y+2;//the +2 fires bullet from TOP of player
-		vectorBinary[2] = PlayerCube.z;
-		vectorBinary[3] = thrustX;
+		vectorBinary[0] = PlayerCube.x();
+		vectorBinary[1] = PlayerCube.y()+2;//the +2 fires bullet from TOP of player
+		vectorBinary[2] = PlayerCube.z();
+		vectorBinary[3] = thrust.x;
 		vectorBinary[4] = 0;
-		vectorBinary[5] = thrustZ;
+		vectorBinary[5] = thrust.z;
 	
 		//only coding FIRST TWO bytes
 		var headerBytes   = new Uint8Array(buffer,0,4);
@@ -590,6 +592,7 @@ function clickShootCube() {
 		headerBytes[2] = 0;//empty for now
 		headerBytes[3] = 0;//empty for now
 		
+		console.log(headerBytes,vectorBinary)
 		//ONLY server approves instance of a shot.  see handler for 'shot' inbound msg from server.
 		//binary mode
 		socket.emit('I',buffer);
@@ -794,7 +797,7 @@ function checkPlayerOrientation(){
 	
 	if(PxRotV > maxRot){		
 		
-		var PxRot = PlayerCube.quanternionY();
+		var PxRot = PlayerCube.quanternionX();
 	
 		//check that we haven't actually rotated too far on this axis, if we have RESET
 		if(PxRot>.5 || PxRot<-.5){
