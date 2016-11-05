@@ -11,14 +11,14 @@ btRigidBody
 __proto__
 
 activate(arg0)
-applyCentralForce(arg0)
-applyCentralImpulse(arg0)
+applyCentralForce(vec3)
+applyCentralImpulse(vec3)
 applyCentralLocalForce(arg0)
 applyForce(arg0,arg1)
 applyImpulse(arg0,arg1)
 applyLocalTorque(arg0)
-applyTorque(arg0)
-applyTorqueImpulse(arg0)
+applyTorque(vec3)
+applyTorqueImpulse(vec3)
 constructor:btRigidBody(arg0)
 forceActivationState(arg0)
 getAngularVelocity()
@@ -74,12 +74,19 @@ function PlayerObjectConstructor(rbID,rigidBodies) {
 	}
 	
 	this.id = rbID;//string with format 'id0000000'
-	this.Graphics = rigidBodies[this.id];//Threejs
-	this.Physics = rigidBodies[this.id].userData.physics;//Ammojs
+	this.graphicsBody = rigidBodies[this.id];//Threejs
+	this.physicsBody = rigidBodies[this.id].userData.physics;//Ammojs
 	this.Health = 100;
 	this.Items = new Object();//place holder
 	this.TopHorizontalSpeed = 15;//although set locally, server uses it's own value.  prevent cheating
 	this.TopVerticalSpeed = 15;//although set locally, server uses it's own value.  prevent cheating
+	this.ShotSpeed = 500;
+	this.RotationSpeed = 0.5;
+	this.vector3Aux1 = new Ammo.btVector3();
+
+	//PlayerCube is ALLWAYS ACTIVEATE
+	this.physicsBody.setActivationState(4);
+			
 };
 
 /******Player Attributes */
@@ -87,72 +94,90 @@ PlayerObjectConstructor.prototype.setTopHorizontalSpeed = function(speed){
 	
 	this.TopHorizontalSpeed = speed;
 };
-PlayerObjectConstructor.prototype.getTopHorizontalSpeed = function(){
-	
-	return this.TopHorizontalSpeed;
-};
+
 
 PlayerObjectConstructor.prototype.setTopVerticalSpeed = function(speed){
 	
 	this.TopVerticalSpeed = speed;
 };
 
-PlayerObjectConstructor.prototype.getTopVerticalSpeed = function(){
-	
-	return this.TopVerticalSpeed;
-};
 
 PlayerObjectConstructor.prototype.setHealth = function(health){
 	
 	this.Health = health;
 };
 
-PlayerObjectConstructor.prototype.getHealth = function(){
-	
-	return this.Health;
-};
 
 /**********Current Linear Velocity ****/
 PlayerObjectConstructor.prototype.LVlength = function(){
 	
-	return this.Physics.getLinearVelocity().length();
+	return this.physicsBody.getLinearVelocity().length();
 };
 
 PlayerObjectConstructor.prototype.LVx = function(){
 	
-	return this.Physics.getLinearVelocity().x();
+	return this.physicsBody.getLinearVelocity().x();
 };
 
 PlayerObjectConstructor.prototype.LVy = function(){
 	
-	return this.Physics.getLinearVelocity().y();
+	return this.physicsBody.getLinearVelocity().y();
 };
+
+PlayerObjectConstructor.prototype.setLV = function(){
+	
+	if(arguments.length > 1){
+		this.physicsBody.setLinearVelocity(this.vector3Aux1.setValue(arguments[0],[1],[2]));
+	}
+	else{
+/*
+TODO: 11/4/16 JMN accept any object with any combo of properties: x,y,z or individual and apply argruments.  used setlv but pass current lv when arg obj hasOwnProperty() fails
+*/
+//console.log('TODO');
+		}
+}
+	
+
 
 PlayerObjectConstructor.prototype.LVz = function(){
 	
-	return this.Physics.getLinearVelocity().z();
+	return this.physicsBody.getLinearVelocity().z();
 };
 
 /**********Current Angular Velocity ****/
 PlayerObjectConstructor.prototype.AVx = function(){
 	
-	return this.Physics.getAngulVelocity().x();
+	return this.physicsBody.getAngularVelocity().x();
 };
 
 PlayerObjectConstructor.prototype.AVy = function(){
 	
-	return this.Physics.getAngulVelocity().y();
+	return this.physicsBody.getAngularVelocity().y();
 };
 
 PlayerObjectConstructor.prototype.AVz = function(){
 	
-	return this.Physics.getAngulVelocity().z();
+	return this.physicsBody.getAngularVelocity().z();
 };
 
 PlayerObjectConstructor.prototype.AVlength = function(){
 	
-	return this.Physics.getAngulVelocity().length();
+	return this.physicsBody.getAngularVelocity().length();
 };
+
+PlayerObjectConstructor.prototype.setAV = function(){
+	
+	if(arguments.length > 1){
+		this.physicsBody.setAngularVelocity(this.vector3Aux1.setValue(arguments[0],[1],[2]));
+	}
+	else{
+/*
+TODO: 11/4/16 JMN accept any object with any combo of properties: x,y,z or individual and apply argruments.  used setav but pass current av when arg obj hasOwnProperty() fails
+*/
+console.log('TODO');
+		}
+}
+
 /*
 http://www.euclideanspace.com/maths/geometry/rotations/conversions/quaternionToEuler/
 Convert quanternion to randians:
@@ -165,7 +190,7 @@ PlayerObjectConstructor.prototype.heading = function(){
 	
 	//heading(y) = atan2(2*qy*qw-2*qx*qz , 1 - 2*qy2 - 2*qz2)
 	//Math.atan2(y, x)
-	var quat = this.Physics.getWorldTransform().getRotation();
+	var quat = this.physicsBody.getWorldTransform().getRotation();
 	var arg1 = (2*quat.y()*quat.w() - 2*quat.x()*quat.z());
 	var arg2 = (1 - 2*(quat.y()*quat.y()) - 2 * (quat.z()*quat.z()));
 	
@@ -188,36 +213,36 @@ PlayerObjectConstructor.prototype.heading = function(){
 /**********World Rotation  X,Y,Z,W */
 PlayerObjectConstructor.prototype.quanternionX = function(){
 	
-	return this.Physics.getWorldTransform().getRotation().x();
+	return this.physicsBody.getWorldTransform().getRotation().x();
 };
 
 PlayerObjectConstructor.prototype.quanternionY = function(){
 	
-	return this.Physics.getWorldTransform().getRotation().y();
+	return this.physicsBody.getWorldTransform().getRotation().y();
 };
 
 PlayerObjectConstructor.prototype.quanternionZ = function(){
 	
-	return this.Physics.getWorldTransform().getRotation().z();
+	return this.physicsBody.getWorldTransform().getRotation().z();
 };
 
 PlayerObjectConstructor.prototype.quanternionW = function(){
 	
-	return this.Physics.getWorldTransform().getRotation().w();
+	return this.physicsBody.getWorldTransform().getRotation().w();
 };
 
 /**********World Position X,Y,Z*/
 PlayerObjectConstructor.prototype.x = function(){
 	
-	return this.Physics.getWorldTransform().getOrigin().x();
+	return this.physicsBody.getWorldTransform().getOrigin().x();
 };
 
 PlayerObjectConstructor.prototype.y = function(){
 	
-	return this.Physics.getWorldTransform().getOrigin().y();
+	return this.physicsBody.getWorldTransform().getOrigin().y();
 };
 
 PlayerObjectConstructor.prototype.z = function(){
 	
-	return this.Physics.getWorldTransform().getOrigin().z();
+	return this.physicsBody.getWorldTransform().getOrigin().z();
 };

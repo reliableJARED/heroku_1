@@ -12,16 +12,17 @@ var io = require('socket.io')(http);
 
 var port = process.env.PORT || 5000; 
 
-//var ip = '192.168.1.101'
+var ip = '192.168.1.100'
 //var ip = '192.168.1.102'
-var ip = '10.10.10.100'
+//var ip = '10.10.10.100'
 
 
 //required for serving locally when testing
 var serveStatic = require('serve-static');
-app.use(serveStatic(__dirname+'/'))
-app.use(serveStatic(__dirname + '/static/images/'))
-app.use(serveStatic(__dirname + '/static/three.js/build/'))
+app.use(serveStatic(__dirname+'/'));
+app.use(serveStatic(__dirname + '/static/images/'));
+app.use(serveStatic(__dirname + '/static/images/textures'));
+app.use(serveStatic(__dirname + '/static/three.js/build/'));
 
 //GLOBAL Physics variables
 var physicsWorld;
@@ -800,7 +801,7 @@ app.get('/', function(request, response){
 });
 
 
-http.listen(port,ip, function(){
+http.listen(port, ip, function(){
 	console.log('listening on port: '+port);
 	console.log('serving files from root: '+__dirname);
 	});		

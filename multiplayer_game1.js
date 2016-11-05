@@ -9,6 +9,9 @@ var UNIQUE_ID; //assigned by the server
 var camX =0;var camY = 5; var camZ = -20;//Set the initial perspective for the user
 var PlayerCube;
 var PlayerCube_local;
+var textures = new Array();
+//TODO: Server assigns this array
+textures[0] = 'bullet.png';
 
 /**** Player specific vars that shouldn't be global **********/
 const MovementSpeed = 15;
@@ -36,8 +39,7 @@ var transformAux1 = new Ammo.btTransform();
 var vector3Aux1 = new Ammo.btVector3();
 var quaternionAux1 = new Ammo.btQuaternion();
 var PHYSICS_ON = true;
-const MovementForce = 1;//sets the movement force from dpad
-
+const INTERPOLATE_AMT = .7;//sets % to merge with server updates
 
 //Input Controller
 var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50,callback:GAMEPAD_right_callback}});
@@ -80,9 +82,9 @@ var socket = io();
 			if( NewID === UNIQUE_ID){
 				//do nothing because this is global alert to others about us
 			}else{
-				createBoxObject(msg[NewID]);
+				createBox(msg[NewID]);
 				};
-			//	OtherPlayers[NewID] = createBoxObject(msg[NewID],true)}
+			//	OtherPlayers[NewID] = createBox(msg[NewID],true)}
 		   });
 		
 		socket.on('playerID',function(msg){
@@ -94,15 +96,11 @@ var socket = io();
 		
 		socket.on('yourObj',function(msg){
 			//Server assigning you to a rigidBody
-			PlayerCube = rigidBodiesLookUp[msg];
-			
-			PlayerCube_local = new PlayerObjectConstructor(msg, rigidBodiesLookUp);
-			
-			//PlayerCube is ALLWAYS ACTIVEATE
-			PlayerCube.userData.physics.setActivationState(4);
-			
+
+			PlayerCube = new PlayerObjectConstructor(msg, rigidBodiesLookUp);
+			console.log(PlayerCube)
 			//assign your player to the physics synchronizer
-			synchronizer.assignPlayer(rigidBodiesLookUp[msg]);
+			synchronizer.assignPlayer(PlayerCube);
 			
 			 //now that you exist, start rendering loop
 			animate();	
@@ -122,7 +120,7 @@ var socket = io();
 				for(var i =0; i<worldObjects.length;i++){
 					
 					if(worldObjects[i].shape === 'box'){
-						createBoxObject(worldObjects[i]);
+						createBox(worldObjects[i]);
 						}					
 					};
 					
@@ -194,8 +192,8 @@ var socket = io();
 		   //remaining bytes are for all float32 (4bytes each) that code movement commands
 		   
 			
-			//determine what player object should be used, node that local player is called PlayerCube
-			var player = (PlayerCube.userData.id === ID)? PlayerCube.userData.physics:rigidBodiesLookUp[ID].userData.physics
+			//determine what player object should be used
+			var player = rigidBodiesLookUp[ID];
 		
 			//parse our binary data from server into readable formats
 			var dataArray = new Float32Array(msg[ID],4);
@@ -210,7 +208,7 @@ var socket = io();
 			//Movement
 			else{
 				ApplyMovementToAPlayer(player,header[0],dataArray)
-			};
+			    };
 			}
 			catch(err){console.log(err)}
 			
@@ -300,8 +298,15 @@ function initPhysics() {
 		return true;
 };
 
-function createBoxObject(object,returnObj) {
+function createBox(object,returnObj) {
 		//console.log('building',object)
+		
+		/*
+		TODO:
+		Change this to work like the bullet builder which doesn't require
+		an object.  This way server doesn't need to send a JSON for world
+		building.  Use a 16bit to encode textures, pass array of strings for texture names inside images directory
+		*/
 		var material;//consider passing mat types to flag basic, phong, etc...
 	
 		var texture = null;
@@ -402,13 +407,14 @@ function createBullet(type,data){
 			x: data[5],
 			y: data[6],
 			z: data[7] ,
+			texture:textures[0],
 			Rx: 0,
 			Ry: 0,
 			Rz: 0,
 			Rw: 1
 		}
 		
-	var bullet = createBoxObject(bulletBlueprint,true);
+	var bullet = createBox(bulletBlueprint,true);
 	
 	//create a vector to apply shot force to our bullet
 	vector3Aux1.setValue(data[8],data[9],data[10]);
@@ -424,57 +430,55 @@ function createBullet(type,data){
 
 function ApplyMovementToAPlayer(PlayerObject,type,data){
 	
-	//set the object to active so that updates take effect
-	PlayerObject.setActivationState(1);
-	
-	
 	//use bit operators for comparisons to speed things up
 	if(applyCentralImpulse & type ){
 				
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				PlayerObject.applyCentralImpulse(vector3Aux1);
+				PlayerObject.userData.physics.applyCentralImpulse(vector3Aux1);
 		
 	}else if (applyTorque & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				PlayerObject.applyTorque(vector3Aux1);
+				PlayerObject.userData.physics.applyTorque(vector3Aux1);
 		
 	}else if (applyTorqueImpulse & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				PlayerObject.applyTorqueImpulse(vector3Aux1);
+				PlayerObject.userData.physics.applyTorqueImpulse(vector3Aux1);
 	
 	}else if (applyCentralForce & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				PlayerObject.applyCentralForce(vector3Aux1);
+				PlayerObject.userData.physics.applyCentralForce(vector3Aux1);
 				
 	}else if (changeALLvelocity & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				PlayerObject.setLinearVelocity(vector3Aux1);
+				PlayerObject.userData.physics.setLinearVelocity(vector3Aux1);
 	
 				vector3Aux1.setValue(data[3],data[4],data[5]);
-				PlayerObject.setAngularVelocity(vector3Aux1);
+				PlayerObject.userData.physics.setAngularVelocity(vector3Aux1);
 				
 	}else if (changeLinearVelocity & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				PlayerObject.setLinearVelocity(vector3Aux1);
+				PlayerObject.userData.physics.setLinearVelocity(vector3Aux1);
 				
 	}else if (changeAngularVelocity & type) {
 		
 				vector3Aux1.setValue(data[0],data[1],data[2]);
-				PlayerObject.setAngularVelocity(vector3Aux1);
+				PlayerObject.userData.physics.setAngularVelocity(vector3Aux1);
 	}
 	
 }
 
 
-function LinearVelocityCalculator(RotationAngle){
+function LinearVelocityCalculator(RotationAngle,magnitude){
 	//RotationAngle is the angle of rotation about the Y axis.
-	 var Z = MovementSpeed* Math.cos(RotationAngle);
-	 var X = MovementSpeed* Math.sin(RotationAngle);
+	 var magnitude = magnitude || PlayerCube.TopHorizontalSpeed;
+	 
+	 var Z = magnitude* Math.cos(RotationAngle);
+	 var X = magnitude* Math.sin(RotationAngle);
 	 /*
 					/| 
 				   / | 
@@ -489,26 +493,23 @@ function LinearVelocityCalculator(RotationAngle){
 function moveBackward() {
 	
 	//quat is a pi to -pi rotation angle
-	var quat = PlayerCube_local.quanternionY();
+	var quat = PlayerCube.quanternionY();
 	
 	//headingAngle is a pi/2 to -pi/2 rotation eular angle around Y axis
-	var headingAngle = PlayerCube_local.heading();
+	var headingAngle = PlayerCube.heading();
 	
-	//returns what our X and Z linear velocity components should be
+	//returns object of what our X and Z linear velocity components 
 	var thrust = LinearVelocityCalculator(headingAngle);
 	
 	 //adjuster depending on if z should be pos or neg
 	 var Zsign;
 
-	/*determine what direction our player is facing and the correction neg/pos for applied movementForce*/	  
-	if( quat < 0.75  || quat < -0.75 ){Zsign=-1}
-	else {Zsign=1}
-	
-	//apply Z thrust direction sign correction
-	thrust.z *= Zsign
-	
+	/*determine what direction our player is facing and set the correction neg/pos for applied movementForce*/	  
+	if( quat < 0.75  || quat < -0.75 ){thrust.z *= -1}
+	else {thrust.z *= 1}
+
 	//keep the Y portion of the velocity what it currently is
-	var Y = PlayerCube_local.LVy();
+	var Y = PlayerCube.LVy();
 
 	var buffer = getBinaryToSend([changeLinearVelocity],[-thrust.x,Y,thrust.z]);
 	
@@ -519,7 +520,7 @@ function moveBackward() {
 
 function moveLeft() {
 		
-		var buffer = getBinaryToSend([changeAngularVelocity],[0,RotationSpeed,0]);	
+		var buffer = getBinaryToSend([changeAngularVelocity],[0,PlayerCube.RotationSpeed,0]);	
 			
 		//binary mode
 		socket.emit('I',buffer);
@@ -527,7 +528,7 @@ function moveLeft() {
 
 function moveRight() {
 	
-		var buffer = getBinaryToSend([changeAngularVelocity],[0,-RotationSpeed,0]);	
+		var buffer = getBinaryToSend([changeAngularVelocity],[0,-PlayerCube.RotationSpeed,0]);	
 				
 		//binary mode
 		socket.emit('I',buffer);
@@ -535,24 +536,19 @@ function moveRight() {
 
 function moveForward() {
 	
-	var quat = PlayerCube_local.quanternionY();
+	var quat = PlayerCube.quanternionY();
 	
-	var headingAngle = PlayerCube_local.heading();
+	var headingAngle = PlayerCube.heading();
 
 	//returns what our X and Z linear velocity components should be
 	var thrust = LinearVelocityCalculator(headingAngle);
 	
-	 //adjuster depending on if z should be pos or neg
-	 var Zsign;
-
-	/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
-	 if( (quat > 0.75 && quat < 1.0) || (quat > -1  && quat < -0.75 )  ){Zsign=-1}
-	 else {Zsign=1}
-	
-	thrust.z *= Zsign;
+	/*determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
+	 if( (quat > 0.75 && quat < 1.0) || (quat > -1  && quat < -0.75 )  ){thrust.z *=-1}
+	 else {thrust.z *=1}
 	
 	//keep y velocity what it currently is
-	var Y = PlayerCube_local.LVy();
+	var Y = PlayerCube.LVy();
 	
 	var buffer = getBinaryToSend([changeLinearVelocity],[thrust.x,Y,thrust.z]);	
 	
@@ -563,33 +559,26 @@ function moveForward() {
 
 function clickShootCube() {
 
-	 var pos = PlayerCube.position;
-	 console.log(pos.x,PlayerCube.userData.physics.getWorldTransform().getOrigin().x())
-	 var yRot = PlayerCube.rotation._y
-	 var thrustZ = shotFireForce* Math.cos(yRot);
-	 var thrustX = shotFireForce* Math.sin(yRot);
-				   
-	 //used to determine if thrust in the x or z should be pos or neg
-	 var Zquad ;
-	 var QUAT = PlayerCube.quaternion._y;
+	 var headingAngle = PlayerCube.heading();
+     var thrust = LinearVelocityCalculator(headingAngle);
+
+	 var QUAT = PlayerCube.quanternionY();
 
 	/*Blocks to determine what direction our player is facing and the correction neg/pos for applied movementForce*/			  
-	 if( (QUAT > 0.75 && QUAT < 1.0) || (QUAT > -1  && QUAT < -0.75 )  ){Zquad=-1}
-	else {Zquad=1}
-	
-	thrustZ = thrustZ*Zquad
-	
+	 if( (QUAT > 0.74 && QUAT < 1.0) || (QUAT > -1  && QUAT < -0.74 )  ){
+		 thrust.z *=-1}
+	else {thrust.z=1}
 	
 	//4 bytes header, 24bytes data
-		var buffer = new ArrayBuffer(28);
+	var buffer = new ArrayBuffer(28);
 	
 		//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
 		//create a dataview so we can manipulate our arraybuffer
 		//offset 4 bytes to make room for headers
 		var vectorBinary   = new Float32Array(buffer,4);
-		vectorBinary[0] = pos.x;
-		vectorBinary[1] = pos.y+2;//the +2 fires bullet from TOP of player
-		vectorBinary[2] = pos.z;
+		vectorBinary[0] = PlayerCube.x;
+		vectorBinary[1] = PlayerCube.y+2;//the +2 fires bullet from TOP of player
+		vectorBinary[2] = PlayerCube.z;
 		vectorBinary[3] = thrustX;
 		vectorBinary[4] = 0;
 		vectorBinary[5] = thrustZ;
@@ -601,13 +590,13 @@ function clickShootCube() {
 		headerBytes[2] = 0;//empty for now
 		headerBytes[3] = 0;//empty for now
 		
-		//ONLY server approves instance of a shot right now.  see handler for 'shot' inbound msg from server.
+		//ONLY server approves instance of a shot.  see handler for 'shot' inbound msg from server.
 		//binary mode
 		socket.emit('I',buffer);
 };
 
 function thrust(active){
-	var LV = PlayerCube.userData.physics.getLinearVelocity();
+	var LV = PlayerCube.physicsBody.getLinearVelocity();
 	
 	var x = LV.x();
 	var y;
@@ -616,7 +605,7 @@ function thrust(active){
 	}else {
 		 y = 0;
 	}
-	var z = LV.z();
+	var z = LV.z()
 	
 	var buffer = getBinaryToSend([changeLinearVelocity],[x,y,z]);	
 			
@@ -680,8 +669,8 @@ function GAMEPAD_right_callback(){
 		//no dpad buttons are down clear angular and linear velocity
 		if(GAMEPAD.rightGUI.bits === 0){
 			
-			PlayerCube.userData.physics.setLinearVelocity(vector3Aux1.setValue(0,0,0));
-			PlayerCube.userData.physics.setAngularVelocity(vector3Aux1.setValue(0,0,0));
+			PlayerCube.setLV(0,0,0);
+			PlayerCube.setAV(0,0,0);
 			
 			//prepare binary data
 			var buffer = getBinaryToSend([changeALLvelocity],[0,0,0,0,0,0])
@@ -698,7 +687,7 @@ function GAMEPAD_right_callback(){
 		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downLeft.bit &&
 		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downRight.bit){
 				
-				PlayerCube.userData.physics.setLinearVelocity(vector3Aux1.setValue(0,0,0));
+				PlayerCube.setLV(0,0,0);
 				
 				//prepare binary data
 				var buffer = getBinaryToSend([changeLinearVelocity],[0,0,0])
@@ -711,7 +700,7 @@ function GAMEPAD_right_callback(){
 		else if(GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.left.bit && 
 		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.right.bit ){
 				
-				PlayerCube.userData.physics.setAngularVelocity(vector3Aux1.setValue(0,0,0));
+				PlayerCube.setAV(0,0,0);
 				
 				//prepare binary data
 				var buffer = getBinaryToSend([changeAngularVelocity],[0,0,0])
@@ -749,12 +738,12 @@ function animate() {
   
 	/*CHASE CAMERA EFFECT*/
 		var relativeCameraOffset = new THREE.Vector3(camX,camY,camZ);//camera chase distance
-		var cameraOffset = relativeCameraOffset.applyMatrix4( PlayerCube.matrixWorld );
+		var cameraOffset = relativeCameraOffset.applyMatrix4( PlayerCube.graphicsBody.matrixWorld );
 		camera.position.x = cameraOffset.x;
 		camera.position.y = cameraOffset.y;
 		camera.position.z = cameraOffset.z;
 		
-		camera.lookAt( PlayerCube.position );
+		camera.lookAt( PlayerCube.graphicsBody.position );
 };
     
 
@@ -793,17 +782,19 @@ function updateGraphics( deltaTime ) {
 
 
 function checkPlayerOrientation(){
-	//console.log('check')
-	/******************** orientation check hack - could be better**********/
+	//11/4/16 JMN make this a PlayerCubeConstructor prototype func
+	//console.log('TODO')
+	/******************** orientation check hack - could be better**********/  
 	
 	//if player starts to rotate in z or x stop them.
-	var PxRotV = PlayerCube.userData.physics.getAngularVelocity().x()//PlayerCube.userData.physics.getWorldTransform().getRotation().x();
-	var PzRotV = PlayerCube.userData.physics.getAngularVelocity().z()//PlayerCube.userData.physics.getWorldTransform().getRotation().z();
+	var PxRotV = PlayerCube.AVx();//PlayerCube.userData.physics.getWorldTransform().getRotation().x();
+	var PzRotV = PlayerCube.AVz();
+	//PlayerCube.userData.physics.getWorldTransform().getRotation().z();
 	var maxRot = 0.01;
 	
 	if(PxRotV > maxRot){		
 		
-		var PxRot = PlayerCube.userData.physics.getWorldTransform().getRotation().x();
+		var PxRot = PlayerCube.quanternionY();
 	
 		//check that we haven't actually rotated too far on this axis, if we have RESET
 		if(PxRot>.5 || PxRot<-.5){
@@ -812,11 +803,8 @@ function checkPlayerOrientation(){
 		//	console.log('correcting')
 			//get the angular velocity of the player keep y and z compoent, set x to half current
 			var AVx = PxRotV * .5
-			var AVy = PlayerCube.userData.physics.getAngularVelocity().y();
-			vector3Aux1.setX( AVx );
-			vector3Aux1.setY( AVy );
-			vector3Aux1.setZ( PzRotV );
-			PlayerCube.userData.physics.setAngularVelocity(vector3Aux1);
+			var AVy = PlayerCube.AVy();
+			PlayerCube.setAV(AVx,AVy,PzRotV);
 		
 			//4 bytes header, 12bytes data
 			var buffer = new ArrayBuffer(16);
@@ -839,33 +827,32 @@ function checkPlayerOrientation(){
 
 	if(PzRotV > maxRot){
 		
-		var PzRot = PlayerCube.userData.physics.getWorldTransform().getRotation().z();
+		var PzRot = PlayerCube.quanternionZ();
 		
 		//check that we haven't actually rotated too far on this axis, if we have RESET
-		if(PzRot>.5 || PxRot<-.5){
+		if(PzRot>.5 || PzRot<-.5){
 			playerResetFromCrash();
 		}else{
 		//	console.log('correcting')
 			//get the angular velocity of the player keep y and x compoent, set z to half current
 			var AVz = PzRotV * .5
-			var AVy = PlayerCube.userData.physics.getAngularVelocity().y();
-		
-			vector3Aux1.setX( PxRotV);
-			vector3Aux1.setY( AVy);
-			vector3Aux1.setZ( AVz );
-			PlayerCube.userData.physics.setAngularVelocity(vector3Aux1);
+			var AVy = PlayerCube.AVy();
+
+			PlayerCube.setAV(PzRotV,AVy,AVz);
 	
 			//4 bytes header, 12bytes data
 			var buffer = new ArrayBuffer(16);
 			
 			//header
-			var buttonBit   = new Uint8Array(buffer,0,4);
-			buttonBit[0] = changeAngularVelocity;//type of action
-			buttonBit[1] = 0;//represents button being pressed
+			var header   = new Uint8Array(buffer,0,4);
+			header[0] = changeAngularVelocity;//type of action
+			header[1] = 0;//empty
+			header[2] = 0;//empty
+			header[3] = 0;//empty
 		
 			//data
 			var vectorBinary   = new Float32Array(buffer,4);
-			vectorBinary[3] = PxRotV;
+			vectorBinary[3] = PzRotV;
 			vectorBinary[4] = AVy;
 			vectorBinary[5] = AVz;
 	
@@ -878,9 +865,10 @@ function checkPlayerOrientation(){
 }
 
 function playerResetFromCrash(){
-	//clear forces
-		PlayerCube.userData.physics.setLinearVelocity(new Ammo.btVector3(0,0,0));
-		PlayerCube.userData.physics.setAngularVelocity(new Ammo.btVector3(0,0,0));
+	console.log("todo")//11/4/16 JMN this shouldn't resent here, need to be called only if server replys  to the resetMe else keep sending it, THEN apply force clear
+    	//clear forces
+		PlayerCube.setLV(0,0,0);
+		PlayerCube.setAV(0,0,0);
 		
 	    socket.emit('resetMe');
 	
@@ -1022,20 +1010,26 @@ ServerPhysicsSync.prototype.GetLocalWorldState = function(){
 
 			if ( ms ) {
 			
-				//get the location and orientation of our object
+				//get the location and orientation of our MOVING object
 				ms.getWorldTransform( this.transformAux1 );
 				var p = this.transformAux1.getOrigin();
 				var q = this.transformAux1.getRotation();
+				var LV = objPhys.getLinearVelocity();
 		
 				//update our comparisons
 				this.ObjectsData[id] = new Array();
-				this.ObjectsData[id][0] = p.x();
-				this.ObjectsData[id][1] = p.y();
-				this.ObjectsData[id][2] = p.z();
-				this.ObjectsData[id][3] = q.x();
-				this.ObjectsData[id][4] = q.y();
-				this.ObjectsData[id][5] = q.z();
-				this.ObjectsData[id][6] = q.w();
+				this.ObjectsData[id][this.x] = p.x();
+				this.ObjectsData[id][this.y] = p.y();
+				this.ObjectsData[id][this.z] = p.z();
+				this.ObjectsData[id][this.Rx] = q.x();
+				this.ObjectsData[id][this.Ry] = q.y();
+				this.ObjectsData[id][this.Rz] = q.z();
+				this.ObjectsData[id][this.Rw] = q.w();
+				this.ObjectsData[id][this.LVx] = LV.x();
+				this.ObjectsData[id][this.LVy] = LV.y();
+				this.ObjectsData[id][this.LVz] = LV.z();
+				
+//	console.log('todo');//11/4/16 JMN add AV and LV props too
 			};
 	};
 	
@@ -1057,37 +1051,47 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 			
 			/* 	** 	RUN A DIVERGENCE CHECK ON POSITION** */
 			try{
-			 if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[0]) > this.divergenceThreshold ||
-					Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[1]) > this.divergenceThreshold ||
-					Math.abs(this.ServerUpdates[i+this.z] -objectPhysics[2]) > this.divergenceThreshold ){
+			 if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[i+this.x]) > this.divergenceThreshold ||
+					Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[i+this.y]) > this.divergenceThreshold ||
+					Math.abs(this.ServerUpdates[i+this.z] -objectPhysics[i+this.z]) > this.divergenceThreshold ){
 		      
-		      	//DIVERGENCE check failed! replace everything locally with what the server says						
+		      	//DIVERGENCE check failed! replace everything locally with what the server says, smooth using interpolation	
+						var interpolateX = objectPhysics[i+this.x] + (this.ServerUpdates[i+this.x]  - objectPhysics[i+this.x])* INTERPOLATE_AMT;
+						
+						var interpolateY = objectPhysics[i+this.y] +(this.ServerUpdates[i+this.y]  - objectPhysics[i+this.y])* INTERPOLATE_AMT;						
+						
+						var interpolateZ = objectPhysics[i+this.z] +(this.ServerUpdates[i+this.z]  - objectPhysics[i+this.z])* INTERPOLATE_AMT;
 						
 						var objPhys = this.rigidBodiesLookUp[id].userData.physics;
 					
 						//vector for position update
-						this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
+						this.vector3Aux1.setValue(interpolateX,interpolateY,interpolateZ);
 						
 						//apply to transform
 						this.transformAux1.setOrigin(this.vector3Aux1);
 					
 						//sets the quaternion based on objects SEVER physics
 						this.quaternionAux1.setValue(this.ServerUpdates[i+this.Rx],this.ServerUpdates[i+this.Ry],this.ServerUpdates[i+this.Rz],this.ServerUpdates[i+this.Rw]);	
-				   	//this.quaternionAux1.setEulerZYX(this.ServerUpdates[i+this.Rz],this.ServerUpdates[i+this.Ry],this.ServerUpdates[i+this.Rx]);	
-
+				   	
 						//apply to transform
 						this.transformAux1.setRotation(this.quaternionAux1);
 													
-						//apply position rotation update
+						//apply position rotation update to object
 						objPhys.setWorldTransform(this.transformAux1);
 					
 						//vector for angular velocity
-						this.vector3Aux1.setValue(this.ServerUpdates[i+this.AVx],this.ServerUpdates[i+this.AVy],this.ServerUpdates[i+this.AVz])						
+				//		this.vector3Aux1.setValue(this.ServerUpdates[i+this.AVx],this.ServerUpdates[i+this.AVy],this.ServerUpdates[i+this.AVz])						
 						
 						//apply angular velocity
 						//objPhys.setAngularVelocity(this.vector3Aux1);
 						
 						//vector for linear velocity
+						//INTERPOLATE
+						 interpolateX = objectPhysics[i+this.LVx] + (this.ServerUpdates[i+this.LVx]  - objectPhysics[i+this.LVx])* INTERPOLATE_AMT;
+						
+						 interpolateY = objectPhysics[i+this.LVy] +(this.ServerUpdates[i+this.LVy]  - objectPhysics[i+this.LVy])* INTERPOLATE_AMT;						
+						
+						 interpolateZ = objectPhysics[i+this.LVz] +(this.ServerUpdates[i+this.LVz]  - objectPhysics[i+this.LVz])* INTERPOLATE_AMT;
 						this.vector3Aux1.setValue(this.ServerUpdates[i+this.LVx],this.ServerUpdates[i+this.LVy],this.ServerUpdates[i+this.LVz])
 						
 						//apply linear velocity
