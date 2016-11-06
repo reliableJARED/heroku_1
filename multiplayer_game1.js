@@ -9,15 +9,19 @@ var UNIQUE_ID; //assigned by the server
 var camX =0;var camY = 5; var camZ = -20;//Set the initial perspective for the user
 var PlayerCube;
 var PlayerCube_local;
-var textures = new Array();
-//TODO: Server assigns this array
-textures[0] = 'bullet.png';
 
-/**** Player specific vars that shouldn't be global **********/
-const MovementSpeed = 15;
-const LiftSpeed = 15;
-const shotFireForce = 500;
-const RotationSpeed = .5;
+//server assigned texture files
+var TEXTURE_FILES_INDEX = new Object();
+var TEXTURE_FILES = new Array();
+
+/**** Player specific vars 
+used in many calcs, server has it's own set.  If someone trys to cheat
+and change things their playing exp. will be messed up
+ **********/
+const TOP_HORIZONTAL_SPEED = 15;
+const TOP_VERTICAL_SPEED = 15;
+const SHOT_SPEED = 500;
+const ROTATION_SPEED = .5;
 
 //add rate of fire, health, items, etc.
 /**********************************************************/
@@ -90,15 +94,15 @@ var socket = io();
 		socket.on('playerID',function(msg){
 			//server assigned uniqueID
 			UNIQUE_ID = msg;
-			socket.emit('getMyObj','get');
+			
 		});
 
 		
 		socket.on('yourObj',function(msg){
 			//Server assigning you to a rigidBody
-
-			PlayerCube = new PlayerObjectConstructor(msg, rigidBodiesLookUp);
-			console.log(PlayerCube)
+	console.log(msg)
+			PlayerCube = new PlayerObjectConstructor(rigidBodiesLookUp[msg]);
+		
 			//assign your player to the physics synchronizer
 			synchronizer.assignPlayer(PlayerCube);
 			
@@ -109,24 +113,33 @@ var socket = io();
 		socket.on('setup', function(msg){
 			//msg is an object with an array of JSON with each root key the ID of an object
 			if(newPlayer){
+				
+				//assign the lookup index for textures
+				TEXTURE_FILES_INDEX  = msg.TEXTURE_FILES_INDEX ;
+				
+				//load all textures
+				serverTextureLoader( msg.TEXTURE_FILES);
+
 				var timeStamp = Object.keys(msg)[0];
 				//sync clocks
 				clock = new GameClock(timeStamp);
 				synchronizer.linkGameClock(clock);
 			
+				
 				var worldObjects = msg[timeStamp];
 				
 				//msg is the array of objects
 				for(var i =0; i<worldObjects.length;i++){
 					
-					if(worldObjects[i].shape === 'box'){
+					if(worldObjects[i].shape === 0){
 						createBox(worldObjects[i]);
 						}					
 					};
 					
 				newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
 			};
-			
+			//now that world is built, ask for assigned object
+			socket.emit('getMyObj','get');
 		});
 		
 
@@ -259,6 +272,11 @@ function initGraphics() {
 }
 
 function BackgroundEnvGraphics() {
+	/*
+TODO: JMN 11/5/16
+this should be called from may world builder, and Images need to be replaced
+with loaded images in TEXTURE_FILES
+*/	
 	
 	var imagePrefix = "snow_mountain_";
 	var directions  = ["xneg", "xneg", "ypos", "yneg", "xpos", "xpos"];
@@ -271,7 +289,7 @@ function BackgroundEnvGraphics() {
 	for (var i = 0; i < 6; i++)
 	//KEY! THREE.BackSide to put image on inner face not outer face of cube
 		materialArray.push( new THREE.MeshBasicMaterial({
-			map: THREE.ImageUtils.loadTexture( imagePrefix + directions[i] + imageSuffix ),
+			map: textureLoader.load( imagePrefix + directions[i] + imageSuffix ),
 			side: THREE.BackSide
 		}));
 		
@@ -299,6 +317,15 @@ function initPhysics() {
 		
 		return true;
 };
+function serverTextureLoader(filenameArray) {
+
+	for (f=0;f<filenameArray.length;f++) {
+ 		 texture = textureLoader.load(filenameArray[f]);
+ 	 	TEXTURE_FILES.push(texture);
+ 	};
+ 	
+};
+
 
 function createBox(object,returnObj) {
 		//console.log('building',object)
@@ -323,21 +350,22 @@ function createBox(object,returnObj) {
 		if (object.hasOwnProperty('color')) {color = object.color};
 		
 		if (object.hasOwnProperty('texture') ){ 
-				var textureFile = object.texture;
-			//	console.log(textureFile)
-			
-			    texture = textureLoader.load(textureFile);
-			 
-  /*todo: 11/4/16 JMN PASS FLAGS FOR WRAPPING */
-			   //set texture to tile the gound (don't do this if you want it to stretch to fit)			   
-			//	texture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
-			//	texture.repeat.set( 50, 50 );// 20x20 tiles of image
-				var mat = new THREE.MeshBasicMaterial( { color: color, map:texture} );
+		
+		
+				 texture = TEXTURE_FILES[object.texture];
+				
+
+  /*TODO: 11/4/16 JMN PASS FLAGS FOR WRAPPING */
+  /* Server needs to specify what side, what texture and if color is used
+  */
+			//	var mat = new THREE.MeshBasicMaterial( { color:color,map:texture} );
+				var mat = new THREE.MeshBasicMaterial( { map:texture} );
 				var a = new THREE.MeshBasicMaterial( { color: color} );
 				var b = 	new THREE.MeshBasicMaterial( { color: color} );
 				var c = new THREE.MeshBasicMaterial( { color: color} );
 				var d =new THREE.MeshBasicMaterial( { color: color} );
 				var e = new THREE.MeshBasicMaterial( { color: color} );
+				//cube texture index map:
 				//0 -left
 				//1 - right
 				//2 - top
@@ -622,7 +650,7 @@ function thrust(active){
 	var x = LV.x();
 	var y;
 	if (active) {
-		 y = LiftSpeed 
+		 y = PlayerCube.TopVerticalSpeed; 
 	}else {
 		 y = 0;
 	}

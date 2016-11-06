@@ -60,7 +60,7 @@ updateInertiaTensor()
 function PlayerObjectConstructor(playerObj) {
 	
 	'use strict';
-
+	console.log(playerObj)
 
 	//Check that we got the right args
 	if(playerObj.type !== 'Mesh'){

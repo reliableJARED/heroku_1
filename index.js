@@ -24,14 +24,30 @@ app.use(serveStatic(__dirname + '/static/images/'));
 app.use(serveStatic(__dirname + '/static/images/textures'));
 app.use(serveStatic(__dirname + '/static/three.js/build/'));
 
-//GLOBAL Physics variables
-var physicsWorld;
-var gravityConstant = -9.8
+//GLOBAL variables
+var physicsWorld; 
+const gravityConstant = -9.8
 var rigidBodies =  new Array();
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
 const updateFrequency = .5;//Seconds	
 const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
+var TEXTURE_FILES_INDEX = {
+	ground:0,
+	SnowBlock:1,
+	playerFace:2,
+	envXneg:3,
+	envXpos:4,
+	envYneg:5,
+	envYpos:6};
+var TEXTURE_FILES =[
+	'snow.png',
+	'snow_small.png',
+	'playerFace.png',
+	'snow_mountain_xneg.png',
+	'snow_mountain_xpos.png',
+	'snow_mountain_yneg.png',
+	'snow_mountain_ypos.png'];
 					
 GameClock = function () {
 	this.startTime = Date.now();
@@ -118,9 +134,9 @@ function createObjects() {
 			w : 2000,
 			h : 1,
 			d : 2000,
-			shape:'box',
-			color: "rgb(100%, 100%, 100%)",
-			texture:'snow.png',
+			shape:0,//box =0
+			color: 0xffffff,
+			texture:TEXTURE_FILES_INDEX.ground,
 			x: 0,
 			y: 0,
 			z: 0,
@@ -172,8 +188,9 @@ function createCubeTower(height,width,depth){
 			w : 2,
 			h : 2,
 			d : 2,
-			shape:'box',
+			shape:0,//box =0
 			color: Math.random() * 0x0000ff, //random blues
+			texture:TEXTURE_FILES_INDEX.SnowBlock,
 			x: 0,
 			y: 0,
 			z: 0,
@@ -475,12 +492,15 @@ function BuildWorldStateForNewConnection(){
 	var time = Date.now();
 	
 	/*IMPORTANT: See SO link above.  Can't send rigidBodiesIndex directly, had to copy to new array.  */	
-	io.emit('setup',{[time]:world});
+	io.emit('setup',{
+		[time]:world,
+		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
+		TEXTURE_FILES:TEXTURE_FILES});
 	
 }
 
 function AddPlayer(uniqueID){
-	
+	console.log('make')
 	//uniqueID is SocketID
 	
 		//random start position for new player
@@ -493,9 +513,9 @@ function AddPlayer(uniqueID){
 			h : 2,
 			d : 2,
 			mass : 10,
-			shape:'box',
-			color: Math.random() * 0x00ff00,//random GREEN
-			texture:'playerFace.png',
+			shape:0,//0= box
+			color: Math.random() * 0xff0000,//random RED
+			texture:TEXTURE_FILES_INDEX.playerFace,
 			x: randX,
 			y: 10,
 			z: randZ,
