@@ -74,6 +74,7 @@ function PlayerObjectConstructor(playerObj) {
 	this.graphicsBody = playerObj;//Threejs
 	this.physicsBody = playerObj.userData.physics;//Ammojs
 	this.Health = 100;
+	this.Ammo = 100;
 	this.Items = new Object();//place holder
 	this.TopHorizontalSpeed = 15;//although set locally, server uses it's own value.  prevent cheating
 	this.TopVerticalSpeed = 15;//although set locally, server uses it's own value.  prevent cheating

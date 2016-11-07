@@ -32,6 +32,7 @@ var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to n
 var clock;									//info that is only needed when a newly connected player first builds the world
 const updateFrequency = .5;//Seconds	
 const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
+const IMPACT_FORCE_MINIMUM = 1;//minimum impact for collision to be broadcast
 var TEXTURE_FILES_INDEX = {
 	ground:0,
 	SnowBlock:1,
@@ -250,7 +251,9 @@ function createCubeTower(height,width,depth){
 
 
 
-function AddToRigidBodiesIndex(obj){
+function AddToRigidBodiesIndex(obj,player){
+	//indicates if the object is a players cube
+	var player = player || false;
 	
 	//rigidBodiesIndex holds construction info about our object
 	//it is used for new players to construct the current world state
@@ -277,7 +280,8 @@ function AddToRigidBodiesIndex(obj){
 				mass:obj.mass, 
 			   shape:obj.shape,
 			   color:obj.color,
-			   texture:obj.texture
+			   texture:obj.texture,
+			   player:player
 			};
 			
 	//console.log(rigidBodiesIndex)
@@ -352,6 +356,40 @@ function createPhysicalCube (blueprint){
 function updatePhysics( deltaTime, timeForUpdate ) {
 	/* http://www.bulletphysics.org/mediawiki-1.5.8/index.php/Stepping_The_World */
 	physicsWorld.stepSimulation( deltaTime,10);//Bullet maintains an internal clock, in order to keep the actual length of ticks constant
+
+	//***COLLISION CHECKS
+	//TODO: JMN Nov6 2016 tie in collision check with clients, broadcast as a Uint16 buffer
+	//count of object pairs in collision
+	var collisionPairs = dispatcher.getNumManifolds();
+	var collisionData = new Array();
+	for(var i=0;i<collisionPairs;i++){
+		//for each collision pair, check if the impact force of the two objects exceeds our ForceThreshold (global var)
+		//this will eliminate small impacts from being evaluated, light resting on the ground and gravity is acting on object
+		//truncate with bit OR 0 because don't need decimal
+		var impactForce = dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
+
+		//check that force is over our threshold, prevent checks on very small impact forces		
+		if( impactForce > IMPACT_FORCE_MINIMUM){
+			//Objects ptr id, MUST have 'id' add to the front before use in lookup
+			var Obj1_ptr = dispatcher.getManifoldByIndexInternal(i).getBody0().ptr;
+			var Obj2_ptr = dispatcher.getManifoldByIndexInternal(i).getBody1().ptr;
+			collisionData.push(Obj1_ptr,Obj2_ptr,impactForce)
+		}
+	}
+	if (collisionData.length >0) {
+	//send out collision data
+	//set the data as uint16 data array
+	var binaryData = new Uint16Array(collisionData);
+	
+	//create a data buffer of the underlying array
+	var buff = Buffer.from(binaryData.buffer)
+
+	//send out he data
+	io.emit('C', buff );
+	}
+	//********END COLLISION CHECKS
+
+
 
 	if (timeForUpdate){
 		//tell users to grab a world state because update is coming next tick
@@ -460,27 +498,11 @@ function BuildWorldStateForNewConnection(){
 	var world = new Array();
 
 	for(var i = 0; i < rigidBodies.length; i++){
+		
 		//Try/Catch is here because ridgidBodies length can be affected by other functions.  synchronized locking not setup yet
 		var lookUp = 'id'+rigidBodies[i].ptr.toString();
-	//	var lookUp = rigidBodies[i].ptr;
-		
+
 		try{
-			var obj =  rigidBodies[i]
-			
-			obj.getMotionState().getWorldTransform( transformAux1 )
-			
-			//get the physical orientation and location of our object
-			var p = transformAux1.getOrigin();
-			rigidBodiesIndex[lookUp].x = p.x();	
-			rigidBodiesIndex[lookUp].y = p.y();
-			rigidBodiesIndex[lookUp].z = p.z();
-				
-			var q = transformAux1.getRotation();
-			rigidBodiesIndex[lookUp].Rx = q.x();
-			rigidBodiesIndex[lookUp].Ry = q.y();
-			rigidBodiesIndex[lookUp].Rz = q.z();
-			rigidBodiesIndex[lookUp].Rw = q.w();
-		
 			world.push(rigidBodiesIndex[lookUp]);
 		}
 		catch(err){
@@ -500,7 +522,7 @@ function BuildWorldStateForNewConnection(){
 }
 
 function AddPlayer(uniqueID){
-	console.log('make')
+	
 	//uniqueID is SocketID
 	
 		//random start position for new player
@@ -538,7 +560,8 @@ function AddPlayer(uniqueID){
 		
 		//add to our index used to update clients about objects that have moved
 		/*IMPORTANT: AddToRigidBodiesIndex expects that obj.physics is an Ammo object.  NOT the values sent used in the blueprint to build the object*/
-		AddToRigidBodiesIndex(cube);
+		//passing true indicates this cube will be used for a player		
+		AddToRigidBodiesIndex(cube,true);
 		
 		//associate the player's socketID with it's object in rigidBodies
 		PlayerIndex[uniqueID] =  cube;
@@ -564,7 +587,7 @@ function FireShot(ID,data){
 		binaryData[1] = 0.5;//height
 		binaryData[2] = 0.5;//depth
 		binaryData[3] = 10;//mass
-		binaryData[4] = 0x7997A1  //color, hex for gray/blue
+		binaryData[4] = 0xffffff  //color, white
 		binaryData[5] = data.readFloatLE(4);//x
 		binaryData[6] = data.readFloatLE(8);//y
 		binaryData[7] = data.readFloatLE(12);//z
