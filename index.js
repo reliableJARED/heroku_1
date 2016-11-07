@@ -33,9 +33,12 @@ var clock;									//info that is only needed when a newly connected player firs
 const updateFrequency = .5;//Seconds	
 const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 const IMPACT_FORCE_MINIMUM = 1;//minimum impact for collision to be broadcast
+
+var GROUND_ID;//used to quickly find the ground.
+
 var TEXTURE_FILES_INDEX = {
 	ground:0,
-	SnowBlock:1,
+	blocks_1:1,
 	playerFace:2,
 	envXneg:3,
 	envXpos:4,
@@ -149,6 +152,8 @@ function createObjects() {
 
 		//build the object
 		var ground = createPhysicalCube(groundObjBlueprint);
+		
+		GROUND_ID = ground.id;
 
 		//add ground our physics object holder
 		rigidBodies.push( ground.physics );
@@ -179,8 +184,8 @@ function createCubeTower(height,width,depth){
 	var depth = depth || 2;
 	
 	//create random location for our tower, near other blocks
-	var randX =  Math.floor(Math.random() * 200);
-	var randZ =  Math.floor(Math.random() * 200) - 100;
+	var randX =  Math.floor(Math.random() * 300) - 100;
+	var randZ =  Math.floor(Math.random() * 300) - 100;
 	
 	var pos =  new Ammo.btVector3(randX,1,randZ);
 	
@@ -191,13 +196,14 @@ function createCubeTower(height,width,depth){
 			d : 2,
 			shape:0,//box =0
 			color: Math.random() * 0x0000ff, //random blues
-			texture:TEXTURE_FILES_INDEX.SnowBlock,
+			texture:TEXTURE_FILES_INDEX.blocks_1,
 			x: 0,
 			y: 0,
 			z: 0,
 			Rx: 0,
 			Ry: 0,
-			Rz: 0
+			Rz: 0,
+			breakApartForce: 50
 		}
 		
 	//three nested loops will create the tower
@@ -210,7 +216,7 @@ function createCubeTower(height,width,depth){
 		for (var w=0;w<width;w++) {
 		
 			for(var d =0; d<depth;d++){
-			   console.log("195:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
+			   //console.log("219:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
 				ObjBlueprint.x = pos.x();
 				ObjBlueprint.y = pos.y();
 				ObjBlueprint.z = pos.z();
@@ -251,10 +257,13 @@ function createCubeTower(height,width,depth){
 
 
 
-function AddToRigidBodiesIndex(obj,player){
+function AddToRigidBodiesIndex(obj){
 	//indicates if the object is a players cube
-	var player = player || false;
-	
+	if(typeof obj.player === 'undefined'){obj.player = false};
+
+	//indicates if this object can break, if it can - force requied to break it in Newtons
+	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = false};
+
 	//rigidBodiesIndex holds construction info about our object
 	//it is used for new players to construct the current world state
 	//Ammo assigns a uniqueID number to every object which can be found in the 'ptr' property
@@ -278,10 +287,11 @@ function AddToRigidBodiesIndex(obj,player){
 				h:obj.h, 
 				d:obj.d, 
 				mass:obj.mass, 
-			   shape:obj.shape,
-			   color:obj.color,
-			   texture:obj.texture,
-			   player:player
+			    shape:obj.shape,
+			    color:obj.color,
+			    texture:obj.texture,
+			    player:obj.player,
+			    breakApartForce:obj.breakApartForce
 			};
 			
 	//console.log(rigidBodiesIndex)
@@ -368,24 +378,41 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 		//truncate with bit OR 0 because don't need decimal
 		var impactForce = dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
 
-		//check that force is over our threshold, prevent checks on very small impact forces		
+		//check that force is over our threshold, prevent tracking very small impact forces		
 		if( impactForce > IMPACT_FORCE_MINIMUM){
-			//Objects ptr id, MUST have 'id' add to the front before use in lookup
+			
+			//Objects ptr id, MUST have 'id' added to the front before use as a rigidBodiesIndex lookup
 			var Obj1_ptr = dispatcher.getManifoldByIndexInternal(i).getBody0().ptr;
-			var Obj2_ptr = dispatcher.getManifoldByIndexInternal(i).getBody1().ptr;
+			var Obj2_ptr = dispatcher.getManifoldByIndexInternal(i).getBody1().ptr;	
+			
+			//apply breakApart to servers world
+			var Obj1_lookupID = 'id'+Obj1_ptr.toString();
+			if(Obj1_lookupID === GROUND_ID) Obj1_ptr =0;
+			try{
+				breakObject(rigidBodiesIndex[Obj1_lookupID],impactForce);
+			}catch(err){console.log("394:",err)}
+			
+			var Obj2_lookupID = 'id'+Obj2_ptr.toString();
+			if(Obj2_lookupID === GROUND_ID) Obj2_ptr =0;
+			try{
+				//returns bool if object can be broken
+				breakObject(rigidBodiesIndex[Obj2_lookupID],impactForce);
+			}catch(err){console.log("399:",err, +"\n"+Obj2_lookupID)}
+			
+			//console.log('387:',Obj1_ptr,Obj2_ptr)
 			collisionData.push(Obj1_ptr,Obj2_ptr,impactForce)
-		}
+		};
 	}
 	if (collisionData.length >0) {
-	//send out collision data
-	//set the data as uint16 data array
-	var binaryData = new Uint16Array(collisionData);
+		//send out collision data
+		//set the data as uint16 data array
+		var binaryData = new Uint32Array(collisionData);
 	
-	//create a data buffer of the underlying array
-	var buff = Buffer.from(binaryData.buffer)
+		//create a data buffer of the underlying array
+		var buff = Buffer.from(binaryData.buffer)
 
-	//send out he data
-	io.emit('C', buff );
+		//send out he data
+		io.emit('C', buff );
 	}
 	//********END COLLISION CHECKS
 
@@ -406,6 +433,117 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	//loop our physics at about X fps
 	setTimeout( TickPhysics, 20);//milisecond callback timer
 };
+
+
+function breakObject(object,impactForce){
+	//console.log("430:",object)
+	console.log('436: breakObject() under construction as of 11/7/16');
+	/*TODO:
+		Rubble should be the same as bullets.  Use that existing framework
+		*/
+	//first if the force is NOT great enough to actuall break this object or object cant break return
+	if(object.id === GROUND_ID || 
+		typeof object.breakApartForce === 'undefined' || 
+		!object.breakApartForce ||
+		object.breakApartForce > impactForce)return false;
+	
+	//get some object properties from our object to be broken
+	var depth = object.w;
+	var height = object.h; 
+	var width = object.d;
+	var mass = object.mass;
+	var posX = object.x;
+	var posY = object.y;
+	var posZ = object.z;
+	var quatX = object.Rx;
+	var quatY = object.Ry;
+	var quatZ = object.Rz;
+	var texture = object.texture;
+	var color = object.color;
+	
+	//var rubbleMass = mass/(depth+height+width);//density
+	var rubbleMass = 0.01;
+	
+	var force = impactForce/(depth+height+width);
+	
+	
+	//now that we have our properties, remove the object from the server world
+	// DON"T BROADCAST! passing false will not broadcast
+	RemoveObj(object.id,false);
+
+	//The rubble will be propotionally sized cubes based on the original objects size
+	//frac creates frac^3 pieces of rubble.
+	var frac = 2;
+	var dfrac = depth/frac;
+	var hfrac = height/frac;
+	var wfrac = width/frac;
+	//next create our rubble
+	for (var h=0;h<frac;h++) {
+				
+		for (var w=0;w<frac;w++) {
+		
+			for(var d =0; d<frac;d++){
+				
+				var rubbleBluePrint = {
+						w : dfrac,
+						h : hfrac,
+						d : wfrac,
+						mass : rubbleMass,
+						shape:0,//0= box
+						color: color,
+						texture:texture,
+						x: posX,
+						y: posY,
+						z: posZ,
+						Rx: quatX,
+						Ry: quatY,
+						Rz: quatZ
+					}
+		
+				//build the piece of rubble
+				var rubblePiece = createPhysicalCube(rubbleBluePrint);
+				
+				//apply force to our piece of rubble		
+				// in random directions
+				var rd_X = Math.random() < 0.5 ? -1 : 1 ;
+				var rd_Y = Math.random() < 0.5 ? -1 : 1 ;
+				var rd_Z = Math.random() < 0.5 ? -1 : 1 ;
+				
+				//apply impact force to our rubble
+				rubblePiece.physics.applyCentralImpulse(vector3Aux1.setValue( force*rd_X,force*rd_Y,force*rd_Z ));	
+				
+				//set to ACTIVE so the pieces bounce around
+				//rubblePiece.physics.setActivationState(1);
+				
+				//add to our physics object holder
+				rigidBodies.push( rubblePiece.physics );
+				
+				//add to to physics world
+				physicsWorld.addRigidBody( rubblePiece.physics );
+				
+				//Add a random 1-5 sec delay b4 new rubble object is removed from world
+				var delay =  Math.random() * 4000 + 1000;
+		
+				//add self destruct to the rubble so it will be removed from world after delay time
+				setTimeout(function () { RemoveObj(rubblePiece.id,false)},delay);
+				
+				//add to posX, used in the placement for our next rubble block being created	
+				posX += (dfrac);
+			}
+			//reset our X axis
+			posX = frac;
+			//Start our new row, create each new block Z over
+			posZ +=(wfrac);//+Z dimention
+		}
+		//reset our Z axis
+		posZ = frac;
+		//start the new grid up one level
+		posY += hfrac; 
+	}
+	
+	return true;
+}
+
 
 
 function emitWorldUpdate() {
@@ -543,7 +681,9 @@ function AddPlayer(uniqueID){
 			z: randZ,
 			Rx: 0,
 			Ry: 0,
-			Rz: 0
+			Rz: 0,
+			player:true,
+			breakApartForce:300
 		}
 		
 		//build the object
@@ -587,7 +727,7 @@ function FireShot(ID,data){
 		binaryData[1] = 0.5;//height
 		binaryData[2] = 0.5;//depth
 		binaryData[3] = 10;//mass
-		binaryData[4] = 0xffffff  //color, white
+		binaryData[4] = 0xf6f6f6  //color, light gray
 		binaryData[5] = data.readFloatLE(4);//x
 		binaryData[6] = data.readFloatLE(8);//y
 		binaryData[7] = data.readFloatLE(12);//z
@@ -708,7 +848,7 @@ function PlayerInput(ID,data){
 }
 
 
-function RemoveObj(RB_id) {
+function RemoveObj(RB_id,broadcast) {
 	/* DUPLICATE WARNING RemoveAPlayer does 99% the same, merge them, D.N.R.Y.S. */
 	
 	//remove from our rigidbodies holder
@@ -716,8 +856,7 @@ function RemoveObj(RB_id) {
 		
 		/*the construction of 'ids' in this whole server setup is WACKED! can lead to major headachs.  FIX.  the term ID is being used to describe both the ptr id assigned from physics engin and the id assigned to a socket. not to mention the concatination of 'id' to the front of a ptr id converted to string*/
 		
-		if(RB_id === 'id'+rigidBodies[i].ptr.toString() ){
-		//loose equality check because RB_id may be string or int
+		if(RB_id === 'id'+rigidBodies[i].ptr.toString()){
 		//if(RB_id == rigidBodies[i].ptr){
 			//console.log("REMOVING:", RB_id)
 			//remove player from the physical world
@@ -731,7 +870,7 @@ function RemoveObj(RB_id) {
 	}
 	
 	//tell everyone to delete object
-	io.emit('rmvObj', RB_id);
+	if(broadcast !== false)io.emit('rmvObj', RB_id);
 }
 
 function RemoveAPlayer(uniqueID){

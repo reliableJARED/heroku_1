@@ -128,14 +128,15 @@ var socket = io();
 				clock = new GameClock(timeStamp);
 				synchronizer.linkGameClock(clock);
 			
-				
 				var worldObjects = msg[timeStamp];
-				
+				console.log(worldObjects)
 				//msg is the array of objects
-				for(var i =0; i<worldObjects.length;i++){
-					
+				for(var i =0; i<worldObjects.length;i++){	
+					console.log(worldObjects.shape)
 					if(worldObjects[i].shape === 0){
+						
 						createBox(worldObjects[i]);
+						
 						}					
 					};
 					
@@ -173,10 +174,17 @@ var socket = io();
 		});
 		
 		socket.on('C',function (msg) {
-			//msg is Uint16 binary data
-			//there are THREE ints per collision - 2 ids, 1 force
+			//msg is Uint32 binary data
+			//structure is [id,id,force,id,id,force,id,id,force...]
 			//important the ids need 'id' stuck at the front as they are just numbers
-			var dataArray = new Uint16Array(msg);
+			var dataArray = new Uint32Array(msg);
+			for(var i = 0; i<dataArray.length; i+=3){
+				console.log(dataArray[i],dataArray[i+1],dataArray[i+2])
+				var id1 = 'id'+dataArray[i].toString();
+					if(dataArray[i] != 0)breakObject(id1,dataArray[i+2]);
+				var id2 = 'id'+dataArray[i+1].toString();
+					if(dataArray[i+1] != 0)breakObject(id2,dataArray[i+2])
+			}
 			//console.log(dataArray)
 		});
 		
@@ -197,12 +205,7 @@ var socket = io();
 			//console.log(msg);
 			//msg is an ID for an object
 			//remove it
-			try{
-			scene.remove( rigidBodiesLookUp[msg] )
-			physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
-			delete rigidBodiesLookUp[msg];
-			}
-			catch(err){console.log(err)}
+			RemoveObj(msg)
 		});
 		
 		//**** PLAYER INPUT HANDLER
@@ -337,7 +340,191 @@ function serverTextureLoader(filenameArray) {
  	
 };
 
+function breakObject(lookUp,impactForce){
+	console.log('breakObject() under construction as of 11/7/16');
+	console.log(lookUp)
+	//first find the object to be broken
+	var obj =  rigidBodiesLookUp[lookUp];
+	console.log(obj);
+	
+	//get some object properties from our broken object
+	var depth = obj.geometry.parameters.depth;//x length 
+	var height = obj.geometry.parameters.height;//y length 
+	var width = obj.geometry.parameters.width;//z length 
+	var mass = 0.01;//obj.userData.mass;
+	var rubbleMass = mass/(depth+height+width);
+	var force = impactForce/(depth+height+width);
+	var material = obj.material;
 
+	//we want our rubble in the same position as our object that is breaking
+	var pos = obj.position;// used to hold our position THREE.Vector3()
+	var quat = obj.quaternion;//original objects orientation THREE.Quaternion()
+	
+	//destroy all parts of the object and remove from world
+	RemoveObj(obj);
+	
+	//now make rubble in the objects place
+	//The rubble will be propotionally sized cubes based on the original objects size
+	//such that the original object breaks into 8 smaller pieces if it's a cube.
+	var frac = 2;
+	//three nested loops will create the rubble
+	//inner loop lays blocks in a row
+	//mid loop starts a new column
+	//outer loop starts new layer
+	for (var h=0;h<frac;h++) {
+				
+		for (var w=0;w<frac;w++) {
+		
+			for(var d =0; d<frac;d++){
+			
+				//create a rubble object,
+				var rubble = REALbox(depth/frac,height/frac,width/frac,rubbleMass,pos,quat,material);
+				
+				//apply force to our piece of rubble		
+				// in random directions
+				var rd_X = Math.random() < 0.5 ? -1 : 1 ;
+				var rd_Y = Math.random() < 0.5 ? -1 : 1 ;
+				var rd_Z = Math.random() < 0.5 ? -1 : 1 ;
+				
+				//apply impact force to our rubble
+				rubble.userData.physics.applyCentralImpulse(new Ammo.btVector3( force*rd_X,force*rd_Y,force*rd_Z ));	
+				
+				//set to ACTIVE so the pieces bounce around
+				//rubble.userData.physics.setActivationState(1);
+				
+				//add rubble to world
+				physicsWorld.addRigidBody(rubble.userData.physics);
+				rigidBodies.push(rubble);
+				scene.add(rubble);
+
+				//Add a random 1-5 sec delay b4 new rubble object is removed from world
+				var delay =  Math.random() * 4000 + 1000;
+		
+				//add self destruct to the rubble so it will be removed from world after delay time
+				destructionTimer(rubble,delay);	
+				
+				//add to pos, used in the placement for our next rubble block being created	
+				pos.addVectors(pos,new THREE.Vector3(depth/frac,0,0));//+X dimention
+			}
+			//reset our X axis
+			pos.subVectors(pos,new THREE.Vector3(frac,0,0));
+			//Start our new row, create each new block Z over
+			pos.addVectors(pos,new THREE.Vector3(0,0,width/frac));//+Z dimention
+		}
+		//reset our Z axis
+		pos.subVectors(pos,new THREE.Vector3(0,0,frac));
+		//start the new grid up one level
+		pos.addVectors(pos,new THREE.Vector3(0,height/frac,0));//+Y	dimention
+	}
+	
+	
+	
+	/*
+	//get some object properties from our object to be broken
+	var depth = object.w;
+	var height = object.h; 
+	var width = object.d;
+	var mass = object.mass;
+	var posX = object.x;
+	var posY = object.y;
+	var posZ = object.z;
+	var quatX = object.Rx;
+	var quatY = object.Ry;
+	var quatZ = object.Rz;
+	var texture = object.texture;
+	var color = object.color;
+	
+	var rubbleMass = mass/(depth+height+width);//density
+	
+	var force = impactForce/(depth+height+width);
+	
+	
+	//now that we have our properties, remove the object from the world
+	RemoveObj(object.id);
+
+	//The rubble will be propotionally sized cubes based on the original objects size
+	//frac creates frac^3 pieces of rubble.
+	var frac = 2;
+	var dfrac = depth/frac;
+	var hfrac = height/frac;
+	var wfrac = width/frac;
+	//next create our rubble
+	for (var h=0;h<frac;h++) {
+				
+		for (var w=0;w<frac;w++) {
+		
+			for(var d =0; d<frac;d++){
+				
+				var rubbleBluePrint = {
+						w : dfrac,
+						h : hfrac,
+						d : wfrac,
+						mass : rubbleMass,
+						shape:0,//0= box
+						color: color,
+						texture:texture,
+						x: posX,
+						y: posY,
+						z: posZ,
+						Rx: quatX,
+						Ry: quatY,
+						Rz: quatZ,
+					}
+		
+				//build the piece of rubble
+				var rubblePiece = createBox(rubbleBluePrint);
+				
+				//apply force to our piece of rubble		
+				// in random directions
+				var rd_X = Math.random() < 0.5 ? -1 : 1 ;
+				var rd_Y = Math.random() < 0.5 ? -1 : 1 ;
+				var rd_Z = Math.random() < 0.5 ? -1 : 1 ;
+				
+				//apply impact force to our rubble
+				rubblePiece.physics.applyCentralImpulse(vector3Aux1.setValue( force*rd_X,force*rd_Y,force*rd_Z ));	
+				
+				//set to ACTIVE so the pieces bounce around
+				//rubblePiece.physics.setActivationState(1);
+				
+				//add to our physics object holder
+				rigidBodies.push( rubblePiece.physics );
+				
+				//add to to physics world
+				physicsWorld.addRigidBody( rubblePiece.physics );
+				
+				//Add a random 1-5 sec delay b4 new rubble object is removed from world
+				var delay =  Math.random() * 4000 + 1000;
+		
+				//add self destruct to the rubble so it will be removed from world after delay time
+				setTimeout(function () { RemoveObj(rubblePiece.id)},delay);
+				
+				//add to posX, used in the placement for our next rubble block being created	
+				posX += (dfrac);
+			}
+			//reset our X axis
+			posX = frac;
+			//Start our new row, create each new block Z over
+			posZ +=(wfrac);//+Z dimention
+		}
+		//reset our Z axis
+		posZ = frac;
+		//start the new grid up one level
+		posY += hfrac; 
+	}
+	
+	*/
+}
+
+function RemoveObj(msg){
+			//msg is an ID for an object
+			try{
+			scene.remove( rigidBodiesLookUp[msg] )
+			physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
+			delete rigidBodiesLookUp[msg];
+			}
+			catch(err){console.log(err)}
+	};
+		
 function createBox(object,returnObj) {
 		//console.log('building',object)
 		
@@ -365,7 +552,7 @@ function createBox(object,returnObj) {
 				 texture = TEXTURE_FILES[object.texture];
 
 			if (object.player) {	
-			console.log("player")			
+			console.log("player",object)			
 					//player so only apply texture to front face of cube
 					var mat = new THREE.MeshBasicMaterial( { color:color,map:texture} );
 					var a = new THREE.MeshBasicMaterial( { color: color} );
@@ -380,7 +567,6 @@ function createBox(object,returnObj) {
 				}else {
 					//Cover the whole cube with texture
 					material = new THREE.MeshBasicMaterial( { map:texture} );
-				
 				}
 			}else{
 				material = new THREE.MeshBasicMaterial( { color: color} );
