@@ -34,6 +34,12 @@ const updateFrequency = .5;//Seconds
 const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 const IMPACT_FORCE_MINIMUM = 1;//minimum impact for collision to be broadcast
 
+/*used for binary exporting world*/
+const BYTE_COUNT_INT32 = 5;//id,w,h,d,mass,
+const BYTE_COUNT_INT8  = 3;//texture,shape,player
+const BYTE_COUNT_F32 = 8;//color,x,y,z,Rx,Ry,Rz,Rw
+		
+	
 var GROUND_ID;//used to quickly find the ground.
 
 var TEXTURE_FILES_INDEX = {
@@ -167,7 +173,7 @@ function createObjects() {
 		
 		//create a tower
 		for (var i = 0; i<10; i++) {
-			createCubeTower();
+		//	createCubeTower();
 		}
 }
 
@@ -260,44 +266,207 @@ function createCubeTower(height,width,depth){
 
 function AddToRigidBodiesIndex(obj){
 	//indicates if the object is a players cube
-	if(typeof obj.player === 'undefined'){obj.player = false};
+	if(typeof obj.player === 'undefined'){obj.player = 0};
 
 	//indicates if this object can break, if it can - force requied to break it in Newtons
-	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = false};
+	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = 0};
 
-	//rigidBodiesIndex holds construction info about our object
-	//it is used for new players to construct the current world state
-	//Ammo assigns a uniqueID number to every object which can be found in the 'ptr' property
-	
-	//assign our objects loc/rot to our reusable transform object
-	obj.physics.getMotionState().getWorldTransform( transformAux1 );
-	
-	var loc = transformAux1.getOrigin();//position
-	var rot = transformAux1.getRotation();//orientation
-	
-	rigidBodiesIndex[obj.id] = {
-				id:obj.id,
-				x:loc.x(), 
-				y:loc.y(), 
-				z:loc.z(), 
-				Rx:rot.x(), 
-				Ry:rot.y(), 
-				Rz:rot.z(), 
-				Rw:rot.w(),
-				w:obj.w, 
-				h:obj.h, 
-				d:obj.d, 
-				mass:obj.mass, 
-			    shape:obj.shape,
-			    color:obj.color,
-			    texture:obj.texture,
-			    player:obj.player,
-			    breakApartForce:obj.breakApartForce
-			};
-			
+	rigidBodiesIndex[obj.id] = new RigidBodyConstructor(obj);
+
 	//console.log(rigidBodiesIndex)
 }
 
+
+RigidBodyConstructor = function(obj){
+		
+		this.physics = obj.physics;//our AMMO portion of this object
+		this.id = obj.id;
+		this.w = obj.w;
+		this.h = obj.h; 
+		this.d = obj.d; 
+		this.mass = obj.mass; 
+		this.shape = obj.shape;
+		this.color = obj.color;
+		this.texture = obj.texture;
+		this.player = obj.player;
+		this.breakApartForce = obj.breakApartForce;
+		this.destroyObject = obj.destroyObject;
+		this.transformAux1 = new Ammo.btTransform();//reusable transform object
+		
+		/*used for binary exporting*/
+		this.int32Count = BYTE_COUNT_INT32;//id
+		this.int8Count = BYTE_COUNT_INT8;//w,h,d,mass,texture,shape,player
+		this.float32Count = BYTE_COUNT_F32;//color,x,y,z,Rx,Ry,Rz,Rw
+		
+		this.totalBytes = (this.int32Count*2)+(this.int8Count)+(this.float32Count*4);
+	
+};
+
+RigidBodyConstructor.prototype.breakObject = function(){
+	
+		/* TODO */
+};
+
+RigidBodyConstructor.prototype.getOrigin = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1);
+	var pos = this.transformAux1.getOrigin();
+	return {x:pos.x(),y:pos.y(),z:pos.z()};
+};
+
+RigidBodyConstructor.prototype.getRotation = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1)
+	var quat = this.transformAux1.getRotation();
+	return {x:quat.x(),y:quat.y(),z:quat.z(),w:quat.w()};
+};
+
+RigidBodyConstructor.prototype.getLinearVelocity = function(){
+	
+	var LV =  this.physics.getLinearVelocity();
+	return {x:LV.x(), y:LV.y(), z:LV.z()};
+};
+
+RigidBodyConstructor.prototype.getAngularVelocityVelocity = function(){
+	
+	var AV =  this.physics.getAngularVelocity();
+	return {x:AV.x(), y:AV.y(), z:AV.z()};
+};
+
+RigidBodyConstructor.prototype.x = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1);
+	return this.transformAux1.getOrigin().x();
+};
+
+RigidBodyConstructor.prototype.y = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1);
+	return this.transformAux1.getOrigin().y();
+};
+
+RigidBodyConstructor.prototype.z = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1);
+	return this.transformAux1.getOrigin().z();
+};
+
+RigidBodyConstructor.prototype.Rx = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1)
+	return this.transformAux1.getRotation().x();
+};
+
+RigidBodyConstructor.prototype.Ry = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1)
+	return this.transformAux1.getRotation().y();
+};
+
+RigidBodyConstructor.prototype.Rz = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1)
+	return this.transformAux1.getRotation().z();
+};
+
+RigidBodyConstructor.prototype.Rw = function(){
+	
+	this.physics.getMotionState().getWorldTransform(this.transformAux1)
+	return this.transformAux1.getRotation().w();
+};
+
+RigidBodyConstructor.prototype.LVx = function(){
+	
+	return this.physics.getLinearVelocity().x();
+};
+
+RigidBodyConstructor.prototype.LVy = function(){
+	
+	return this.physics.getLinearVelocity().y();
+};
+
+RigidBodyConstructor.prototype.LVz = function(){
+	
+	return this.physics.getLinearVelocity().z();
+};
+
+RigidBodyConstructor.prototype.AVx = function(){
+	
+	return this.physics.getAngularVelocity().x();
+};
+
+RigidBodyConstructor.prototype.AVy = function(){
+	
+	return this.physics.getAngularVelocity().y();
+};
+
+RigidBodyConstructor.prototype.AVz = function(){
+	
+	return this.physics.getAngularVelocity().z();
+};
+
+RigidBodyConstructor.prototype.exportJSON = function(){
+	
+	var pos = this.getOrigin();
+	var quat = this.getRotation();
+	return {
+		id:this.id,
+		x:pos.x, 
+		y:pos.y, 
+		z:pos.z,
+		Rx:quat.x,
+		Ry:quat.y, 
+		Rz:quat.z, 
+		Rw:quat.w,
+		w:this.w,
+		h:this.h, 
+		d:this.d,
+		mass:this.mass,
+		shape:this.shape,
+		color:this.color,
+		texture:this.texture,
+		player:this.player
+	}	
+}
+
+RigidBodyConstructor.prototype.exportBinary = function(){
+	                   
+
+	var int32 = new Int32Array(this.int32Count);//ORDER: id,w,h,d,mass,
+	var int8 = new Int8Array(this.int8Count);//ORDER: texture,shape,player
+	var f32 = new Float32Array(this.float32Count);//ORDER: color,x,y,z,Rx,Ry,Rz,Rw
+
+	int32[0] = parseInt(this.id.slice(2),10);//remove the 'id' and return as number
+	int32[1] = this.w;
+	int32[2] = this.h;
+	int32[3] = this.d;
+	int32[4] = this.mass;
+	
+	int8[0] = this.texture;
+	int8[1] = this.shape;
+	int8[2] = this.player;
+	
+	f32[0] = this.color;
+	f32[1] = this.x();
+	f32[2] = this.y();
+	f32[3] = this.z();
+	f32[4] = this.Rx();
+	f32[5] = this.Ry();
+	f32[6] = this.Rz();
+	f32[7] = this.Rw();
+	
+	console.log(int32)
+	console.log(int8)
+	console.log(f32)
+	//prepare binary
+	var int32Buffer = Buffer.from(int32.buffer);
+	var int8Buffer = Buffer.from(int8.buffer);
+	var f32Buffer = Buffer.from(f32.buffer);
+
+	var binaryData = Buffer.concat([int32Buffer,int8Buffer,f32Buffer],this.totalBytes);
+	
+	return binaryData
+}
 
 //the object returned from createPhysicalCube has places the Ammo object under the property 'physics'
 //the x,y,z,Rx,Ry,Rz props are deleted and a new prop 'physics' is created.
@@ -369,39 +538,13 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	physicsWorld.stepSimulation( deltaTime,10);//Bullet maintains an internal clock, in order to keep the actual length of ticks constant
 
 	//***COLLISION CHECKS
-	//TODO: JMN Nov6 2016 tie in collision check with clients, broadcast as a Uint16 buffer
-	//count of object pairs in collision
-	var collisionPairs = dispatcher.getNumManifolds();
-
-	for(var i=0;i<collisionPairs;i++){
-		//for each collision pair, check if the impact force of the two objects exceeds our ForceThreshold (global var)
-		//this will eliminate small impacts from being evaluated, light resting on the ground and gravity is acting on object
-		//truncate with bit OR 0 because don't need decimal
-		var impactForce = dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
-
-		//check that force is over our threshold, prevent tracking very small impact forces		
-		if( impactForce > IMPACT_FORCE_MINIMUM){
-			
-			//Objects ptr id, MUST have 'id' added to the front before use as a rigidBodiesIndex lookup
-			var Obj1_ptr = dispatcher.getManifoldByIndexInternal(i).getBody0().ptr;
-			var Obj2_ptr = dispatcher.getManifoldByIndexInternal(i).getBody1().ptr;	
-			
-			//apply breakApart to servers world
-			var Obj1_lookupID = 'id'+Obj1_ptr.toString();
-			try{
-				if(Obj1_lookupID !== GROUND_ID)breakObject(rigidBodiesIndex[Obj1_lookupID],impactForce);
-			}catch (err) {console.log(err)};
-			
-			var Obj2_lookupID = 'id'+Obj2_ptr.toString();
-			try{
-				if(Obj2_lookupID !== GROUND_ID)breakObject(rigidBodiesIndex[Obj2_lookupID],impactForce);
-			}catch (err) {console.log(err)};
-		};
-	}
-
+	
+	//TODO: JMN Nov6 2016 tie in collision check with clients, broadcast
+	//distruction rubble
+	//var collisionPairs = dispatcher.getNumManifolds();
+	//processCollisionPairs(dispatcher.getNumManifolds());
+	
 	//********END COLLISION CHECKS
-
-
 
 	if (timeForUpdate){
 		//tell users to grab a world state because update is coming next tick
@@ -420,30 +563,57 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 };
 
 
-function breakObject(object,impactForce){
+function processCollisionPairs(collisionPairs){
+	
+		for(var i=0;i<collisionPairs;i++){
+		//for each collision pair, check if the impact force of the two objects exceeds our ForceThreshold (global IMPACT_FORCE_MINIMUM)
+		//this will eliminate small impacts from being evaluated, light resting on the ground, gravity acting on object etc.
+		//truncate with bit OR 0 because don't need decimal
+			var impactForce = dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
 
-	//console.log("430:",object)
-	/*TODO:
-		Rubble should be the same as bullets.  Use that existing framework
-		*/
-	//first if the force is NOT great enough to actuall break this object or object cant break return
-	if(typeof object.breakApartForce === 'undefined' || 
-		!object.breakApartForce ||
-		object.breakApartForce > impactForce)return false;
+			//check that force is over our threshold
+			if( impactForce > IMPACT_FORCE_MINIMUM){
+			
+				//Objects ptr id, MUST have 'id' added to the front before use as a rigidBodiesIndex lookup
+				var Obj1_lookupID = 'id'+dispatcher.getManifoldByIndexInternal(i).getBody0().ptr.toString();
+				var Obj2_lookupID = 'id'+dispatcher.getManifoldByIndexInternal(i).getBody1().ptr.toString();
 
-		//get some object properties from our object to be broken
-		var depth = object.w;
-		var height = object.h; 
-		var width = object.d;
-		var mass = object.mass;
-		var posX = object.x;
-		var posY = object.y;
-		var posZ = object.z;
-		var quatX = object.Rx;
-		var quatY = object.Ry;
-		var quatZ = object.Rz;
-		var texture = object.texture;
-		var color = object.color;
+				//check if the object can break, and if force is large enough to break it
+				FlagObjectToBreak(rigidBodiesIndex[Obj1_lookupID],impactForce);
+				FlagObjectToBreak(rigidBodiesIndex[Obj2_lookupID],impactForce);
+		};
+	};
+};
+
+
+function FlagObjectToBreak(object,impactForce){
+
+	//console.log("422:",object)
+	//first if the force is NOT great enough to actually break this object or object cant break, return
+	if(!object.breakApartForce ||
+		object.breakApartForce > impactForce){
+			return false;}
+	else{
+		object.destroyObject = true;
+		return true;}
+}
+
+
+function generateRubble(object){
+	
+	//get some object properties from our object to be broken
+	var depth = object.w;
+	var height = object.h; 
+	var width = object.d;
+	var mass = object.mass;
+	var posX = object.x;
+	var posY = object.y;
+	var posZ = object.z;
+	var quatX = object.Rx;
+	var quatY = object.Ry;
+	var quatZ = object.Rz;
+	var texture = object.texture;
+	var color = object.color;
 	
 	var rubbleMass = mass/(depth+height+width);//density
 	
@@ -548,7 +718,7 @@ function breakObject(object,impactForce){
 	
 	return true;
 	
-
+	
 }
 
 
@@ -636,35 +806,53 @@ function TickPhysics() {
 	   updatePhysics( deltaTime,sendUpdate );
     };
 	
-	
-function BuildWorldStateForNewConnection(){
 
-	//http://stackoverflow.com/questions/35769707/socket-io-loses-data-on-server-side
-	var world = new Array();
+
+function BuildWorldStateForNewConnection(){
+	
+	var msgByteCount = 0;
+	var header = new Int16Array(4);
+	header[0] = rigidBodies.length;
+	header[1] = BYTE_COUNT_INT8
+	header[2] = BYTE_COUNT_INT32
+	header[3] = BYTE_COUNT_F32	
+	console.log("819",header.buffer.byteLength)
+	var binaryData = Buffer.from(header.buffer);
 
 	for(var i = 0; i < rigidBodies.length; i++){
 		
-		//Try/Catch is here because ridgidBodies length can be affected by other functions.  synchronized locking not setup yet
+		//Try/Catch is here mostly for debug
 		var lookUp = 'id'+rigidBodies[i].ptr.toString();
 
 		try{
-			world.push(rigidBodiesIndex[lookUp]);
+			var currentByteLength = binaryData.length + rigidBodiesIndex[lookUp].totalBytes;
+			//basically PUSH new binary to end of current binary
+			console.log("830",rigidBodiesIndex[lookUp].exportJSON())
+			console.log("831",rigidBodiesIndex[lookUp].exportBinary().byteLength)
+			binaryData = Buffer.concat([binaryData, rigidBodiesIndex[lookUp].exportBinary()], currentByteLength )
 		}
 		catch(err){
-			console.log(err)
+			console.log("876",err)
 			delete rigidBodiesIndex[lookUp]}
 	}
+	
+	console.log("883",binaryData.byteLength)
 	
 	//create a time stamp
 	var time = Date.now();
 	
 	/*IMPORTANT: See SO link above.  Can't send rigidBodiesIndex directly, had to copy to new array.  */	
 	io.emit('setup',{
-		[time]:world,
+		time:time,
+		data: binaryData,
 		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
 		TEXTURE_FILES:TEXTURE_FILES});
 	
 }
+
+
+
+
 
 function AddPlayer(uniqueID){
 	
@@ -689,7 +877,7 @@ function AddPlayer(uniqueID){
 			Rx: 0,
 			Ry: 0,
 			Rz: 0,
-			player:true,
+			player:1,
 			breakApartForce:300
 		}
 		
@@ -717,6 +905,9 @@ function AddPlayer(uniqueID){
 		io.emit('newPlayer', {[uniqueID]:rigidBodiesIndex[cube.id]});
 		
 }
+
+
+
 
 //function FireShot(player){
 function FireShot(ID,data){

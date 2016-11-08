@@ -114,7 +114,12 @@ var socket = io();
 		});		
 		
 		socket.on('setup', function(msg){
-			//msg is an object with an array of JSON with each root key the ID of an object
+			console.log(msg.data.byteLength)
+			//msg is an object with 4 props
+			//time: timeStamp from server
+			//data: binary data of all world objects
+			//TEXTURE_FILES_INDEX: Object whos keys match files in TEXTURE_FILES array
+			//TEXTURE_FILES: array of file name strings
 			if(newPlayer){
 				
 				//assign the lookup index for textures
@@ -123,26 +128,82 @@ var socket = io();
 				//load all textures
 				serverTextureLoader( msg.TEXTURE_FILES);
 
-				var timeStamp = Object.keys(msg)[0];
+				var timeStamp = msg.time;
 				//sync clocks
 				clock = new GameClock(timeStamp);
 				synchronizer.linkGameClock(clock);
 			
-				var worldObjects = msg[timeStamp];
-				console.log(worldObjects)
-				//msg is the array of objects
-				for(var i =0; i<worldObjects.length;i++){	
-					console.log(worldObjects.shape)
-					try {
-						if(worldObjects[i].shape === 0){
-
-							createBox(worldObjects[i]);
-
-							};					
-						}catch (err) {console.log(err)};
-					};
+				var binaryData = msg.data;
+				
+				//first 8 bytes are int16 headers
+				var header = new Uint16Array(msg.data,0,4);
+					console.log(header)
+					var totalObjs = header[0];
+					var int8count = header[1];
+					var int32count = header[2];
+					var f32count = header[3];
 					
-				newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
+					var totalPropsPerObj = (int8count+int32count+f32count) 
+					var totalBytesPerObj = (int8count+(int32count*2)+(f32count*4)) 
+					
+					var shift_int32 = int32count * 4;
+					var shift_int8 = int8count;
+					var shift_f32 = f32count * 4;
+					
+				//now unpack the binary data into objects to be built
+				for(var i =4; i<totalObjs*totalBytesPerObj;i+=totalBytesPerObj){
+					//the data.msg is a HUGE mixed binary data
+					var objectBinary = new DataView(msg.data, i, i+shift_int32+shift_int8+shift_f32 );
+					console.log(objectBinary)
+
+				/*TODO:
+				https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
+				need to slice the buffer before converting into typedArray'safe*/
+					//order is int32, int8, f32
+					console.log(i,i+shift_int32)
+					var int32 = new Int32Array(msg.data,i,i+shift_int32);
+					console.log(int32)
+					
+					console.log(i+shift_int32+1,i+shift_int32+shift_int8+1)
+					var int8 = new Int8Array(msg.data,i+shift_int32+1,i+shift_int32+shift_int8+1);
+					console.log(int8)
+					
+					console.log(i+shift_int32+shift_int8+2,i+shift_int32+shift_int8+2+shift_f32)
+					var f32 = new Float32Array(msg.data,i+shift_int32+shift_int8+2,i+shift_int32+shift_int8+2+shift_f32);
+					console.log(f32)
+					//create object 
+					var objectBluePrint = {
+						id : 'id'+int32[i].toString(),
+						w : int8[0], 
+						h : int8[1],
+						d : int8[2],
+						mass : int8[3], 
+						texture : int8[4],
+						shape : int8[5], 
+						player : int8[6], 
+						color : f32[0],
+						x : f32[1],
+						y : f32[2],
+						z : f32[3], 
+						Rx : f32[4], 
+						Ry : f32[5], 
+						Rz : f32[6], 
+						Rw : f32[7] 
+					}
+					console.log(objectBluePrint);
+					//ONLY box is supported now anyway
+					createBox(objectBluePrint);
+					/*if(objectBluePrint.shape === 0){
+							createBox(objectBluePrint);
+							};	
+					*/
+					
+					
+				}
+
+					
+			newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
+			
 			};
 			//now that world is built, ask for assigned object
 			socket.emit('getMyObj','get');
@@ -521,25 +582,26 @@ function RemoveObj(msg){
 	};
 		
 function createBox(object,returnObj) {
-		//console.log('building',object)
-		
+
 		/*
-		TODO:
-		Change this to work like the bullet builder which doesn't require
-		an object.  This way server doesn't need to send a JSON for world
-		building.  Use a 16bit to encode textures, pass array of strings for texture names inside images directory
+		CONSIDER:
+		should this take an array or Object or both? if it took an array.
+		could map the props to a local object first, then use.
+		
+		var localObject;
+		if (typeof object === Object){localObject = object}
+		else{
+			localObject.w = object[0]
+			etc...
+		}
 		*/
+		
 		var material=[];//consider passing mat types to flag basic, phong, etc...
 	
 		var texture = null;
 		
 		var color = 0xffffff;//default is white
-	//	var yourNumber = parseInt(color, 16);
-	//	console.log(yourNumber)
-	//	console.log(color.toString(16))
-	//	console.log(parseFloat(color.toString(10)))
-	//	console.log(parseFloat(color))
-		
+
 		if (object.hasOwnProperty('color')) {color = object.color};
 		
 		if (object.hasOwnProperty('texture') ){ 
@@ -547,8 +609,8 @@ function createBox(object,returnObj) {
 				 texture = TEXTURE_FILES[object.texture];
 
 			if (object.player) {	
-			console.log("player",object)			
-					//player so only apply texture to front face of cube
+					console.log("player",object)			
+					//player so only apply texture to FRONT FACE of cube
 					var mat = new THREE.MeshBasicMaterial( { color:color,map:texture} );
 					var a = new THREE.MeshBasicMaterial( { color: color} );
 					//cube texture index map:
@@ -560,7 +622,7 @@ function createBox(object,returnObj) {
 					//5 - back
 					material = new THREE.MeshFaceMaterial( [a,a,a,a,mat,a]);
 				}else {
-					//Cover the whole cube with texture
+					//Cover the WHOLE cube with texture
 					material = new THREE.MeshBasicMaterial( { map:texture} );
 				}
 			}else{
