@@ -133,11 +133,13 @@ var socket = io();
 				//msg is the array of objects
 				for(var i =0; i<worldObjects.length;i++){	
 					console.log(worldObjects.shape)
-					if(worldObjects[i].shape === 0){
-						
-						createBox(worldObjects[i]);
-						
-						}					
+					try {
+						if(worldObjects[i].shape === 0){
+
+							createBox(worldObjects[i]);
+
+							};					
+						}catch (err) {console.log(err)};
 					};
 					
 				newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
@@ -174,18 +176,9 @@ var socket = io();
 		});
 		
 		socket.on('C',function (msg) {
-			//msg is Uint32 binary data
-			//structure is [id,id,force,id,id,force,id,id,force...]
-			//important the ids need 'id' stuck at the front as they are just numbers
-			var dataArray = new Uint32Array(msg);
-			for(var i = 0; i<dataArray.length; i+=3){
-				console.log(dataArray[i],dataArray[i+1],dataArray[i+2])
-				var id1 = 'id'+dataArray[i].toString();
-					if(dataArray[i] != 0)breakObject(id1,dataArray[i+2]);
-				var id2 = 'id'+dataArray[i+1].toString();
-					if(dataArray[i+1] != 0)breakObject(id2,dataArray[i+2])
-			}
-			//console.log(dataArray)
+			var dataArray = new Float32Array(msg);
+		//	console.log(dataArray)
+			createBullet(dataArray);
 		});
 		
 
@@ -202,7 +195,7 @@ var socket = io();
 		});
 		
 		socket.on('rmvObj', function(msg){
-			//console.log(msg);
+			console.log(msg);
 			//msg is an ID for an object
 			//remove it
 			RemoveObj(msg)
@@ -231,7 +224,7 @@ var socket = io();
 			//Shot
 			if (fireBullet & header[0]) {
 				//do something with ID here? it tells us who is firing this shot Could be YOU!
-				createBullet(header,dataArray);
+				createBullet(dataArray);
 				}
 			
 			//Movement
@@ -518,11 +511,13 @@ function breakObject(lookUp,impactForce){
 function RemoveObj(msg){
 			//msg is an ID for an object
 			try{
-			scene.remove( rigidBodiesLookUp[msg] )
-			physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
-			delete rigidBodiesLookUp[msg];
+				scene.remove( rigidBodiesLookUp[msg] )
+				physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
+				delete rigidBodiesLookUp[msg];
 			}
-			catch(err){console.log(err)}
+			catch(err){
+				console.log("err:",msg)
+				}
 	};
 		
 function createBox(object,returnObj) {
@@ -633,7 +628,7 @@ function createBoxPhysicsObject (object){
 	return physicsCube;
 }
 
-function createBullet(type,data){
+function createBullet(data){
 	
 	var bulletBlueprint = {
 			id: 'id'+data[11].toString(),

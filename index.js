@@ -195,7 +195,8 @@ function createCubeTower(height,width,depth){
 			h : 2,
 			d : 2,
 			shape:0,//box =0
-			color: Math.random() * 0x0000ff, //random blues
+	//		color: Math.random() * 0x0000ff, //random blues
+			color: 0xededed,//light gray
 			texture:TEXTURE_FILES_INDEX.blocks_1,
 			x: 0,
 			y: 0,
@@ -203,7 +204,7 @@ function createCubeTower(height,width,depth){
 			Rx: 0,
 			Ry: 0,
 			Rz: 0,
-			breakApartForce: 50
+			breakApartForce: 5
 		}
 		
 	//three nested loops will create the tower
@@ -371,7 +372,7 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	//TODO: JMN Nov6 2016 tie in collision check with clients, broadcast as a Uint16 buffer
 	//count of object pairs in collision
 	var collisionPairs = dispatcher.getNumManifolds();
-	var collisionData = new Array();
+
 	for(var i=0;i<collisionPairs;i++){
 		//for each collision pair, check if the impact force of the two objects exceeds our ForceThreshold (global var)
 		//this will eliminate small impacts from being evaluated, light resting on the ground and gravity is acting on object
@@ -387,33 +388,17 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 			
 			//apply breakApart to servers world
 			var Obj1_lookupID = 'id'+Obj1_ptr.toString();
-			if(Obj1_lookupID === GROUND_ID) Obj1_ptr =0;
 			try{
-				breakObject(rigidBodiesIndex[Obj1_lookupID],impactForce);
-			}catch(err){console.log("394:",err)}
+				if(Obj1_lookupID !== GROUND_ID)breakObject(rigidBodiesIndex[Obj1_lookupID],impactForce);
+			}catch (err) {console.log(err)};
 			
 			var Obj2_lookupID = 'id'+Obj2_ptr.toString();
-			if(Obj2_lookupID === GROUND_ID) Obj2_ptr =0;
 			try{
-				//returns bool if object can be broken
-				breakObject(rigidBodiesIndex[Obj2_lookupID],impactForce);
-			}catch(err){console.log("399:",err, +"\n"+Obj2_lookupID)}
-			
-			//console.log('387:',Obj1_ptr,Obj2_ptr)
-			collisionData.push(Obj1_ptr,Obj2_ptr,impactForce)
+				if(Obj2_lookupID !== GROUND_ID)breakObject(rigidBodiesIndex[Obj2_lookupID],impactForce);
+			}catch (err) {console.log(err)};
 		};
 	}
-	if (collisionData.length >0) {
-		//send out collision data
-		//set the data as uint16 data array
-		var binaryData = new Uint32Array(collisionData);
-	
-		//create a data buffer of the underlying array
-		var buff = Buffer.from(binaryData.buffer)
 
-		//send out he data
-		io.emit('C', buff );
-	}
 	//********END COLLISION CHECKS
 
 
@@ -436,40 +421,36 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 
 
 function breakObject(object,impactForce){
+
 	//console.log("430:",object)
-	console.log('436: breakObject() under construction as of 11/7/16');
 	/*TODO:
 		Rubble should be the same as bullets.  Use that existing framework
 		*/
 	//first if the force is NOT great enough to actuall break this object or object cant break return
-	if(object.id === GROUND_ID || 
-		typeof object.breakApartForce === 'undefined' || 
+	if(typeof object.breakApartForce === 'undefined' || 
 		!object.breakApartForce ||
 		object.breakApartForce > impactForce)return false;
+
+		//get some object properties from our object to be broken
+		var depth = object.w;
+		var height = object.h; 
+		var width = object.d;
+		var mass = object.mass;
+		var posX = object.x;
+		var posY = object.y;
+		var posZ = object.z;
+		var quatX = object.Rx;
+		var quatY = object.Ry;
+		var quatZ = object.Rz;
+		var texture = object.texture;
+		var color = object.color;
 	
-	//get some object properties from our object to be broken
-	var depth = object.w;
-	var height = object.h; 
-	var width = object.d;
-	var mass = object.mass;
-	var posX = object.x;
-	var posY = object.y;
-	var posZ = object.z;
-	var quatX = object.Rx;
-	var quatY = object.Ry;
-	var quatZ = object.Rz;
-	var texture = object.texture;
-	var color = object.color;
-	
-	//var rubbleMass = mass/(depth+height+width);//density
-	var rubbleMass = 0.01;
+	var rubbleMass = mass/(depth+height+width);//density
 	
 	var force = impactForce/(depth+height+width);
 	
-	
 	//now that we have our properties, remove the object from the server world
-	// DON"T BROADCAST! passing false will not broadcast
-	RemoveObj(object.id,false);
+	RemoveObj(object.id);
 
 	//The rubble will be propotionally sized cubes based on the original objects size
 	//frac creates frac^3 pieces of rubble.
@@ -477,6 +458,7 @@ function breakObject(object,impactForce){
 	var dfrac = depth/frac;
 	var hfrac = height/frac;
 	var wfrac = width/frac;
+	
 	//next create our rubble
 	for (var h=0;h<frac;h++) {
 				
@@ -484,33 +466,49 @@ function breakObject(object,impactForce){
 		
 			for(var d =0; d<frac;d++){
 				
+				var binaryData   = new Float32Array(12);
+					binaryData[0] = dfrac;//width
+					binaryData[1] = hfrac;//height
+					binaryData[2] = wfrac;//depth
+					binaryData[3] = rubbleMass;//mass
+					binaryData[4] = color; //color, light gray
+					binaryData[5] = posX;//x
+					binaryData[6] = posY;//y
+					binaryData[7] = posZ;//z
+
+				/*
+				THIS IS RIDICULOUS lol
+				TODO: JMN Nov7 2016
+				change createPhysicalCube() so it accepts a data array OR object
+				*/
 				var rubbleBluePrint = {
-						w : dfrac,
-						h : hfrac,
-						d : wfrac,
-						mass : rubbleMass,
-						shape:0,//0= box
-						color: color,
-						texture:texture,
-						x: posX,
-						y: posY,
-						z: posZ,
-						Rx: quatX,
-						Ry: quatY,
-						Rz: quatZ
+						w : binaryData[0],
+						h : binaryData[1],
+						d : binaryData[2],
+						mass : binaryData[3],
+						color: binaryData[4],
+						x: binaryData[5],
+						y: binaryData[6],
+						z: binaryData[7],
+						Rx: 0,
+						Ry: 0,
+						Rz: 0
 					}
 		
 				//build the piece of rubble
 				var rubblePiece = createPhysicalCube(rubbleBluePrint);
 				
+				console.log(rubblePiece.id);
+				binaryData[11] = rubblePiece.physics.ptr;//the NUMBER portion of ptr ID
+				
 				//apply force to our piece of rubble		
 				// in random directions
-				var rd_X = Math.random() < 0.5 ? -1 : 1 ;
-				var rd_Y = Math.random() < 0.5 ? -1 : 1 ;
-				var rd_Z = Math.random() < 0.5 ? -1 : 1 ;
+				binaryData[8] = force * (Math.random() < 0.5 ? -1 : 1);
+				binaryData[9] = force * (Math.random() < 0.5 ? -1 : 1);
+				binaryData[10] = force * (Math.random() < 0.5 ? -1 : 1);
 				
 				//apply impact force to our rubble
-				rubblePiece.physics.applyCentralImpulse(vector3Aux1.setValue( force*rd_X,force*rd_Y,force*rd_Z ));	
+				rubblePiece.physics.applyCentralImpulse(vector3Aux1.setValue( binaryData[8],binaryData[9],binaryData[10] ));	
 				
 				//set to ACTIVE so the pieces bounce around
 				//rubblePiece.physics.setActivationState(1);
@@ -525,7 +523,14 @@ function breakObject(object,impactForce){
 				var delay =  Math.random() * 4000 + 1000;
 		
 				//add self destruct to the rubble so it will be removed from world after delay time
-				setTimeout(function () { RemoveObj(rubblePiece.id,false)},delay);
+				setTimeout(function () { RemoveObj(rubblePiece.id)},delay);
+				
+				//prepare binary data for shipping
+				var dataBuffer = Buffer.from(binaryData.buffer)
+		
+				//add to worlds of other players 
+				io.emit('C', dataBuffer);
+						
 				
 				//add to posX, used in the placement for our next rubble block being created	
 				posX += (dfrac);
@@ -542,6 +547,8 @@ function breakObject(object,impactForce){
 	}
 	
 	return true;
+	
+
 }
 
 
@@ -848,9 +855,9 @@ function PlayerInput(ID,data){
 }
 
 
-function RemoveObj(RB_id,broadcast) {
+function RemoveObj(RB_id) {
 	/* DUPLICATE WARNING RemoveAPlayer does 99% the same, merge them, D.N.R.Y.S. */
-	
+	console.log('858:',RB_id)
 	//remove from our rigidbodies holder
 	for(var i=0;i < rigidBodies.length;i++){
 		
@@ -870,7 +877,7 @@ function RemoveObj(RB_id,broadcast) {
 	}
 	
 	//tell everyone to delete object
-	if(broadcast !== false)io.emit('rmvObj', RB_id);
+	io.emit('rmvObj', RB_id);
 }
 
 function RemoveAPlayer(uniqueID){
