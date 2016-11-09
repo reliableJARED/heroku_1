@@ -50,6 +50,7 @@ var TEXTURE_FILES_INDEX = {
 	envXpos:4,
 	envYneg:5,
 	envYpos:6};
+	
 var TEXTURE_FILES =[
 	'snow.png',
 	'snow_small.png',

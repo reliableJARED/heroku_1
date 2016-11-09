@@ -121,7 +121,8 @@ var socket = io();
 			//TEXTURE_FILES_INDEX: Object whos keys match files in TEXTURE_FILES array
 			//TEXTURE_FILES: array of file name strings
 			if(newPlayer){
-				
+				newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
+			
 				//assign the lookup index for textures
 				TEXTURE_FILES_INDEX  = msg.TEXTURE_FILES_INDEX ;
 				
@@ -144,43 +145,48 @@ var socket = io();
 					var f32count = header[3];
 					
 					var totalPropsPerObj = (int8count+int32count+f32count) 
-					var totalBytesPerObj = (int8count+(int32count*2)+(f32count*4)) 
+					
+					var totalBytesPerObj = 45;//int8count+(int32count*4)+(f32count*4)
 					
 					var shift_int32 = int32count * 4;
 					var shift_int8 = int8count;
 					var shift_f32 = f32count * 4;
-					
+					console.log(totalBytesPerObj)
 				//now unpack the binary data into objects to be built
-				for(var i =4; i<totalObjs*totalBytesPerObj;i+=totalBytesPerObj){
+				for(var i =8; i<=msg.data.byteLength;i+=45){
+					console.log(i,i+shift_int32);
+					console.log(i+shift_int32,i+shift_int32+shift_int8);
+					console.log(i+shift_int32+shift_int8,i+shift_int32+shift_int8+shift_f32);
 					//the data.msg is a HUGE mixed binary data
-					var objectBinary = new DataView(msg.data, i, i+shift_int32+shift_int8+shift_f32 );
-					console.log(objectBinary)
-
 				/*TODO:
 				https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
-				need to slice the buffer before converting into typedArray'safe*/
+				need to slice the buffer before converting into typedArray
+				*/
+				
 					//order is int32, int8, f32
-					console.log(i,i+shift_int32)
-					var int32 = new Int32Array(msg.data,i,i+shift_int32);
+					var int32 = new Int32Array(msg.data.slice(i,i+shift_int32));
 					console.log(int32)
 					
-					console.log(i+shift_int32+1,i+shift_int32+shift_int8+1)
-					var int8 = new Int8Array(msg.data,i+shift_int32+1,i+shift_int32+shift_int8+1);
+					var int8 = new Int8Array(msg.data.slice(i+shift_int32,i+shift_int32+shift_int8));
 					console.log(int8)
 					
-					console.log(i+shift_int32+shift_int8+2,i+shift_int32+shift_int8+2+shift_f32)
-					var f32 = new Float32Array(msg.data,i+shift_int32+shift_int8+2,i+shift_int32+shift_int8+2+shift_f32);
+					var f32 = new Float32Array(msg.data.slice(i+shift_int32+shift_int8,i+shift_int32+shift_int8+shift_f32));
 					console.log(f32)
+
+										
+					
 					//create object 
 					var objectBluePrint = {
-						id : 'id'+int32[i].toString(),
-						w : int8[0], 
-						h : int8[1],
-						d : int8[2],
-						mass : int8[3], 
-						texture : int8[4],
-						shape : int8[5], 
-						player : int8[6], 
+						id : 'id'+int32[0].toString(),
+						w : int32[1], 
+						h : int32[2],
+						d : int32[3],
+						mass : int32[4], 
+						
+						texture : int8[0],
+						shape : int8[1], 
+						player : int8[2], 
+						
 						color : f32[0],
 						x : f32[1],
 						y : f32[2],
@@ -202,7 +208,7 @@ var socket = io();
 				}
 
 					
-			newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
+
 			
 			};
 			//now that world is built, ask for assigned object
