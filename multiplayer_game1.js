@@ -103,7 +103,6 @@ var socket = io();
 		
 		socket.on('yourObj',function(msg){
 			//Server assigning you to a rigidBody
-	
 			PlayerCube = new PlayerObjectConstructor(rigidBodiesLookUp[msg]);
 		
 			//assign your player to the physics synchronizer
@@ -113,8 +112,11 @@ var socket = io();
 			animate();	
 		});		
 		
+		function requestPlayerObj(){
+			//when world is built, ask for assigned object
+			socket.emit('getMyObj');
+		};
 		socket.on('setup', function(msg){
-			console.log(msg.data.byteLength)
 			//msg is an object with 4 props
 			//time: timeStamp from server
 			//data: binary data of all world objects
@@ -129,90 +131,16 @@ var socket = io();
 				//load all textures
 				serverTextureLoader( msg.TEXTURE_FILES);
 
-				var timeStamp = msg.time;
 				//sync clocks
-				clock = new GameClock(timeStamp);
+				clock = new GameClock(msg.time);
 				synchronizer.linkGameClock(clock);
 			
-				var binaryData = msg.data;
-				
-				//first 8 bytes are int16 headers
-				var header = new Uint16Array(msg.data,0,4);
-					console.log(header)
-					var totalObjs = header[0];
-					var int8count = header[1];
-					var int32count = header[2];
-					var f32count = header[3];
-					
-					var totalPropsPerObj = (int8count+int32count+f32count) 
-					
-					var totalBytesPerObj = 45;//int8count+(int32count*4)+(f32count*4)
-					
-					var shift_int32 = int32count * 4;
-					var shift_int8 = int8count;
-					var shift_f32 = f32count * 4;
-					console.log(totalBytesPerObj)
-				//now unpack the binary data into objects to be built
-				for(var i =8; i<=msg.data.byteLength;i+=45){
-					console.log(i,i+shift_int32);
-					console.log(i+shift_int32,i+shift_int32+shift_int8);
-					console.log(i+shift_int32+shift_int8,i+shift_int32+shift_int8+shift_f32);
-					//the data.msg is a HUGE mixed binary data
-				/*TODO:
-				https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
-				need to slice the buffer before converting into typedArray
-				*/
-				
-					//order is int32, int8, f32
-					var int32 = new Int32Array(msg.data.slice(i,i+shift_int32));
-					console.log(int32)
-					
-					var int8 = new Int8Array(msg.data.slice(i+shift_int32,i+shift_int32+shift_int8));
-					console.log(int8)
-					
-					var f32 = new Float32Array(msg.data.slice(i+shift_int32+shift_int8,i+shift_int32+shift_int8+shift_f32));
-					console.log(f32)
+				var ObjectsToBuild = unpackServerBinaryData(msg.data);
+				buildObjectBatch(ObjectsToBuild, requestPlayerObj)
 
-										
-					
-					//create object 
-					var objectBluePrint = {
-						id : 'id'+int32[0].toString(),
-						w : int32[1], 
-						h : int32[2],
-						d : int32[3],
-						mass : int32[4], 
-						
-						texture : int8[0],
-						shape : int8[1], 
-						player : int8[2], 
-						
-						color : f32[0],
-						x : f32[1],
-						y : f32[2],
-						z : f32[3], 
-						Rx : f32[4], 
-						Ry : f32[5], 
-						Rz : f32[6], 
-						Rw : f32[7] 
-					}
-					console.log(objectBluePrint);
-					//ONLY box is supported now anyway
-					createBox(objectBluePrint);
-					/*if(objectBluePrint.shape === 0){
-							createBox(objectBluePrint);
-							};	
-					*/
-					
-					
-				}
-
-					
+			};
 
 			
-			};
-			//now that world is built, ask for assigned object
-			socket.emit('getMyObj','get');
 		});
 		
 
@@ -244,7 +172,7 @@ var socket = io();
 		
 		socket.on('C',function (msg) {
 			var dataArray = new Float32Array(msg);
-		//	console.log(dataArray)
+			console.log(dataArray)
 			createBullet(dataArray);
 		});
 		
@@ -262,7 +190,7 @@ var socket = io();
 		});
 		
 		socket.on('rmvObj', function(msg){
-			console.log(msg);
+		//	console.log('remove:',msg);
 			//msg is an ID for an object
 			//remove it
 			RemoveObj(msg)
@@ -279,8 +207,7 @@ var socket = io();
 		   //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
 		   //remaining bytes are for all float32 (4bytes each) that code movement commands
 		   
-			
-			
+
 			//determine what player object should be used
 			var player = rigidBodiesLookUp[ID];
 		
@@ -399,6 +326,94 @@ function serverTextureLoader(filenameArray) {
  	};
  	
 };
+
+function buildObjectBatch(ObjectsToBuild, requestPlayerObj) {
+
+   for(var o=0; o<ObjectsToBuild.length; o++){
+		//ONLY box is supported now anyway, else there is a shape prop
+		createBox(ObjectsToBuild[o]);
+		/*if(objectBluePrint.shape === 0){
+			createBox(objectBluePrint);
+			};	
+		*/	
+	};
+	
+    requestPlayerObj();
+};
+
+function unpackServerBinaryData(binaryData){
+	
+	var AllObjectBluePrints = new Array();
+	// binaryData is mixed structure binary data for all objects
+	//first 8 bytes are int16 headers
+				var header = new Uint16Array(binaryData,0,4);
+
+					var totalObjs = header[0];
+					var int8count = header[1];
+					var int32count = header[2];
+					var f32count = header[3];
+					
+					var totalPropsPerObj = (int8count+int32count+f32count) 
+					var totalBytesPerObj = int8count+(int32count*4)+(f32count*4)
+					
+					//order of binary data is int32, int8, f32 
+					//create offsets
+					var startInt32 = 0;
+					var endInt32 = int32count*4;
+					var startInt8 = endInt32;
+					var endInt8 = startInt8 + int8count;
+					var startF32 = endInt8;
+					var endF32 = startF32 + (f32count*4);
+					
+				//now unpack the binary data into objects to be built
+				//skip first 8 because they are headers
+			for(var i =8; i<binaryData.byteLength;i+=totalBytesPerObj){
+				/*TODO:
+				https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
+				need to slice the buffer before converting into typedArray.
+				this is because new typedArray() expects start to be an increment
+				of the base.  ie floats start on multipue of 4.
+				*/
+				
+					//order is int32, int8, f32
+					//int32 buffer slice
+					var bufferInt32 = binaryData.slice(i+startInt32,i+endInt32);
+					var int32 = new Int32Array(bufferInt32);
+					
+					var bufferInt8 = binaryData.slice(i+startInt8,i+endInt8)
+					var int8 = new Int8Array(bufferInt8);
+					
+					var bufferF32 = binaryData.slice(i+startF32,i+endF32)
+					var f32 = new Float32Array(bufferF32);
+					
+					//create object 
+					var objectBluePrint = {
+						id : 'id'+int32[0].toString(),
+						w : int32[1], 
+						h : int32[2],
+						d : int32[3],
+						mass : int32[4], 
+						
+						texture : int8[0],
+						shape : int8[1], 
+						player : int8[2], 
+						
+						color : f32[0],
+						x : f32[1],
+						y : f32[2],
+						z : f32[3], 
+						Rx : f32[4], 
+						Ry : f32[5], 
+						Rz : f32[6], 
+						Rw : f32[7] 
+					};
+					
+					
+					AllObjectBluePrints.push(objectBluePrint)
+			}
+			
+	return AllObjectBluePrints;
+}
 
 function breakObject(lookUp,impactForce){
 	console.log('breakObject() under construction as of 11/7/16');
@@ -588,7 +603,7 @@ function RemoveObj(msg){
 	};
 		
 function createBox(object,returnObj) {
-
+	
 		/*
 		CONSIDER:
 		should this take an array or Object or both? if it took an array.
@@ -615,7 +630,7 @@ function createBox(object,returnObj) {
 				 texture = TEXTURE_FILES[object.texture];
 
 			if (object.player) {	
-					console.log("player",object)			
+							
 					//player so only apply texture to FRONT FACE of cube
 					var mat = new THREE.MeshBasicMaterial( { color:color,map:texture} );
 					var a = new THREE.MeshBasicMaterial( { color: color} );

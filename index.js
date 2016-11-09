@@ -174,7 +174,7 @@ function createObjects() {
 		
 		//create a tower
 		for (var i = 0; i<10; i++) {
-		//	createCubeTower();
+			createCubeTower();
 		}
 }
 
@@ -299,13 +299,19 @@ RigidBodyConstructor = function(obj){
 		this.int8Count = BYTE_COUNT_INT8;//w,h,d,mass,texture,shape,player
 		this.float32Count = BYTE_COUNT_F32;//color,x,y,z,Rx,Ry,Rz,Rw
 		
-		this.totalBytes = (this.int32Count*2)+(this.int8Count)+(this.float32Count*4);
+		this.totalBytes = (this.int32Count*4)+(this.int8Count)+(this.float32Count*4);
 	
 };
 
-RigidBodyConstructor.prototype.breakObject = function(){
+RigidBodyConstructor.prototype.breakObject = function(impactForce){
 	
 		/* TODO */
+		/*
+		check if this.breakApartForce ===0 OR > impactForce: true -> return false
+		
+		else return true
+		
+		*/
 };
 
 RigidBodyConstructor.prototype.getOrigin = function(){
@@ -427,7 +433,7 @@ RigidBodyConstructor.prototype.exportJSON = function(){
 		color:this.color,
 		texture:this.texture,
 		player:this.player
-	}	
+	};	
 }
 
 RigidBodyConstructor.prototype.exportBinary = function(){
@@ -456,9 +462,7 @@ RigidBodyConstructor.prototype.exportBinary = function(){
 	f32[6] = this.Rz();
 	f32[7] = this.Rw();
 	
-	console.log(int32)
-	console.log(int8)
-	console.log(f32)
+
 	//prepare binary
 	var int32Buffer = Buffer.from(int32.buffer);
 	var int8Buffer = Buffer.from(int8.buffer);
@@ -580,6 +584,10 @@ function processCollisionPairs(collisionPairs){
 				var Obj2_lookupID = 'id'+dispatcher.getManifoldByIndexInternal(i).getBody1().ptr.toString();
 
 				//check if the object can break, and if force is large enough to break it
+				//DON"T DO THIS! Objs will have built in .breakObject() method.
+				//call that here NOT: FlagObjectToBreak()
+				//.breakObject() will return true if it can break, pass object to
+				//generateRubble()
 				FlagObjectToBreak(rigidBodiesIndex[Obj1_lookupID],impactForce);
 				FlagObjectToBreak(rigidBodiesIndex[Obj2_lookupID],impactForce);
 		};
@@ -669,7 +677,7 @@ function generateRubble(object){
 				//build the piece of rubble
 				var rubblePiece = createPhysicalCube(rubbleBluePrint);
 				
-				console.log(rubblePiece.id);
+				
 				binaryData[11] = rubblePiece.physics.ptr;//the NUMBER portion of ptr ID
 				
 				//apply force to our piece of rubble		
@@ -814,10 +822,10 @@ function BuildWorldStateForNewConnection(){
 	var msgByteCount = 0;
 	var header = new Int16Array(4);
 	header[0] = rigidBodies.length;
-	header[1] = BYTE_COUNT_INT8
-	header[2] = BYTE_COUNT_INT32
-	header[3] = BYTE_COUNT_F32	
-	console.log("819",header.buffer.byteLength)
+	header[1] = BYTE_COUNT_INT8;
+	header[2] = BYTE_COUNT_INT32;
+	header[3] = BYTE_COUNT_F32;
+
 	var binaryData = Buffer.from(header.buffer);
 
 	for(var i = 0; i < rigidBodies.length; i++){
@@ -828,16 +836,13 @@ function BuildWorldStateForNewConnection(){
 		try{
 			var currentByteLength = binaryData.length + rigidBodiesIndex[lookUp].totalBytes;
 			//basically PUSH new binary to end of current binary
-			console.log("830",rigidBodiesIndex[lookUp].exportJSON())
-			console.log("831",rigidBodiesIndex[lookUp].exportBinary().byteLength)
 			binaryData = Buffer.concat([binaryData, rigidBodiesIndex[lookUp].exportBinary()], currentByteLength )
 		}
 		catch(err){
-			console.log("876",err)
+
 			delete rigidBodiesIndex[lookUp]}
 	}
 	
-	console.log("883",binaryData.byteLength)
 	
 	//create a time stamp
 	var time = Date.now();
@@ -1049,7 +1054,6 @@ function PlayerInput(ID,data){
 
 function RemoveObj(RB_id) {
 	/* DUPLICATE WARNING RemoveAPlayer does 99% the same, merge them, D.N.R.Y.S. */
-	console.log('858:',RB_id)
 	//remove from our rigidbodies holder
 	for(var i=0;i < rigidBodies.length;i++){
 		
@@ -1120,7 +1124,6 @@ io.on('connection', function(socket){
 	
 	
 	socket.on('disconnect', function(){
-		console.log('playerleft: ', this.id)
 		RemoveAPlayer(this.id);
 	});
 	
