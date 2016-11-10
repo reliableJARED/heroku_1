@@ -27,7 +27,6 @@ app.use(serveStatic(__dirname + '/static/three.js/build/'));
 //GLOBAL variables
 var physicsWorld; 
 const gravityConstant = -9.8
-var rigidBodies =  new Array();
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
 const updateFrequency = .5;//Seconds	
@@ -162,9 +161,6 @@ function createObjects() {
 		
 		GROUND_ID = ground.id;
 
-		//add ground our physics object holder
-		rigidBodies.push( ground.physics );
-		
 		//add ground to physics world
 		physicsWorld.addRigidBody( ground.physics );
 		
@@ -211,7 +207,7 @@ function createCubeTower(height,width,depth){
 			Rx: 0,
 			Ry: 0,
 			Rz: 0,
-			breakApartForce: 1
+			breakApartForce: 5
 		}
 		
 	//three nested loops will create the tower
@@ -232,7 +228,7 @@ function createCubeTower(height,width,depth){
 				//MAJOR FLAW. ccreatePhysicalCube alters the object passed to it!.  need to send a copy
 				 var block = createPhysicalCube(Object.assign({},ObjBlueprint));
 				 block.physics.setActivationState(1);
-				rigidBodies.push( block.physics );
+
 				physicsWorld.addRigidBody( block.physics );
 				AddToRigidBodiesIndex(block);
 
@@ -306,7 +302,7 @@ RigidBodyConstructor = function(obj){
 RigidBodyConstructor.prototype.breakObject = function(impactForce){
 	
 	//this.destroyObject is a flag to indicate obj is already qued for destruction
-	if(!this.breakApartForce || this.breakApartForce > impactForce || this.destroyObject){
+	if(this.breakApartForce === 0 || this.breakApartForce > impactForce || this.destroyObject){
 			return false;
 	}else{
 			this.destroyObject = true;
@@ -550,9 +546,10 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	//var collisionPairs = dispatcher.getNumManifolds();
 	var destroyObjs = processCollisionPairs(dispatcher.getNumManifolds());
 	
-	
 	for (var x=0; x < destroyObjs.length; x++) {
+
 		generateRubble(destroyObjs[x])
+		
 		//destroy the flagged objects
 		RemoveObj(destroyObjs[x].id);
 	};
@@ -589,7 +586,7 @@ function processCollisionPairs(collisionPairs){
 			var impactForce = dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
 
 			if( impactForce > IMPACT_FORCE_MINIMUM){
-			
+
 				//Objects ptr id, MUST have 'id' added to the front before use as a rigidBodiesIndex lookup
 				var Obj1_lookupID = 'id'+dispatcher.getManifoldByIndexInternal(i).getBody0().ptr.toString();
 				var Obj2_lookupID = 'id'+dispatcher.getManifoldByIndexInternal(i).getBody1().ptr.toString();
@@ -620,12 +617,9 @@ function generateRubble(object){
 	var height = object.h; 
 	var width = object.d;
 	var mass = object.mass;
-	var posX = object.x;
-	var posY = object.y;
-	var posZ = object.z;
-	var quatX = object.Rx;
-	var quatY = object.Ry;
-	var quatZ = object.Rz;
+	var posX = object.x();
+	var posY = object.y();
+	var posZ = object.z();
 	var texture = object.texture;
 	var color = object.color;
 	
@@ -636,15 +630,17 @@ function generateRubble(object){
 	//The rubble will be propotionally sized cubes based on the original objects size
 	//frac creates frac^3 pieces of rubble.
 	var frac = 2;
-	var dfrac = depth/frac;
-	var hfrac = height/frac;
-	var wfrac = width/frac;
+	var dfrac = depth/(frac*frac);
+	var hfrac = height/(frac*frac);
+	var wfrac = width/(frac*frac);
 	
 	//next create our rubble
 	for (var h=0;h<frac;h++) {
-				
-		for (var w=0;w<frac;w++) {
 		
+		var posZ_layer = posZ;		
+		for (var w=0;w<frac;w++) {
+			
+			var posX_layer = posX;
 			for(var d =0; d<frac;d++){
 				
 				var binaryData   = new Float32Array(12);
@@ -653,9 +649,9 @@ function generateRubble(object){
 					binaryData[2] = wfrac;//depth
 					binaryData[3] = rubbleMass;//mass
 					binaryData[4] = color; //color, light gray
-					binaryData[5] = posX;//x
+					binaryData[5] = posX_layer;//x
 					binaryData[6] = posY;//y
-					binaryData[7] = posZ;//z
+					binaryData[7] = posZ_layer;//z
 
 				/*
 				THIS IS RIDICULOUS lol
@@ -679,6 +675,7 @@ function generateRubble(object){
 				//build the piece of rubble
 				var rubblePiece = createPhysicalCube(rubbleBluePrint);
 				
+				AddToRigidBodiesIndex(rubblePiece);
 				
 				binaryData[11] = rubblePiece.physics.ptr;//the NUMBER portion of ptr ID
 				
@@ -693,18 +690,15 @@ function generateRubble(object){
 				
 				//set to ACTIVE so the pieces bounce around
 				//rubblePiece.physics.setActivationState(1);
-				
-				//add to our physics object holder
-				rigidBodies.push( rubblePiece.physics );
-				
+
 				//add to to physics world
 				physicsWorld.addRigidBody( rubblePiece.physics );
 				
 				//Add a random 1-5 sec delay b4 new rubble object is removed from world
 				var delay =  Math.random() * 4000 + 1000;
-		
+				
 				//add self destruct to the rubble so it will be removed from world after delay time
-				setTimeout(function () { RemoveObj(rubblePiece.id)},delay);
+				delayedDestruction(rubblePiece.id,delay);
 				
 				//prepare binary data for shipping
 				var dataBuffer = Buffer.from(binaryData.buffer)
@@ -712,17 +706,16 @@ function generateRubble(object){
 				//add to worlds of other players 
 				io.emit('C', dataBuffer);
 						
-				
 				//add to posX, used in the placement for our next rubble block being created	
-				posX += (dfrac);
+				posX_layer += (dfrac);
 			}
 			//reset our X axis
-			posX = frac;
+			posX_layer = posX;
 			//Start our new row, create each new block Z over
-			posZ +=(wfrac);//+Z dimention
+			posX_layer += wfrac;//+Z dimention
 		}
 		//reset our Z axis
-		posZ = frac;
+		posX_layer = posZ;
 		//start the new grid up one level
 		posY += hfrac; 
 	}
@@ -732,7 +725,12 @@ function generateRubble(object){
 	
 }
 
+function delayedDestruction(ID,delay) {
 
+		setTimeout(function () {
+				RemoveObj(ID)
+			},delay);
+}
 
 function emitWorldUpdate() {
 		
@@ -745,9 +743,10 @@ function emitWorldUpdate() {
 		//clients hold a matching representation of the physics object using the ID's in their presented graphics.
 
 		// check for rigidbodies that are in motion (changed) since last stepSimulation
-		for ( var i = 0; i < rigidBodies.length; i++ ) {
+		var totalObjCount = Object.keys(rigidBodiesIndex)
+		for ( var i = 0; i < totalObjCount.length; i++ ) {
 		
-			var obj = rigidBodies[ i ];
+			var obj = rigidBodiesIndex[ totalObjCount[i] ].physics;
 			var ms =  obj.getMotionState();
 	  
 			if ( ms ) {
@@ -822,18 +821,19 @@ function TickPhysics() {
 function BuildWorldStateForNewConnection(){
 	
 	var msgByteCount = 0;
+	var totalObjs = Object.keys(rigidBodiesIndex);
 	var header = new Int16Array(4);
-	header[0] = rigidBodies.length;
+	header[0] = totalObjs.length;
 	header[1] = BYTE_COUNT_INT8;
 	header[2] = BYTE_COUNT_INT32;
 	header[3] = BYTE_COUNT_F32;
 
 	var binaryData = Buffer.from(header.buffer);
 
-	for(var i = 0; i < rigidBodies.length; i++){
+	for(var i = 0; i < totalObjs.length; i++){
 		
 		//Try/Catch is here mostly for debug
-		var lookUp = 'id'+rigidBodies[i].ptr.toString();
+		var lookUp = totalObjs[i];
 
 		try{
 			var currentByteLength = binaryData.length + rigidBodiesIndex[lookUp].totalBytes;
@@ -867,7 +867,7 @@ function AddPlayer(uniqueID){
 	//uniqueID is SocketID
 	
 		//random start position for new player
-		//create random location for our tower, near other blocks
+		//create random location
 	   var randX =  Math.floor(Math.random() * 20) - 10;
 	   var randZ =  Math.floor(Math.random() * 20) - 10;
 	
@@ -894,10 +894,7 @@ function AddPlayer(uniqueID){
 		
 		//keep the cube always active		
 		cube.physics.setActivationState(4);
-
-		//add to our physics object holder
-		rigidBodies.push( cube.physics );
-		
+	
 		//add to physics world
 		physicsWorld.addRigidBody( cube.physics );
 		
@@ -933,7 +930,7 @@ function FireShot(ID,data){
 		binaryData[1] = 0.5;//height
 		binaryData[2] = 0.5;//depth
 		binaryData[3] = 10;//mass
-		binaryData[4] = 0xf6f6f6  //color, light gray
+		binaryData[4] = Math.random() * 0xffffff //RANDOM color
 		binaryData[5] = data.readFloatLE(4);//x
 		binaryData[6] = data.readFloatLE(8);//y
 		binaryData[7] = data.readFloatLE(12);//z
@@ -968,9 +965,6 @@ function FireShot(ID,data){
 		//keep the cube always active		
 		cube.physics.setActivationState(4);
 
-		//add to our physics object holder
-		rigidBodies.push( cube.physics );
-		
 		//add to physics world
 		physicsWorld.addRigidBody( cube.physics );
 		
@@ -990,8 +984,8 @@ function FireShot(ID,data){
 		//add shot to worlds of other players and let them know who shot it
 		io.emit('I', {[PlayerIndex[ID].id]:binaryShot});
 		
-		//remove shot from world in 5000 mili seconds
-		setTimeout(function () { RemoveObj(cube.id)},5000);
+		//remove shot from world in 5000 mili seconds	
+		delayedDestruction(cube.id,5000)
 }
 
 
@@ -1054,34 +1048,32 @@ function PlayerInput(ID,data){
 }
 
 
-function RemoveObj(RB_id) {
+function RemoveObj(RB_id,batch) {
+
 	/* DUPLICATE WARNING RemoveAPlayer does 99% the same, merge them, D.N.R.Y.S. */
-	//remove from our rigidbodies holder
-	for(var i=0;i < rigidBodies.length;i++){
-		
+
 		/*the construction of 'ids' in this whole server setup is WACKED! can lead to major headachs.  FIX.  the term ID is being used to describe both the ptr id assigned from physics engin and the id assigned to a socket. not to mention the concatination of 'id' to the front of a ptr id converted to string*/
 		
-		if(RB_id === 'id'+rigidBodies[i].ptr.toString()){
-		//if(RB_id == rigidBodies[i].ptr){
-			//console.log("REMOVING:", RB_id)
-			//remove player from the physical world
-			physicsWorld.removeRigidBody( rigidBodies[i] );
-			//remove player from rigidbodies
-			rigidBodies.splice(i,1);
+		//SINGLE OBJECT
+		if (typeof batch === 'undefined') {
+			physicsWorld.removeRigidBody( rigidBodiesIndex[RB_id].physics);
+
 			//remove from our rigidbodies index
-			delete rigidBodiesIndex[RB_id]
+			delete rigidBodiesIndex[RB_id];
 			
+			//tell everyone to delete SINGLE object
+			io.emit('rmvObj', RB_id);
 		}
-	}
 	
-	//tell everyone to delete object
-	io.emit('rmvObj', RB_id);
+	
+
 }
 
 function RemoveAPlayer(uniqueID){
 	
 	var RB_id = PlayerIndex[uniqueID].id;
 	
+	console.log("player remove:",RB_id);
 	RemoveObj(RB_id)
 	
 	//remove from player inded
@@ -1101,7 +1093,7 @@ function playerResetFromCrash(uniqueID){
 		player.physics.setAngularVelocity(new Ammo.btVector3(0,0,0));
 		
 		//reset location and orientation
-		//create random location for our tower, near other blocks
+		//create random location 
 	    var randX =  Math.floor(Math.random() * 20) - 10;
 	    var randZ =  Math.floor(Math.random() * 20) - 10;
 		 var Y = 0;

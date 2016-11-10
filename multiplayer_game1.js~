@@ -175,8 +175,7 @@ var socket = io();
 		
 		socket.on('C',function (msg) {
 			var dataArray = new Float32Array(msg);
-			console.log(dataArray)
-			createBullet(dataArray);
+			createMovingObj(dataArray);
 		});
 		
 
@@ -221,7 +220,7 @@ var socket = io();
 				//Shot
 				if (fireBullet & header[0]) {
 					//do something with ID here? it tells us who is firing this shot Could be YOU!
-					createBullet(dataArray);
+					createMovingObj(dataArray);
 				}
 			
 				//Movement
@@ -713,7 +712,7 @@ function createBoxPhysicsObject (object){
 	return physicsCube;
 }
 
-function createBullet(data){
+function createMovingObj(data){
 	
 	var bulletBlueprint = {
 			id: 'id'+data[11].toString(),

@@ -175,7 +175,6 @@ var socket = io();
 		
 		socket.on('C',function (msg) {
 			var dataArray = new Float32Array(msg);
-			console.log(dataArray)
 			createMovingObj(dataArray);
 		});
 		
@@ -673,7 +672,7 @@ function createBox(object,returnObj) {
 		//object knows it's id in rigidBodiesLookUp
 		Cube.userData.id = object.id;
 		
-		//Cube.userData.physics.setActivationState(1);// ACTIVEATEATE
+		Cube.userData.physics.setActivationState(1);// ACTIVEATEATE
 		
 		//add cube to our physics world
 		physicsWorld.addRigidBody( Cube.userData.physics );
