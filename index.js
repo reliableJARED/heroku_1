@@ -211,7 +211,7 @@ function createCubeTower(height,width,depth){
 			Rx: 0,
 			Ry: 0,
 			Rz: 0,
-			breakApartForce: 5
+			breakApartForce: 1
 		}
 		
 	//three nested loops will create the tower
@@ -305,13 +305,14 @@ RigidBodyConstructor = function(obj){
 
 RigidBodyConstructor.prototype.breakObject = function(impactForce){
 	
-		/* TODO */
-		/*
-		check if this.breakApartForce ===0 OR > impactForce: true -> return false
-		
-		else return true
-		
-		*/
+	//this.destroyObject is a flag to indicate obj is already qued for destruction
+	if(!this.breakApartForce || this.breakApartForce > impactForce || this.destroyObject){
+			return false;
+	}else{
+			this.destroyObject = true;
+			this.breakApartForce = impactForce;
+			return true;
+	};
 };
 
 RigidBodyConstructor.prototype.getOrigin = function(){
@@ -547,7 +548,15 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	//TODO: JMN Nov6 2016 tie in collision check with clients, broadcast
 	//distruction rubble
 	//var collisionPairs = dispatcher.getNumManifolds();
-	//processCollisionPairs(dispatcher.getNumManifolds());
+	var destroyObjs = processCollisionPairs(dispatcher.getNumManifolds());
+	
+	
+	for (var x=0; x < destroyObjs.length; x++) {
+		generateRubble(destroyObjs[x])
+		//destroy the flagged objects
+		RemoveObj(destroyObjs[x].id);
+	};
+	
 	
 	//********END COLLISION CHECKS
 
@@ -570,13 +579,15 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 
 function processCollisionPairs(collisionPairs){
 	
+		var ObjsToDestroy = new Array(); 
+		
 		for(var i=0;i<collisionPairs;i++){
 		//for each collision pair, check if the impact force of the two objects exceeds our ForceThreshold (global IMPACT_FORCE_MINIMUM)
 		//this will eliminate small impacts from being evaluated, light resting on the ground, gravity acting on object etc.
-		//truncate with bit OR 0 because don't need decimal
+		
+			//truncate with bit OR 0 because don't need decimal
 			var impactForce = dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
 
-			//check that force is over our threshold
 			if( impactForce > IMPACT_FORCE_MINIMUM){
 			
 				//Objects ptr id, MUST have 'id' added to the front before use as a rigidBodiesIndex lookup
@@ -588,24 +599,18 @@ function processCollisionPairs(collisionPairs){
 				//call that here NOT: FlagObjectToBreak()
 				//.breakObject() will return true if it can break, pass object to
 				//generateRubble()
-				FlagObjectToBreak(rigidBodiesIndex[Obj1_lookupID],impactForce);
-				FlagObjectToBreak(rigidBodiesIndex[Obj2_lookupID],impactForce);
+				if(rigidBodiesIndex[Obj1_lookupID].breakObject(impactForce)){
+					ObjsToDestroy.push(rigidBodiesIndex[Obj1_lookupID]);
+				}
+				if(rigidBodiesIndex[Obj2_lookupID].breakObject(impactForce)){
+					ObjsToDestroy.push(rigidBodiesIndex[Obj2_lookupID]);
+				}
 		};
 	};
+	
+	return ObjsToDestroy;
 };
 
-
-function FlagObjectToBreak(object,impactForce){
-
-	//console.log("422:",object)
-	//first if the force is NOT great enough to actually break this object or object cant break, return
-	if(!object.breakApartForce ||
-		object.breakApartForce > impactForce){
-			return false;}
-	else{
-		object.destroyObject = true;
-		return true;}
-}
 
 
 function generateRubble(object){
@@ -626,11 +631,8 @@ function generateRubble(object){
 	
 	var rubbleMass = mass/(depth+height+width);//density
 	
-	var force = impactForce/(depth+height+width);
+	var force = object.breakApartForce/(depth+height+width);
 	
-	//now that we have our properties, remove the object from the server world
-	RemoveObj(object.id);
-
 	//The rubble will be propotionally sized cubes based on the original objects size
 	//frac creates frac^3 pieces of rubble.
 	var frac = 2;

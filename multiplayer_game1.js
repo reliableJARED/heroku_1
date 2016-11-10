@@ -116,6 +116,7 @@ var socket = io();
 			//when world is built, ask for assigned object
 			socket.emit('getMyObj');
 		};
+		
 		socket.on('setup', function(msg){
 			//msg is an object with 4 props
 			//time: timeStamp from server
@@ -136,6 +137,8 @@ var socket = io();
 				synchronizer.linkGameClock(clock);
 			
 				var ObjectsToBuild = unpackServerBinaryData(msg.data);
+				
+				//build the objects, and pass a callback requestPlayerObj when world is ready
 				buildObjectBatch(ObjectsToBuild, requestPlayerObj)
 
 			};
@@ -154,7 +157,7 @@ var socket = io();
 		});
 		
 		socket.on('QC', function(){
-			//this is sent ahead of a server synce update 'U' message.  It tells clients to take grab a world state to be used to compare to the servers update.  The reason to do this is TIME DELAY.  A server notification will always be from the past.  So synchronizer is checking that local and server past framse are OK.
+			//this is sent ahead of a server synce update 'U' message.  It tells clients to grab a world state to be used to compare to the servers update.  The reason to do this is TIME DELAY.  A server notification will always be from the past.  So synchronizer is checking that local and server past framse are OK.
 			synchronizer.GetLocalWorldState();
 		});
 		
@@ -173,7 +176,7 @@ var socket = io();
 		socket.on('C',function (msg) {
 			var dataArray = new Float32Array(msg);
 			console.log(dataArray)
-			createBullet(dataArray);
+			createMovingObj(dataArray);
 		});
 		
 
@@ -200,30 +203,30 @@ var socket = io();
 		socket.on('I',function(msg){
 			
 			try{
-			//ID is a players ID
-			var ID = Object.keys(msg)[0];
+				//ID is a players ID
+				var ID = Object.keys(msg)[0];
 			
-			//msg[ID] is an ArrayBuffer with structure:
-		   //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
-		   //remaining bytes are for all float32 (4bytes each) that code movement commands
+				//msg[ID] is an ArrayBuffer with structure:
+		  	 //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
+		  	 //remaining bytes are for all float32 (4bytes each) that code movement commands
 		   
 
-			//determine what player object should be used
-			var player = rigidBodiesLookUp[ID];
+				//determine what player object should be used
+				var player = rigidBodiesLookUp[ID];
 		
-			//parse our binary data from server into readable formats
-			var dataArray = new Float32Array(msg[ID],4);
-			var header   = new Uint8Array(msg[ID],0,4);
+				//parse our binary data from server into readable formats
+				var dataArray = new Float32Array(msg[ID],4);
+				var header   = new Uint8Array(msg[ID],0,4);
 		
-			//Shot
-			if (fireBullet & header[0]) {
-				//do something with ID here? it tells us who is firing this shot Could be YOU!
-				createBullet(dataArray);
+				//Shot
+				if (fireBullet & header[0]) {
+					//do something with ID here? it tells us who is firing this shot Could be YOU!
+					createMovingObj(dataArray);
 				}
 			
-			//Movement
-			else{
-				ApplyMovementToAPlayer(player,header[0],dataArray)
+				//Movement
+				else{
+					ApplyMovementToAPlayer(player,header[0],dataArray)
 			    };
 			}
 			catch(err){console.log(err)}
@@ -300,7 +303,6 @@ with loaded images in TEXTURE_FILES
 
 };
 
-/*********CLIENT SIDE PHYSICS ************/
 function initPhysics() {
 		// Physics World configurations
 		broadphase = new Ammo.btDbvtBroadphase();
@@ -711,7 +713,7 @@ function createBoxPhysicsObject (object){
 	return physicsCube;
 }
 
-function createBullet(data){
+function createMovingObj(data){
 	
 	var bulletBlueprint = {
 			id: 'id'+data[11].toString(),
