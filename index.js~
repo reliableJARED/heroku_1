@@ -169,7 +169,7 @@ function createObjects() {
 		AddToRigidBodiesIndex(ground);
 		
 		//create a tower
-		for (var i = 0; i<10; i++) {
+		for (var i = 0; i<1; i++) {
 			createCubeTower();
 		}
 }
@@ -179,8 +179,9 @@ function createCubeTower(height,width,depth){
 	/*TODO:
 	set mass to 0 and you'll see the logic is WRONG
 	FIX IT
-	
+	also the position logic is wrong
 	*/
+	console.log("184: ---- FIX THIS ---")
 	//defaults if no args passed for the TOWER, not the blocks
 	var height = height || 10;
 	var width = width || 2;
@@ -751,10 +752,10 @@ function emitWorldUpdate() {
 	  
 			if ( ms ) {
 
-				//get the angularvelocity of the object
-				var Av = obj.getAngularVelocity();				
-				
-				if (Av.length() > .001) {
+				//get the linearVelocity of the object
+				var Lv = obj.getLinearVelocity();
+		
+				if (Lv.length() > .1) {
 				
 				//assign obj's ID to it's starting index position
 				dataToSend[objectCount*PROPERTY_PER_OBJECT] = obj.ptr;
@@ -779,12 +780,12 @@ function emitWorldUpdate() {
 				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+7] = q.w();
 
 				//get the angular velocity of the object
+				var Av = obj.getAngularVelocity();
 				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+8] = Av.x();
 				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+9] = Av.y();
 				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+10] = Av.z();
 
 				//get the linearvelocity of the object
-				var Lv = obj.getLinearVelocity();
 				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+11] = Lv.x();
 				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+12] = Lv.y();
 				dataToSend[(objectCount*PROPERTY_PER_OBJECT)+13] = Lv.z();
@@ -797,20 +798,21 @@ function emitWorldUpdate() {
 	
 	//we need: PROPERTY_PER_OBJECT number of Float32(4 bytes) PER Object,  dataToSend.length x 4 gives total bytes needed
 
-	//put a header in SECOND index to indicate how many props per object are being sent
+	//put a header in FIRST index to indicate how many props per object are being sent
 	dataToSend.unshift(PROPERTY_PER_OBJECT);
 
-	//put a header timestamp at FIRST index
-	dataToSend.unshift(Date.now());
-	
 	//set the data as Float32
 	var binaryData = new Float32Array(dataToSend);
 	
 	//create a data buffer of the underlying array
 	var buff = Buffer.from(binaryData.buffer)
-console.log(typeof buff);
+
 	//send out the data with a time stamp in UTC time
 	io.emit('U', {time:clock.oldTime,data:buff} );
+
+/*	
+CONSIDER MAKING IT ALL BINARY, Pack the timestamp into an f32 spot	
+*/
 	//io.emit('U', buff);
 }
 

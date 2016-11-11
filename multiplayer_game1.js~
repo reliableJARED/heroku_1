@@ -168,7 +168,7 @@ var socket = io();
 		   //console.log(msg.data.byteLength)
 		  // var TimeStamp = new Float32Array(msg.slice(0,1));
 		   var dataArray = new Float32Array(msg);
-		   console.log(TimeStamp,dataArray);
+
 //			var dataArray = new Float32Array(msg.data);
 			
 			//console.log(msg.data.byteLength)

@@ -161,7 +161,7 @@ var socket = io();
 		});
 		
 		socket.on('U', function(msg){
-			console.log("update bytes:",msg.data.byteLength);
+		//	console.log("update bytes:",msg.data.byteLength);
 			//msg.data is an ArrayBuffer, you can't read/write to it without using a typedarray or dataview
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
@@ -210,7 +210,7 @@ var socket = io();
 				//ID is a players ID
 				var ID = Object.keys(msg)[0];
 			
-				console.log("input bytes:",msg[ID].byteLength)			
+				//console.log("input bytes:",msg[ID].byteLength)			
 			
 				//msg[ID] is an ArrayBuffer with structure:
 		  	 //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
