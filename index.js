@@ -69,7 +69,7 @@ GameClock = function () {
 GameClock.prototype.getDelta = function () {
 	var delta = 0;
 	var newTime = Date.now();
-	//convert from mili seconds to secons 
+	//convert from mili seconds to seconds 
 	delta = 0.001 * ( newTime - this.oldTime );
 	this.oldTime = newTime;
 	this.timeToSendUpdate += delta;
@@ -695,7 +695,7 @@ function generateRubble(object){
 				physicsWorld.addRigidBody( rubblePiece.physics );
 				
 				//Add a random 1-5 sec delay b4 new rubble object is removed from world
-				var delay =  Math.random() * 4000 + 1000;
+				var delay =  Math.random() * 8000 + 1000;
 				
 				//add self destruct to the rubble so it will be removed from world after delay time
 				delayedDestruction(rubblePiece.id,delay);
@@ -797,8 +797,11 @@ function emitWorldUpdate() {
 	
 	//we need: PROPERTY_PER_OBJECT number of Float32(4 bytes) PER Object,  dataToSend.length x 4 gives total bytes needed
 
-	//put a header in first index to indicate how many props per object are being sent
+	//put a header in SECOND index to indicate how many props per object are being sent
 	dataToSend.unshift(PROPERTY_PER_OBJECT);
+
+	//put a header timestamp at FIRST index
+	dataToSend.unshift(Date.now());
 	
 	//set the data as Float32
 	var binaryData = new Float32Array(dataToSend);
@@ -806,8 +809,9 @@ function emitWorldUpdate() {
 	//create a data buffer of the underlying array
 	var buff = Buffer.from(binaryData.buffer)
 
-	//send out he data with a time stamp in UTC time
+	//send out the data with a time stamp in UTC time
 	io.emit('U', {time:clock.oldTime,data:buff} );
+	//io.emit('U', buff);
 }
 
 function TickPhysics() {
@@ -1085,9 +1089,10 @@ function RemoveAPlayer(uniqueID){
 }
 
 function playerResetFromCrash(uniqueID){
-	
-	    var player = PlayerIndex[uniqueID];
 		
+		console.log("reset")
+	    var player = rigidBodiesIndex[PlayerIndex[uniqueID].id];
+
 	    //clear forces
 		player.physics.setLinearVelocity(new Ammo.btVector3(0,0,0));
 		player.physics.setAngularVelocity(new Ammo.btVector3(0,0,0));

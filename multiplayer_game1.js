@@ -43,7 +43,7 @@ var transformAux1 = new Ammo.btTransform();
 var vector3Aux1 = new Ammo.btVector3();
 var quaternionAux1 = new Ammo.btQuaternion();
 var PHYSICS_ON = true;
-const INTERPOLATE_AMT = .6;//interpolation setting for server updates
+const INTERPOLATE_AMT = .35;//interpolation setting for server updates
 
 //Input Controller
 var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50,callback:GAMEPAD_right_callback}});
@@ -86,9 +86,6 @@ var socket = io();
 			if( NewID === UNIQUE_ID){
 				//do nothing because this is global alert to others about us
 			}else{
-				//HACK!!
-				//adding prop player = true, makes the texture only on a single face 
-				msg[NewID].player = true;
 				createBox(msg[NewID]);
 				};
 			//	OtherPlayers[NewID] = createBox(msg[NewID],true)}
@@ -118,6 +115,8 @@ var socket = io();
 		};
 		
 		socket.on('setup', function(msg){
+			console.log("setup bytes:",msg.data.byteLength)			
+			
 			//msg is an object with 4 props
 			//time: timeStamp from server
 			//data: binary data of all world objects
@@ -162,11 +161,16 @@ var socket = io();
 		});
 		
 		socket.on('U', function(msg){
+			console.log("update bytes:",msg.data.byteLength);
 			//msg.data is an ArrayBuffer, you can't read/write to it without using a typedarray or dataview
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
 		   //console.log(msg.data.byteLength)
-			var dataArray = new Float32Array(msg.data);
+		  // var TimeStamp = new Float32Array(msg.slice(0,1));
+		   var dataArray = new Float32Array(msg);
+
+//			var dataArray = new Float32Array(msg.data);
+			
 			//console.log(msg.data.byteLength)
 			//after msg.data is loaded in to a typed array, pass to synchronizer
 			synchronizer.queUpdates({time:msg.time,data:dataArray})
@@ -174,6 +178,7 @@ var socket = io();
 		});
 		
 		socket.on('C',function (msg) {
+			console.log('moving obj byte:',msg.byteLength)
 			var dataArray = new Float32Array(msg);
 			createMovingObj(dataArray);
 		});
@@ -204,6 +209,8 @@ var socket = io();
 			try{
 				//ID is a players ID
 				var ID = Object.keys(msg)[0];
+			
+				console.log("input bytes:",msg[ID].byteLength)			
 			
 				//msg[ID] is an ArrayBuffer with structure:
 		  	 //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
@@ -416,183 +423,9 @@ function unpackServerBinaryData(binaryData){
 	return AllObjectBluePrints;
 }
 
-function breakObject(lookUp,impactForce){
-	console.log('breakObject() under construction as of 11/7/16');
-	console.log(lookUp)
-	//first find the object to be broken
-	var obj =  rigidBodiesLookUp[lookUp];
-	console.log(obj);
-	
-	//get some object properties from our broken object
-	var depth = obj.geometry.parameters.depth;//x length 
-	var height = obj.geometry.parameters.height;//y length 
-	var width = obj.geometry.parameters.width;//z length 
-	var mass = 0.01;//obj.userData.mass;
-	var rubbleMass = mass/(depth+height+width);
-	var force = impactForce/(depth+height+width);
-	var material = obj.material;
-
-	//we want our rubble in the same position as our object that is breaking
-	var pos = obj.position;// used to hold our position THREE.Vector3()
-	var quat = obj.quaternion;//original objects orientation THREE.Quaternion()
-	
-	//destroy all parts of the object and remove from world
-	RemoveObj(obj);
-	
-	//now make rubble in the objects place
-	//The rubble will be propotionally sized cubes based on the original objects size
-	//such that the original object breaks into 8 smaller pieces if it's a cube.
-	var frac = 2;
-	//three nested loops will create the rubble
-	//inner loop lays blocks in a row
-	//mid loop starts a new column
-	//outer loop starts new layer
-	for (var h=0;h<frac;h++) {
-				
-		for (var w=0;w<frac;w++) {
-		
-			for(var d =0; d<frac;d++){
-			
-				//create a rubble object,
-				var rubble = REALbox(depth/frac,height/frac,width/frac,rubbleMass,pos,quat,material);
-				
-				//apply force to our piece of rubble		
-				// in random directions
-				var rd_X = Math.random() < 0.5 ? -1 : 1 ;
-				var rd_Y = Math.random() < 0.5 ? -1 : 1 ;
-				var rd_Z = Math.random() < 0.5 ? -1 : 1 ;
-				
-				//apply impact force to our rubble
-				rubble.userData.physics.applyCentralImpulse(new Ammo.btVector3( force*rd_X,force*rd_Y,force*rd_Z ));	
-				
-				//set to ACTIVE so the pieces bounce around
-				//rubble.userData.physics.setActivationState(1);
-				
-				//add rubble to world
-				physicsWorld.addRigidBody(rubble.userData.physics);
-				rigidBodies.push(rubble);
-				scene.add(rubble);
-
-				//Add a random 1-5 sec delay b4 new rubble object is removed from world
-				var delay =  Math.random() * 4000 + 1000;
-		
-				//add self destruct to the rubble so it will be removed from world after delay time
-				destructionTimer(rubble,delay);	
-				
-				//add to pos, used in the placement for our next rubble block being created	
-				pos.addVectors(pos,new THREE.Vector3(depth/frac,0,0));//+X dimention
-			}
-			//reset our X axis
-			pos.subVectors(pos,new THREE.Vector3(frac,0,0));
-			//Start our new row, create each new block Z over
-			pos.addVectors(pos,new THREE.Vector3(0,0,width/frac));//+Z dimention
-		}
-		//reset our Z axis
-		pos.subVectors(pos,new THREE.Vector3(0,0,frac));
-		//start the new grid up one level
-		pos.addVectors(pos,new THREE.Vector3(0,height/frac,0));//+Y	dimention
-	}
-	
-	
-	
-	/*
-	//get some object properties from our object to be broken
-	var depth = object.w;
-	var height = object.h; 
-	var width = object.d;
-	var mass = object.mass;
-	var posX = object.x;
-	var posY = object.y;
-	var posZ = object.z;
-	var quatX = object.Rx;
-	var quatY = object.Ry;
-	var quatZ = object.Rz;
-	var texture = object.texture;
-	var color = object.color;
-	
-	var rubbleMass = mass/(depth+height+width);//density
-	
-	var force = impactForce/(depth+height+width);
-	
-	
-	//now that we have our properties, remove the object from the world
-	RemoveObj(object.id);
-
-	//The rubble will be propotionally sized cubes based on the original objects size
-	//frac creates frac^3 pieces of rubble.
-	var frac = 2;
-	var dfrac = depth/frac;
-	var hfrac = height/frac;
-	var wfrac = width/frac;
-	//next create our rubble
-	for (var h=0;h<frac;h++) {
-				
-		for (var w=0;w<frac;w++) {
-		
-			for(var d =0; d<frac;d++){
-				
-				var rubbleBluePrint = {
-						w : dfrac,
-						h : hfrac,
-						d : wfrac,
-						mass : rubbleMass,
-						shape:0,//0= box
-						color: color,
-						texture:texture,
-						x: posX,
-						y: posY,
-						z: posZ,
-						Rx: quatX,
-						Ry: quatY,
-						Rz: quatZ,
-					}
-		
-				//build the piece of rubble
-				var rubblePiece = createBox(rubbleBluePrint);
-				
-				//apply force to our piece of rubble		
-				// in random directions
-				var rd_X = Math.random() < 0.5 ? -1 : 1 ;
-				var rd_Y = Math.random() < 0.5 ? -1 : 1 ;
-				var rd_Z = Math.random() < 0.5 ? -1 : 1 ;
-				
-				//apply impact force to our rubble
-				rubblePiece.physics.applyCentralImpulse(vector3Aux1.setValue( force*rd_X,force*rd_Y,force*rd_Z ));	
-				
-				//set to ACTIVE so the pieces bounce around
-				//rubblePiece.physics.setActivationState(1);
-				
-				//add to our physics object holder
-				rigidBodies.push( rubblePiece.physics );
-				
-				//add to to physics world
-				physicsWorld.addRigidBody( rubblePiece.physics );
-				
-				//Add a random 1-5 sec delay b4 new rubble object is removed from world
-				var delay =  Math.random() * 4000 + 1000;
-		
-				//add self destruct to the rubble so it will be removed from world after delay time
-				setTimeout(function () { RemoveObj(rubblePiece.id)},delay);
-				
-				//add to posX, used in the placement for our next rubble block being created	
-				posX += (dfrac);
-			}
-			//reset our X axis
-			posX = frac;
-			//Start our new row, create each new block Z over
-			posZ +=(wfrac);//+Z dimention
-		}
-		//reset our Z axis
-		posZ = frac;
-		//start the new grid up one level
-		posY += hfrac; 
-	}
-	
-	*/
-}
 
 function RemoveObj(msg){
-			//msg is an ID for an object
+			//msg is an ID for an object		
 			try{
 				scene.remove( rigidBodiesLookUp[msg] )
 				physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
@@ -630,7 +463,7 @@ function createBox(object,returnObj) {
 		
 				 texture = TEXTURE_FILES[object.texture];
 
-			if (object.player) {	
+			if (object.player === 1) {	
 							
 					//player so only apply texture to FRONT FACE of cube
 					var mat = new THREE.MeshBasicMaterial( { color:color,map:texture} );
@@ -990,7 +823,7 @@ function GAMEPAD_right_callback(){
 		
 		//no dpad buttons are down clear angular and linear velocity
 		if(GAMEPAD.rightGUI.bits === 0){
-			
+
 			PlayerCube.setLV(0,0,0);
 			PlayerCube.setAV(0,0,0);
 			
@@ -1008,7 +841,7 @@ function GAMEPAD_right_callback(){
 		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.down.bit &&
 		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downLeft.bit &&
 		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downRight.bit){
-				
+
 				PlayerCube.setLV(0,0,0);
 				
 				//prepare binary data
@@ -1020,8 +853,12 @@ function GAMEPAD_right_callback(){
 		
 		//If no rotation buttons are down, set angular velocity to 0
 		else if(GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.left.bit && 
-		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.right.bit ){
-				
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.right.bit &&
+		    GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.upRight.bit &&
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.upLeft.bit && 
+		    GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downLeft.bit &&
+		   GAMEPAD.rightGUI.bits ^ GAMEPAD.rightGUI.downRight.bit){
+
 				PlayerCube.setAV(0,0,0);
 				
 				//prepare binary data
@@ -1109,88 +946,23 @@ function checkPlayerOrientation(){
 	/******************** orientation check hack - could be better**********/  
 	
 	//if player starts to rotate in z or x stop them.
-	var PxRotV = PlayerCube.AVx();//PlayerCube.userData.physics.getWorldTransform().getRotation().x();
-	var PzRotV = PlayerCube.AVz();
-	//PlayerCube.userData.physics.getWorldTransform().getRotation().z();
-	var maxRot = 0.01;
-	
-	if(PxRotV > maxRot){		
-		
-		var PxRot = PlayerCube.quanternionX();
-	
-		//check that we haven't actually rotated too far on this axis, if we have RESET
-		if(PxRot>.5 || PxRot<-.5){
-			playerResetFromCrash();
-		}else{
-		//	console.log('correcting')
-			//get the angular velocity of the player keep y and z compoent, set x to half current
-			var AVx = PxRotV * .5
-			var AVy = PlayerCube.AVy();
-			PlayerCube.setAV(AVx,AVy,PzRotV);
-		
-			//4 bytes header, 12bytes data
-			var buffer = new ArrayBuffer(16);
-			
-			//header
-			var buttonBit   = new Uint8Array(buffer,0,4);
-			buttonBit[0] = changeAngularVelocity;//type of action
-			buttonBit[1] = 0;//represents button being pressed
-		
-			//data
-			var vectorBinary   = new Float32Array(buffer,4);
-			vectorBinary[3] = AVx;
-			vectorBinary[4] = AVy;
-			vectorBinary[5] = PzRotV;
-	
-			//binary mode
-			socket.emit('I',buffer);
+	var PxRot = PlayerCube.quanternionX();
+	var PzRot = PlayerCube.quanternionZ();
+
+	//check that we haven't actually rotated too far on this axis, if we have RESET
+	if(PxRot>.5 || PxRot<-.5 ||PzRot>.5 || PzRot<-.5){
+
+		//	playerResetFromCrash();
+		console.log("todo: fix reset")
 		}
-	}
-
-	if(PzRotV > maxRot){
-		
-		var PzRot = PlayerCube.quanternionZ();
-		
-		//check that we haven't actually rotated too far on this axis, if we have RESET
-		if(PzRot>.5 || PzRot<-.5){
-			playerResetFromCrash();
-		}else{
-		//	console.log('correcting')
-			//get the angular velocity of the player keep y and x compoent, set z to half current
-			var AVz = PzRotV * .5
-			var AVy = PlayerCube.AVy();
-
-			PlayerCube.setAV(PzRotV,AVy,AVz);
-	
-			//4 bytes header, 12bytes data
-			var buffer = new ArrayBuffer(16);
-			
-			//header
-			var header   = new Uint8Array(buffer,0,4);
-			header[0] = changeAngularVelocity;//type of action
-			header[1] = 0;//empty
-			header[2] = 0;//empty
-			header[3] = 0;//empty
-		
-			//data
-			var vectorBinary   = new Float32Array(buffer,4);
-			vectorBinary[3] = PzRotV;
-			vectorBinary[4] = AVy;
-			vectorBinary[5] = AVz;
-	
-			//binary mode
-			socket.emit('I',buffer);
-		}
-
-	}
 
 }
 
 function playerResetFromCrash(){
 	console.log("todo")//11/4/16 JMN this shouldn't resent here, need to be called only if server replys  to the resetMe else keep sending it, THEN apply force clear
     	//clear forces
-		PlayerCube.setLV(0,0,0);
-		PlayerCube.setAV(0,0,0);
+	//	PlayerCube.setLV(0,0,0);
+	//	PlayerCube.setAV(0,0,0);
 		
 	    socket.emit('resetMe');
 	
@@ -1336,21 +1108,27 @@ ServerPhysicsSync.prototype.GetLocalWorldState = function(){
 				ms.getWorldTransform( this.transformAux1 );
 				var p = this.transformAux1.getOrigin();
 				var q = this.transformAux1.getRotation();
+				var AV = objPhys.getAngularVelocity();
 				var LV = objPhys.getLinearVelocity();
-		
-				//update our comparisons
-				this.ObjectsData[id] = new Array();
-				this.ObjectsData[id][this.x] = p.x();
-				this.ObjectsData[id][this.y] = p.y();
-				this.ObjectsData[id][this.z] = p.z();
-				this.ObjectsData[id][this.Rx] = q.x();
-				this.ObjectsData[id][this.Ry] = q.y();
-				this.ObjectsData[id][this.Rz] = q.z();
-				this.ObjectsData[id][this.Rw] = q.w();
-				this.ObjectsData[id][this.LVx] = LV.x();
-				this.ObjectsData[id][this.LVy] = LV.y();
-				this.ObjectsData[id][this.LVz] = LV.z();
-				
+			
+	//		if (LV.length() > 0.01|| AV.length > 0.01) {
+					//update our comparisons for moving objs
+					this.ObjectsData[id] = new Array();
+					this.ObjectsData[id][this.objID] = id;
+					this.ObjectsData[id][this.x] = p.x();
+					this.ObjectsData[id][this.y] = p.y();
+					this.ObjectsData[id][this.z] = p.z();
+					this.ObjectsData[id][this.Rx] = q.x();
+					this.ObjectsData[id][this.Ry] = q.y();
+					this.ObjectsData[id][this.Rz] = q.z();
+					this.ObjectsData[id][this.Rw] = q.w();
+					this.ObjectsData[id][this.AVx] = AV.x();
+					this.ObjectsData[id][this.AVy] = AV.y();
+					this.ObjectsData[id][this.AVz] = AV.z();
+					this.ObjectsData[id][this.LVx] = LV.x();
+					this.ObjectsData[id][this.LVy] = LV.y();
+					this.ObjectsData[id][this.LVz] = LV.z();
+			//	}
 //	console.log('todo');//11/4/16 JMN add AV and LV props too
 			};
 	};
@@ -1367,30 +1145,34 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 		 for(var i=0;i<this.ServerUpdates.length; i+= this.propsPerObject){
 			 
 			var id = 'id'+this.ServerUpdates[i].toString();
-
-			var objectPhysics = this.ObjectsData[id];
 			
+			var objectPhysics = this.ObjectsData[id];
 			
 			/* 	** 	RUN A DIVERGENCE CHECK ON POSITION** */
 			//note - ONLY relying on position will speed things up BUT at the cost of inaccurate orientation.  This will lead to errors
 			//the problem is physics relies on POSITION and ORIENTATION 
 			try{
-			 if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[i+this.x]) > this.divergenceThreshold ||
-					Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[i+this.y]) > this.divergenceThreshold ||
-					Math.abs(this.ServerUpdates[i+this.z] -objectPhysics[i+this.z]) > this.divergenceThreshold ){
+				 if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[this.x]) > this.divergenceThreshold ||
+						Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[this.y]) > this.divergenceThreshold ||
+						Math.abs(this.ServerUpdates[i+this.z] - objectPhysics[this.z]) > this.divergenceThreshold ){
+		    
+		    	    //DIVERGENCE check failed! replace everything locally with what the server says, smooth using interpolation		
+					//get the object
+		      	var objPhys = this.rigidBodiesLookUp[id].userData.physics;
 		      
-		      	//DIVERGENCE check failed! replace everything locally with what the server says, smooth using interpolation	
-						var interpolateX = objectPhysics[i+this.x] + (this.ServerUpdates[i+this.x]  - objectPhysics[i+this.x])* INTERPOLATE_AMT;
+						var interpolateX = objectPhysics[this.x] + (this.ServerUpdates[i+this.x]  - objectPhysics[this.x])* INTERPOLATE_AMT;
+
 						
-						var interpolateY = objectPhysics[i+this.y] +(this.ServerUpdates[i+this.y]  - objectPhysics[i+this.y])* INTERPOLATE_AMT;						
+						var interpolateY = objectPhysics[this.y] +(this.ServerUpdates[i+this.y]  - objectPhysics[this.y])* INTERPOLATE_AMT;			
+
 						
-						var interpolateZ = objectPhysics[i+this.z] +(this.ServerUpdates[i+this.z]  - objectPhysics[i+this.z])* INTERPOLATE_AMT;
-						
-						var objPhys = this.rigidBodiesLookUp[id].userData.physics;
+						var interpolateZ = objectPhysics[this.z] +(this.ServerUpdates[i+this.z]  - objectPhysics[this.z])* INTERPOLATE_AMT;
+
 					
 						//vector for position update
+						//this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
 						this.vector3Aux1.setValue(interpolateX,interpolateY,interpolateZ);
-						//	this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
+
 						
 						//apply to transform
 						this.transformAux1.setOrigin(this.vector3Aux1);
@@ -1412,12 +1194,12 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 						
 						//vector for linear velocity
 						//INTERPOLATE
-						 interpolateX = objectPhysics[i+this.LVx] + (this.ServerUpdates[i+this.LVx]  - objectPhysics[i+this.LVx])* INTERPOLATE_AMT;
+						 interpolateX = objectPhysics[this.LVx] + (this.ServerUpdates[i+this.LVx]  - objectPhysics[this.LVx])* INTERPOLATE_AMT;
 						
-						 interpolateY = objectPhysics[i+this.LVy] +(this.ServerUpdates[i+this.LVy]  - objectPhysics[i+this.LVy])* INTERPOLATE_AMT;						
+						 interpolateY = objectPhysics[this.LVy] +(this.ServerUpdates[i+this.LVy]  - objectPhysics[this.LVy])* INTERPOLATE_AMT;						
 						
-						 interpolateZ = objectPhysics[i+this.LVz] +(this.ServerUpdates[i+this.LVz]  - objectPhysics[i+this.LVz])* INTERPOLATE_AMT;
-						
+						 interpolateZ = objectPhysics[this.LVz] +(this.ServerUpdates[i+this.LVz]  - objectPhysics[this.LVz])* INTERPOLATE_AMT;
+
 					//	this.vector3Aux1.setValue(this.ServerUpdates[i+this.LVx],this.ServerUpdates[i+this.LVy],this.ServerUpdates[i+this.LVz])
 						this.vector3Aux1.setValue(interpolateX,interpolateY,interpolateZ);
 						
@@ -1427,6 +1209,7 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 			}catch(err){console.log(err)}		  
 			
 		 };
+	//	this.localPhysicsWorld.stepSimulation( this.deltaTime,10);
 		
 		//reset flag
 		this.pendingUpdates = false;	
