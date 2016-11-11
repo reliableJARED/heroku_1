@@ -43,7 +43,7 @@ var transformAux1 = new Ammo.btTransform();
 var vector3Aux1 = new Ammo.btVector3();
 var quaternionAux1 = new Ammo.btQuaternion();
 var PHYSICS_ON = true;
-const INTERPOLATE_AMT = .35;//interpolation setting for server updates
+const INTERPOLATE_AMT = .5;//interpolation setting for server updates.  Percent to correct local towards server
 
 //Input Controller
 var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50,callback:GAMEPAD_right_callback}});
@@ -84,9 +84,11 @@ var socket = io();
 		   //TODO: STORE NewID somewhere because it represents a players socketID
 		   
 			if( NewID === UNIQUE_ID){
-				//do nothing because this is global alert to others about us
+				//do nothing because this is global alert to others about you!
 			}else{
-				createBox(msg[NewID]);
+				console.log("new player blueprint",msg[NewID])
+				var newP = createBox(msg[NewID],true);
+				console.log("new player",newP)
 				};
 			//	OtherPlayers[NewID] = createBox(msg[NewID],true)}
 		   });
@@ -161,16 +163,14 @@ var socket = io();
 		});
 		
 		socket.on('U', function(msg){
-		//	console.log("update bytes:",msg.data.byteLength);
+			console.log("update bytes:",msg.data.byteLength);
 			//msg.data is an ArrayBuffer, you can't read/write to it without using a typedarray or dataview
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
 		   //console.log(msg.data.byteLength)
 		  // var TimeStamp = new Float32Array(msg.slice(0,1));
-		   var dataArray = new Float32Array(msg);
+		   var dataArray = new Float32Array(msg.data);
 
-//			var dataArray = new Float32Array(msg.data);
-			
 			//console.log(msg.data.byteLength)
 			//after msg.data is loaded in to a typed array, pass to synchronizer
 			synchronizer.queUpdates({time:msg.time,data:dataArray})
@@ -178,7 +178,7 @@ var socket = io();
 		});
 		
 		socket.on('C',function (msg) {
-			console.log('moving obj byte:',msg.byteLength)
+			//console.log('moving obj byte:',msg.byteLength)
 			var dataArray = new Float32Array(msg);
 			createMovingObj(dataArray);
 		});
@@ -510,7 +510,7 @@ function createBox(object,returnObj) {
 		//add cube to our physics world
 		physicsWorld.addRigidBody( Cube.userData.physics );
 		
-		
+
 		if (returnObj) {return Cube};
 }
 
@@ -751,6 +751,9 @@ function clickShootCube() {
 };
 
 function thrust(active){
+	
+	if(PlayerCube.thrustFuel <= 0)return;
+	
 	var LV = PlayerCube.physicsBody.getLinearVelocity();
 	
 	var x = LV.x();
@@ -763,7 +766,10 @@ function thrust(active){
 	var z = LV.z()
 	
 	var buffer = getBinaryToSend([changeLinearVelocity],[x,y,z]);	
-			
+	
+	//deplete thrust fule
+	PlayerCube.thrustFuel--;
+	
 	//binary mode
 	socket.emit('I',buffer);
 };
@@ -894,7 +900,10 @@ function animate() {
 		  
 		  //check what buttons are pressed
 	      GAMEPADpolling();   
-  
+	
+	/* AUTO REGEN PROPS */
+	if(PlayerCube.thrustFuel < 50)PlayerCube.thrustFuel += 0.001;
+	
 	/*CHASE CAMERA EFFECT*/
 		var relativeCameraOffset = new THREE.Vector3(camX,camY,camZ);//camera chase distance
 		var cameraOffset = relativeCameraOffset.applyMatrix4( PlayerCube.graphicsBody.matrixWorld );
@@ -1011,7 +1020,7 @@ ServerPhysicsSync = function (physicsWorld,rigidBodiesLookUp) {
 	this.transformAux1 = new Ammo.btTransform();
 	this.vector3Aux1 = new Ammo.btVector3();
 	this.quaternionAux1 = new Ammo.btQuaternion();
-	this.divergenceThreshold = 1;
+	this.divergenceThreshold = .5;
 	this.gameClock;
 	this.PlayerCube;
 	
@@ -1155,7 +1164,7 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 				 if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[this.x]) > this.divergenceThreshold ||
 						Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[this.y]) > this.divergenceThreshold ||
 						Math.abs(this.ServerUpdates[i+this.z] - objectPhysics[this.z]) > this.divergenceThreshold ){
-		    
+		 
 		    	    //DIVERGENCE check failed! replace everything locally with what the server says, smooth using interpolation		
 					//get the object
 		      	var objPhys = this.rigidBodiesLookUp[id].userData.physics;
@@ -1169,8 +1178,7 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 						var interpolateZ = objectPhysics[this.z] +(this.ServerUpdates[i+this.z]  - objectPhysics[this.z])* INTERPOLATE_AMT;
 
 					
-						//vector for position update
-						//this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
+						//vector for position update	//this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
 						this.vector3Aux1.setValue(interpolateX,interpolateY,interpolateZ);
 
 						

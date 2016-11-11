@@ -14,7 +14,7 @@ var port = process.env.PORT || 5000;
 
 //var ip = '192.168.1.100'
 //var ip = '192.168.1.102'
-//var ip = '10.10.10.100'
+var ip = '10.10.10.100'
 
 
 //required for serving locally when testing
@@ -29,7 +29,8 @@ var physicsWorld;
 const gravityConstant = -9.8
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
-const updateFrequency = .5;//Seconds	
+const updateFrequency = .1;//Seconds	
+const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
 const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 const IMPACT_FORCE_MINIMUM = 1;//minimum impact for collision to be broadcast
 
@@ -169,19 +170,14 @@ function createObjects() {
 		AddToRigidBodiesIndex(ground);
 		
 		//create a tower
-		for (var i = 0; i<1; i++) {
+		for (var i = 0; i<10; i++) {
 			createCubeTower();
 		}
 }
 
 
 function createCubeTower(height,width,depth){
-	/*TODO:
-	set mass to 0 and you'll see the logic is WRONG
-	FIX IT
-	also the position logic is wrong
-	*/
-	console.log("184: ---- FIX THIS ---")
+	
 	//defaults if no args passed for the TOWER, not the blocks
 	var height = height || 10;
 	var width = width || 2;
@@ -190,73 +186,71 @@ function createCubeTower(height,width,depth){
 	//create random location for our tower, near other blocks
 	var randX =  Math.floor(Math.random() * 300) - 100;
 	var randZ =  Math.floor(Math.random() * 300) - 100;
+	var randY = 1;//...not random
 	
-	var pos =  new Ammo.btVector3(randX,1,randZ);
+	var pos =  new Ammo.btVector3(randX,randY,randZ);
+	var blockMass = 1; //zero mass makes objects static.  Objects can hit them but they dont move or fall 
+	var blockW = 2;
+	var blockH = 2;
+	var blockD = 2;
+	var blockShape = 0;//box =0
+	var blockColor = 0xededed;//light gray, rubble will be based on this color
+	var blockTexture = TEXTURE_FILES_INDEX.blocks_1;
+	var blockBreakApartForce = 5;
 	
-	var ObjBlueprint = {
-			mass : 1, //zero mass makes objects static.  Objects can hit them but they dont move or fall 
-			w : 2,
-			h : 2,
-			d : 2,
-			shape:0,//box =0
-	//		color: Math.random() * 0x0000ff, //random blues
-			color: 0xededed,//light gray
-			texture:TEXTURE_FILES_INDEX.blocks_1,
-			x: 0,
-			y: 0,
-			z: 0,
-			Rx: 0,
-			Ry: 0,
-			Rz: 0,
-			breakApartForce: 5
-		}
 		
 	//three nested loops will create the tower
 	//inner loop lays blocks in a row
 	//mid loop starts a new column
 	//outer loop starts next new layer up 
 	/*IMPORTANT: the number 2 is hard coded because CreateCube() creates 2x2x2 cubes.  bad form... but be aware!*/
-	for (var h=0;h<height;h++) {
+	for (var h=1;h<=height;h++) {
 		
 		for (var w=0;w<width;w++) {
 		
 			for(var d =0; d<depth;d++){
-			   //console.log("219:",ObjBlueprint.x,ObjBlueprint.y,ObjBlueprint.z)
-				ObjBlueprint.x = pos.x();
-				ObjBlueprint.y = pos.y();
-				ObjBlueprint.z = pos.z();
 
-				//MAJOR FLAW. ccreatePhysicalCube alters the object passed to it!.  need to send a copy
-				 var block = createPhysicalCube(Object.assign({},ObjBlueprint));
-				 block.physics.setActivationState(1);
+				var block = createPhysicalCube({
+						mass : blockMass, 
+						w : blockW,
+						h : blockH,
+						d : blockD,
+						shape:blockShape,
+						color: blockColor,
+						texture:blockTexture,
+						x: pos.x(),
+						y: pos.y(),
+						z: pos.z(),
+						Rx: 0,
+						Ry: 0,
+						Rz: 0,
+						breakApartForce: blockBreakApartForce
+					});
+					
+				// block.physics.setActivationState(1);
 
 				physicsWorld.addRigidBody( block.physics );
+				
 				AddToRigidBodiesIndex(block);
 
 				//add to pos, used in the placement for our next block being created	
-				pos.setX(ObjBlueprint.x+d) //+X dimention
+				pos.setX(randX+blockW) //+X dimention
 			}
-			//reset for next column
-			pos = new Ammo.btVector3(randX,1,randZ)
 
 			//Start our new row shifted over depth of our object
-			pos.setY((pos.y()*h));
-			pos.setZ(pos.z()+2);//+Z dimention;
-			
-			ObjBlueprint.x = pos.x();
-			ObjBlueprint.y = pos.y();
-			ObjBlueprint.z = pos.z();
+			pos.setX(randX);
+			pos.setZ(randZ+blockD);//+Z dimention;
+
 		}
 		//reset our Z axis
 		//start the new grid up one level
 		//reset for next column
-		pos = new Ammo.btVector3(randX,1,randZ)
+		pos.setX(randX);
+		pos.setZ(randZ);//+Z dimention;
 			
 		//Start our new layer by moving up the height of our cubes
-		pos.setY(2+ObjBlueprint.y)
-		ObjBlueprint.x = pos.x();
-		ObjBlueprint.y = pos.y();
-		ObjBlueprint.z = pos.z();
+		pos.setY(blockH*h);
+
 	}
 }
 
@@ -571,7 +565,7 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	}
 	
 	//loop our physics at about X fps
-	setTimeout( TickPhysics, 20);//milisecond callback timer
+	setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 };
 
 
@@ -631,12 +625,12 @@ function generateRubble(object){
 	//The rubble will be propotionally sized cubes based on the original objects size
 	//frac creates frac^3 pieces of rubble.
 	var frac = 2;
-	var dfrac = depth/(frac*frac);
-	var hfrac = height/(frac*frac);
-	var wfrac = width/(frac*frac);
+	var dfrac = depth/(frac*frac)//depth/frac;
+	var hfrac = height/(frac*frac)//height/frac;
+	var wfrac = width/(frac*frac)//width/frac;
 	
 	//next create our rubble
-	for (var h=0;h<frac;h++) {
+	//for (var h=0;h<frac;h++) {
 		
 		var posZ_layer = posZ;		
 		for (var w=0;w<frac;w++) {
@@ -716,10 +710,10 @@ function generateRubble(object){
 			posX_layer += wfrac;//+Z dimention
 		}
 		//reset our Z axis
-		posX_layer = posZ;
+		//posX_layer = posZ;
 		//start the new grid up one level
-		posY += hfrac; 
-	}
+		//posY += hfrac; 
+	//}
 	
 	return true;
 	
@@ -756,6 +750,8 @@ function emitWorldUpdate() {
 				var Lv = obj.getLinearVelocity();
 		
 				if (Lv.length() > .1) {
+					
+				//	if(Lv.y() < -5)console.log("count:",objectCount,"Y:",Lv.y());
 				
 				//assign obj's ID to it's starting index position
 				dataToSend[objectCount*PROPERTY_PER_OBJECT] = obj.ptr;
@@ -876,7 +872,7 @@ function AddPlayer(uniqueID){
 		//create random location
 	   var randX =  Math.floor(Math.random() * 20) - 10;
 	   var randZ =  Math.floor(Math.random() * 20) - 10;
-	
+	   var randY = 10;//not random, named for convention
 		var cubeObjBlueprint = {
 			w : 2,
 			h : 2,
@@ -886,7 +882,7 @@ function AddPlayer(uniqueID){
 			color: Math.random() * 0xff0000,//random RED
 			texture:TEXTURE_FILES_INDEX.playerFace,
 			x: randX,
-			y: 10,
+			y: randY,
 			z: randZ,
 			Rx: 0,
 			Ry: 0,
@@ -905,16 +901,24 @@ function AddPlayer(uniqueID){
 		physicsWorld.addRigidBody( cube.physics );
 		
 		//add to our index used to update clients about objects that have moved
-		/*IMPORTANT: AddToRigidBodiesIndex expects that obj.physics is an Ammo object.  NOT the values sent used in the blueprint to build the object*/
-		//passing true indicates this cube will be used for a player		
-		AddToRigidBodiesIndex(cube,true);
+		AddToRigidBodiesIndex(cube);
 		
 		//associate the player's socketID with it's object in rigidBodies
 		PlayerIndex[uniqueID] =  cube;
 		
-		//add player to worlds of other players and self
-		io.emit('newPlayer', {[uniqueID]:rigidBodiesIndex[cube.id]});
+		console.log("913 Ugly way to notify a players of newplayer FIX");
+		//cubeObjBlueprint is modified by createPhysicalCube(), but users need pos an quat info
+			cubeObjBlueprint.x = randX;
+			cubeObjBlueprint.y = randY;
+			cubeObjBlueprint.z = randZ;
+			cubeObjBlueprint.Rx = 0;
+			cubeObjBlueprint.Ry = 0;
+			cubeObjBlueprint.Rz = 0;
+			cubeObjBlueprint.Rw = 1;
 		
+		//add player to worlds of other players	
+	    io.emit('newPlayer', {[uniqueID]:cubeObjBlueprint});
+
 }
 
 
@@ -1188,7 +1192,7 @@ app.get('/', function(request, response){
 });
 
 
-http.listen(port, function(){
+http.listen(port, ip, function(){
 	console.log('listening on port: '+port);
 	console.log('serving files from root: '+__dirname);
 	});		
