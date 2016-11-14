@@ -10,6 +10,20 @@ var camX =0;var camY = 5; var camZ = -20;//Set the initial perspective for the u
 var PlayerCube;
 var PlayerCube_local;
 
+//GRAPHICS buffer
+const RENDERING_BUFFER_TOTAL_FRAMES = 10;
+var RENDERING_BUFFER = new Array(RENDERING_BUFFER_TOTAL_FRAMES ); //holds 30 frames of updates
+var RENDERING_BUFFER_FRAME = 0;
+//buffer index positions
+RENDERING_BUFFER_INDEX_id = 0;
+RENDERING_BUFFER_INDEX_x = 1;
+RENDERING_BUFFER_INDEX_y = 2;
+RENDERING_BUFFER_INDEX_z = 3;
+RENDERING_BUFFER_INDEX_Rx = 4;
+RENDERING_BUFFER_INDEX_Ry = 5;
+RENDERING_BUFFER_INDEX_Rz = 6;
+RENDERING_BUFFER_INDEX_Rw = 7;
+
 //server assigned texture files
 var TEXTURE_FILES_INDEX = new Object();
 var TEXTURE_FILES = new Array();
@@ -33,7 +47,6 @@ var synchronizer;
 //GLOBAL Physics variables
 var physicsWorld;
 const gravityConstant = -9.8; //should this be sent from server?
-var OnScreenBodies =[];
 var collisionConfiguration;
 var dispatcher;
 var broadphase;
@@ -43,7 +56,7 @@ var transformAux1 = new Ammo.btTransform();
 var vector3Aux1 = new Ammo.btVector3();
 var quaternionAux1 = new Ammo.btQuaternion();
 var PHYSICS_ON = true;
-const INTERPOLATE_AMT = .5;//interpolation setting for server updates.  Percent to correct local towards server
+const INTERPOLATE_AMT = .7;//interpolation setting for server updates.  Percent to correct local towards server
 
 //Input Controller
 var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50,callback:GAMEPAD_right_callback}});
@@ -107,8 +120,8 @@ var socket = io();
 			//assign your player to the physics synchronizer
 			synchronizer.assignPlayer(PlayerCube);
 			
-			 //now that you exist, start rendering loop
-			animate();	
+			 //now that you exist, start buffering , then rendering loop
+			bufferingGraphics()
 		});		
 		
 		function requestPlayerObj(){
@@ -876,6 +889,28 @@ function GAMEPAD_right_callback(){
 }
 
 
+function bufferingGraphics(){
+	
+	if(RENDERING_BUFFER_FRAME < RENDERING_BUFFER_TOTAL_FRAMES) {
+		
+		console.log('buffer:',RENDERING_BUFFER_FRAME)
+		 var deltaTime = clock.getDelta();
+		  
+		// Step world
+		physicsWorld.stepSimulation( deltaTime,10);
+		
+		graphicsBufferUpdate();
+		
+		//recursive call until buffer full of 30 frames
+		 bufferingGraphics();
+	}else{
+		console.log('buffer done')
+		animate();
+	}
+	
+}
+
+
 function render() {
        renderer.render( scene, camera );//update graphics
 	   
@@ -884,8 +919,79 @@ function render() {
 };
 
 
+function graphicsBufferUpdate(){
 	
+
+	if(RENDERING_BUFFER_FRAME < RENDERING_BUFFER_TOTAL_FRAMES) {
+		RENDERING_BUFFER_FRAME += 1
+	}else{
+		RENDERING_BUFFER_FRAME =0;
+	}
+
+	var IDs = Object.keys(this.rigidBodiesLookUp);	
+	
+	RENDERING_BUFFER[RENDERING_BUFFER_FRAME] = new Array();
+	var TotalObjs = 0;
+	
+	// grab current state of things
+	for ( var i = 0; i < IDs.length; i++ ) {
+	
+		//get the objects ID
+		var id = IDs[i]
+		var objGraphic = rigidBodiesLookUp[id];
+		var objPhys = objGraphic.userData.physics;
+	
+		var ms = objPhys.getMotionState();
+
+			if ( ms ) {
+			
+				//get the location and orientation of our ACTIVE object
+				ms.getWorldTransform( this.transformAux1 );
+				var p = this.transformAux1.getOrigin();
+				var q = this.transformAux1.getRotation();
+
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs] =  new Array(8);
+					//update our comparisons for moving objs
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_id] = id;
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_x] = p.x();
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_y] = p.y();
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_z] = p.z();
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_Rx] = q.x();
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_Ry] = q.y();
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_Rz] = q.z();
+					RENDERING_BUFFER[RENDERING_BUFFER_FRAME][TotalObjs][RENDERING_BUFFER_INDEX_Rw] = q.w();
+				
+				TotalObjs++
+			};
+	};
+	
+	//tell renderer what frame from buffer should be drawn
+	//it should always be ONE frame ahead so that after looping around it is one buffer rotation behind
+	if(RENDERING_BUFFER_FRAME === RENDERING_BUFFER_TOTAL_FRAMES) {
+		return 0;
+	}else{
+		return RENDERING_BUFFER_FRAME +1;
+	}
+}
+
+
+
 function animate() {
+	/**************************************
+	
+	MAJOR REVISIONS REQUIRED
+	TODO: JMN Nov14 2016
+	
+	Deleting objects causes issues when rending from buffer
+	graphics and physics should NOT be on a single object, separate them and relate with the ID
+	
+	Different levels of Importance for rendering.  For example Players and bullets need ASAP updates
+	while environment objects can be slower and less frequent
+	
+	Consider drawing objects from different parts of the buffer? example 2 frames behind vs 30
+	
+	
+	****************************************/
 		 //first sync physics with server updates if needed
 		  synchronizer.sync();
 		  	
@@ -893,13 +999,14 @@ function animate() {
 	
 		  var deltaTime = clock.getDelta();
 		
-			// Step world
-			physicsWorld.stepSimulation( deltaTime,10);
+		// Step world
+		physicsWorld.stepSimulation( deltaTime,10);
 
-		  updateGraphics( deltaTime );
+		////update graphics buffer then draw 
+		updateGraphics( graphicsBufferUpdate() );
 		  
-		  //check what buttons are pressed
-	      GAMEPADpolling();   
+		//check what buttons are pressed
+	    GAMEPADpolling();   
 	
 	/* AUTO REGEN PROPS */
 	if(PlayerCube.thrustFuel < 50)PlayerCube.thrustFuel += 0.001;
@@ -916,31 +1023,29 @@ function animate() {
     
 
 	
-function updateGraphics( deltaTime ) {
+function updateGraphics(bufferFrame) {
 	
-	var IDs = Object.keys(rigidBodiesLookUp);	
+	// Update graphics from buffer
+	for ( var i = 0; i < RENDERING_BUFFER[bufferFrame].length; i++ ) {
+	
+		try{
+		//get the objects ID
+		var id = RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_id]
+		objThree = rigidBodiesLookUp[id];
 
-	// Update graphics based on what happened with the last physics step
-	for ( var i = 0, objThree,objPhys; i < IDs.length; i++ ) {
-	
-	//get the objects ID
-	var id = IDs[i]
-	objThree = rigidBodiesLookUp[id];
-	objPhys = objThree.userData.physics;
-	
-	var ms = objPhys.getMotionState();
-
-		if ( ms ) {
-			
-			//get the location and orientation of our object
-			ms.getWorldTransform( transformAux1 );
-			var p = transformAux1.getOrigin();
-			var q = transformAux1.getRotation();
-		
-			//update our graphic component using data from our physics component
-			objThree.position.set( p.x(), p.y(), p.z() );
-			objThree.quaternion.set( q.x(), q.y(), q.z(), q.w() );
-		};
+		//update our graphic component using data from our buffer
+		objThree.position.set( 
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_x],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_y],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_z]);
+		objThree.quaternion.set( 
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Rx],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Ry],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Rz],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Rw]);
+		}catch(err){
+			/*Issue is graphics are deleted so buffer cant render.*/
+			console.log("fix")}
 	};
 	
 	//draw all the new updates

@@ -29,7 +29,7 @@ var physicsWorld;
 const gravityConstant = -9.8
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 var clock;									//info that is only needed when a newly connected player first builds the world
-const updateFrequency = .1;//Seconds	
+const updateFrequency = .2;//Seconds	
 const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
 const PROPERTY_PER_OBJECT = 14; //IMPORTANT PROPERTY!!! change if number of object properties sent with updates changes.  ie. linear velocity
 const IMPACT_FORCE_MINIMUM = 1;//minimum impact for collision to be broadcast
@@ -604,7 +604,6 @@ function processCollisionPairs(collisionPairs){
 };
 
 
-
 function generateRubble(object){
 	
 	//get some object properties from our object to be broken
@@ -716,8 +715,6 @@ function generateRubble(object){
 	//}
 	
 	return true;
-	
-	
 }
 
 function delayedDestruction(ID,delay) {
@@ -804,7 +801,7 @@ function emitWorldUpdate() {
 	var buff = Buffer.from(binaryData.buffer)
 
 	//send out the data with a time stamp in UTC time
-	io.emit('U', {time:clock.oldTime,data:buff} );
+	if(objectCount>0)io.emit('U', {time:clock.oldTime,data:buff} );
 
 	/*	
 	CONSIDER MAKING IT ALL BINARY, Pack the timestamp into an f32 spot	
@@ -818,7 +815,6 @@ function TickPhysics() {
 	   updatePhysics( deltaTime,sendUpdate );
     };
 	
-
 
 function BuildWorldStateForNewConnection(){
 	
@@ -859,9 +855,6 @@ function BuildWorldStateForNewConnection(){
 		TEXTURE_FILES:TEXTURE_FILES});
 	
 }
-
-
-
 
 
 function AddPlayer(uniqueID){
@@ -920,8 +913,6 @@ function AddPlayer(uniqueID){
 	    io.emit('newPlayer', {[uniqueID]:cubeObjBlueprint});
 
 }
-
-
 
 
 //function FireShot(player){
@@ -998,8 +989,7 @@ function FireShot(ID,data){
 		delayedDestruction(cube.id,5000)
 }
 
-
-												
+											
 function PlayerInput(ID,data){
 
 	//data is a binary buffer
