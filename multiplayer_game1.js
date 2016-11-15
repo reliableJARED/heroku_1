@@ -493,7 +493,7 @@ function createBox(object,returnObj) {
 		//add cube to graphics world
 		scene.add( Cube );
 			   
-	    //attach any properties to the graphic object on 'userData' node of Cube object
+	    //attach any properties to the graphic object on 'userData' node of Cube objectff
 		var pCube = createBoxPhysicsObject(object);
 		
 		
