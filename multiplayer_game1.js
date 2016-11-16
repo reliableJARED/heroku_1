@@ -490,7 +490,7 @@ function createBox(object,returnObj) {
 		//object knows it's id 
 		Cube.userData.id = object.id;
 		
-		//add cube to graphics world
+		//add cube to graphics 
 		scene.add( Cube );
 			   
 	    //attach any properties to the graphic object on 'userData' node of Cube objectff
@@ -504,11 +504,11 @@ function createBox(object,returnObj) {
 		
 		//used to quickly find our object
 		if(object.local === 0){
-			rigidBodies_local[object.id] = pCube;
+			rigidBodies_local[object.id] = {graphics:Cube,physics:pCube};
 			//add cube to our physics world
 			physicsWorld_local.addRigidBody( pCube );
 		}else{
-			rigidBodies[object.id] = pCube;
+			rigidBodies[object.id] = {graphics:Cube,physics:pCube};
 			//add cube to our physics world
 			physicsWorld.addRigidBody( pCube );
 		}

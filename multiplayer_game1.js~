@@ -1,39 +1,31 @@
 //GLOBAL General variables
-var connection = false;
-var newPlayer = true;
 var rigidBodiesLookUp = {};
-var OtherPlayers = new Object();
-var mouse = new THREE.Vector2();
-var clock;
+var OTHER_PLAYERS = new Object();
+var CLOCK;
 var UNIQUE_ID; //assigned by the server
-var camX =0;var camY = 5; var camZ = -20;//Set the initial perspective for the user
 var PlayerCube;
-var PlayerCube_local;
-
-//server assigned texture files
-var TEXTURE_FILES_INDEX = new Object();
-var TEXTURE_FILES = new Array();
-
-/**** Player specific vars 
-used in many calcs, server has it's own set.  If someone trys to cheat
-and change things their playing exp. will be messed up
- **********/
-const TOP_HORIZONTAL_SPEED = 15;
-const TOP_VERTICAL_SPEED = 15;
-const SHOT_SPEED = 500;
-const ROTATION_SPEED = .5;
-
-//add rate of fire, health, items, etc.
-/**********************************************************/
 
 
-var textureLoader = new THREE.TextureLoader();
-var synchronizer;
+//GLOBAL Graphics variables
+var camera, scene, renderer;//primary components of displaying in three.js
+const CameraPositionX =0;//Sets the camera perspective for the user
+const CameraPositionY = 5; //Sets the camera perspective for the user
+const CameraPositionZ = -20;//Sets the camera perspective for the user
+var GRAPHICS = new Object();// Holds ALL world graphics
+var TEXTURE_FILES_INDEX = new Object();//server assigned texture file INDEX locations
+var TEXTURE_FILES = new Array();//server assigned texture files
+const RENDERING_BUFFER_TOTAL_FRAMES = 10;//too large a buffer makes for laggy game play
+var RENDERING_BUFFER = new Graphics_Buffer_Handler(RENDERING_BUFFER_TOTAL_FRAMES );
+const TEXTURE_LOADER = new THREE.TextureLoader();
+
 
 //GLOBAL Physics variables
-var physicsWorld;
+var physicsWorld;//the world in sync with server
+var rigidBodies = new Object();// Holds synchronized physics objects
+var physicsWorld_local;//NOT in sync with server.  Used for visual effects mostly
+var rigidBodies_local = new Object();// Holds NON-synchronized physics objects
+
 const gravityConstant = -9.8; //should this be sent from server?
-var OnScreenBodies =[];
 var collisionConfiguration;
 var dispatcher;
 var broadphase;
@@ -42,20 +34,16 @@ var softBodySolver;
 var transformAux1 = new Ammo.btTransform();
 var vector3Aux1 = new Ammo.btVector3();
 var quaternionAux1 = new Ammo.btQuaternion();
-var PHYSICS_ON = true;
-const INTERPOLATE_AMT = .35;//interpolation setting for server updates
 
-//Input Controller
-var GAMEPAD = new ABUDLR({left:{GUIsize:50,callback:GAMEPAD_left_callback},right:{GUIsize:50,callback:GAMEPAD_right_callback}});
+const INTERPOLATE_AMT = .7;//interpolation setting for server updates.  Percent to correct local towards server
 
 //create the synchronizer to merge local and server side physics
-var synchronizer; 
-		
-		//GLOBAL Graphics variables
-var camera, scene, renderer;//primary components of displaying in three.js
+var synchronizer;
 
-//RAYCASTER  is a project that renders a 3D world based on a 2D map
-var raycaster = new THREE.Raycaster();//http://threejs.org/docs/api/core/Raycaster.html
+//Input Controller
+var GAMEPAD = new ABUDLR({left:{GUIsize:60,callback:GAMEPAD_left_callback},right:{GUIsize:60,callback:GAMEPAD_right_callback,upRight:{color:'black'},downRight:{color:'black'},upLeft:{color:'black'},downLeft:{color:'black'},}});
+
+	
 	
 /************SERVER HOOKUPS*******************/
 //coding values for data sent to server
@@ -73,7 +61,10 @@ var socket = io();
 
 		
 		socket.on('connect',function(msg){
-			connection = true;			
+			/*
+			LAUNCH LOADING SCREEN and/or INSTRUCTIONS
+			*/
+			
 		});
 		
 		socket.on('newPlayer',function(msg){
@@ -84,11 +75,13 @@ var socket = io();
 		   //TODO: STORE NewID somewhere because it represents a players socketID
 		   
 			if( NewID === UNIQUE_ID){
-				//do nothing because this is global alert to others about us
+				//do nothing because this is global alert to others about you!
 			}else{
-				createBox(msg[NewID]);
+				console.log("new player blueprint",msg[NewID])
+				var newP = createBox(msg[NewID],true);
+				console.log("new player",newP)
 				};
-			//	OtherPlayers[NewID] = createBox(msg[NewID],true)}
+			//	OTHER_PLAYERS[NewID] = createBox(msg[NewID],true)}
 		   });
 		
 		socket.on('playerID',function(msg){
@@ -105,8 +98,8 @@ var socket = io();
 			//assign your player to the physics synchronizer
 			synchronizer.assignPlayer(PlayerCube);
 			
-			 //now that you exist, start rendering loop
-			animate();	
+			 //now that you exist, start buffering , then rendering loop
+			bufferingGraphics()
 		});		
 		
 		function requestPlayerObj(){
@@ -122,19 +115,17 @@ var socket = io();
 			//data: binary data of all world objects
 			//TEXTURE_FILES_INDEX: Object whos keys match files in TEXTURE_FILES array
 			//TEXTURE_FILES: array of file name strings
-			if(newPlayer){
-				newPlayer = false;//prevent rebuild for 'setup' msg intended for new players
-			
+			if(CLOCK !== 'undefined'){
+				//sync clocks
+				CLOCK = new GameClock(msg.time);
+				synchronizer.linkGameClock(CLOCK);
+				
 				//assign the lookup index for textures
 				TEXTURE_FILES_INDEX  = msg.TEXTURE_FILES_INDEX ;
 				
 				//load all textures
 				serverTextureLoader( msg.TEXTURE_FILES);
 
-				//sync clocks
-				clock = new GameClock(msg.time);
-				synchronizer.linkGameClock(clock);
-			
 				var ObjectsToBuild = unpackServerBinaryData(msg.data);
 				
 				//build the objects, and pass a callback requestPlayerObj when world is ready
@@ -167,10 +158,8 @@ var socket = io();
 			//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/TypedArray
 		   //console.log(msg.data.byteLength)
 		  // var TimeStamp = new Float32Array(msg.slice(0,1));
-		   var dataArray = new Float32Array(msg);
+		   var dataArray = new Float32Array(msg.data);
 
-//			var dataArray = new Float32Array(msg.data);
-			
 			//console.log(msg.data.byteLength)
 			//after msg.data is loaded in to a typed array, pass to synchronizer
 			synchronizer.queUpdates({time:msg.time,data:dataArray})
@@ -178,7 +167,7 @@ var socket = io();
 		});
 		
 		socket.on('C',function (msg) {
-			console.log('moving obj byte:',msg.byteLength)
+			//console.log('moving obj byte:',msg.byteLength)
 			var dataArray = new Float32Array(msg);
 			createMovingObj(dataArray);
 		});
@@ -190,7 +179,7 @@ var socket = io();
 			so it is setup to handle rmvObj and removePlayer*/
 		//	console.log(msg);
 		//  msg is an ID for an object
-		//	delete OtherPlayers[msg];
+		//	delete OTHER_PLAYERS[msg];
 		//	scene.remove( rigidBodiesLookUp[msg] )
 		//	physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
 			//delete rigidBodiesLookUp[msg];
@@ -210,7 +199,7 @@ var socket = io();
 				//ID is a players ID
 				var ID = Object.keys(msg)[0];
 			
-				console.log("input bytes:",msg[ID].byteLength)			
+				//console.log("input bytes:",msg[ID].byteLength)			
 			
 				//msg[ID] is an ArrayBuffer with structure:
 		  	 //first 4 bytes are 4 uint8, byte 1 encodes action being requested, next 3 vary on what they mean based on specific action.  Like shoot, move, etc.
@@ -248,9 +237,9 @@ function initGraphics() {
    camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 0.2, 5000 );	
   
     //mess around with these parameters to adjust camera perspective view point
-    camera.position.x = camX;
-	camera.position.y = camY;
-    camera.position.z =  camZ;
+    camera.position.x = CameraPositionX;
+	camera.position.y = CameraPositionY;
+    camera.position.z =  CameraPositionZ;
 				
 	//http://threejs.org/docs/#Reference/Scenes/Scene			
 	scene = new THREE.Scene();
@@ -267,7 +256,7 @@ function initGraphics() {
 	var ambientLight = new THREE.AmbientLight( 0x404040 );
 	
 	//ambientLight is for whole scene, use directionalLight for point source/spotlight effect
-   scene.add( ambientLight );
+    scene.add( ambientLight );
     				
     				
     //attach and display the renderer to our html element
@@ -299,7 +288,7 @@ with loaded images in TEXTURE_FILES
 	for (var i = 0; i < 6; i++)
 	//KEY! THREE.BackSide to put image on inner face not outer face of cube
 		materialArray.push( new THREE.MeshBasicMaterial({
-			map: textureLoader.load( imagePrefix + directions[i] + imageSuffix ),
+			map: TEXTURE_LOADER.load( imagePrefix + directions[i] + imageSuffix ),
 			side: THREE.BackSide
 		}));
 		
@@ -309,7 +298,7 @@ with loaded images in TEXTURE_FILES
 
 };
 
-function initPhysics() {
+function initPhysics(WORLD) {
 		// Physics World configurations
 		broadphase = new Ammo.btDbvtBroadphase();
 
@@ -320,16 +309,18 @@ function initPhysics() {
 		solver = new Ammo.btSequentialImpulseConstraintSolver();	
 		softBodySolver = new Ammo.btDefaultSoftBodySolver();
 
-		physicsWorld = new Ammo.btSoftRigidDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration, softBodySolver);
+		WORLD = new Ammo.btSoftRigidDynamicsWorld( dispatcher, broadphase, solver, collisionConfiguration, softBodySolver);
 	
-		physicsWorld.setGravity( new Ammo.btVector3( 0, gravityConstant, 0 ) );
+		WORLD.setGravity( new Ammo.btVector3( 0, gravityConstant, 0 ) );
 		
 		return true;
 };
+
+
 function serverTextureLoader(filenameArray) {
 
 	for (f=0;f<filenameArray.length;f++) {
- 		 texture = textureLoader.load(filenameArray[f]);
+ 		 texture = TEXTURE_LOADER.load(filenameArray[f]);
  	 	TEXTURE_FILES.push(texture);
  	};
  	
@@ -493,24 +484,37 @@ function createBox(object,returnObj) {
 	    Cube.position.set(object.x, object.y, object.z );
 	    Cube.quaternion.set(object.Rx, object.Ry, object.Rz,object.Rw );
 	
-		//used to quickly find our object in our object array
-	    rigidBodiesLookUp[object.id] = Cube;
+		//used to quickly find our object
+	    GRAPHICS[object.id] = Cube;
 		
-		//add cube to graphics world
-		scene.add( Cube );
-			   
-	    //attach any properties to the graphic object on 'userData' node of Cube object
-		Cube.userData.physics = createBoxPhysicsObject(object);
-		
-		//object knows it's id in rigidBodiesLookUp
+		//object knows it's id 
 		Cube.userData.id = object.id;
 		
-		Cube.userData.physics.setActivationState(1);// ACTIVEATEATE
+		//add cube to graphics 
+		scene.add( Cube );
+			   
+	    //attach any properties to the graphic object on 'userData' node of Cube objectff
+		var pCube = createBoxPhysicsObject(object);
 		
-		//add cube to our physics world
-		physicsWorld.addRigidBody( Cube.userData.physics );
+		
+		//object knows it's id 
+		pCube.id = object.id;
+		
+		pCube.setActivationState(1);// ACTIVEATEATE
+		
+		//used to quickly find our object
+		if(object.local === 0){
+			rigidBodies_local[object.id] = pCube;
+			//add cube to our physics world
+			physicsWorld_local.addRigidBody( pCube );
+		}else{
+			rigidBodies[object.id] = pCube;
+			//add cube to our physics world
+			physicsWorld.addRigidBody( pCube );
+		}
 		
 		
+
 		if (returnObj) {return Cube};
 }
 
@@ -751,6 +755,9 @@ function clickShootCube() {
 };
 
 function thrust(active){
+	
+	if(PlayerCube.thrustFuel <= 0)return;
+	
 	var LV = PlayerCube.physicsBody.getLinearVelocity();
 	
 	var x = LV.x();
@@ -763,7 +770,10 @@ function thrust(active){
 	var z = LV.z()
 	
 	var buffer = getBinaryToSend([changeLinearVelocity],[x,y,z]);	
-			
+	
+	//deplete thrust fule
+	PlayerCube.thrustFuel--;
+	
 	//binary mode
 	socket.emit('I',buffer);
 };
@@ -870,6 +880,99 @@ function GAMEPAD_right_callback(){
 }
 
 
+Graphics_Buffer_Handler = function(TotalFrames){
+	
+	this.TotalFrames = TotalFrames;
+	this.bufferFrame = 0;
+	this.INDEX_id = 0;
+	this.INDEX_x = 1;
+	this.INDEX_y = 2;
+	this.INDEX_z = 3;
+	this.INDEX_Rx = 4;
+	this.INDEX_Ry = 5;
+	this.INDEX_Rz = 6;
+	this.INDEX_Rw = 7;
+	this.INDEX_total = 8;
+	this.buffer = new Array(this.TotalFrames);
+	this.ready = false;//toggle when no value is null
+	this.transformAux1 = new Ammo.btTransform();
+	
+}
+
+Graphics_Buffer_Handler.prototype.buffering(PhysicsWorld,PhysicsBodies,GraphicsObjects,clock){
+	
+	//first empty existing
+	this.buffer.length = 0;//clear the buffer
+	console.log('buffering...');
+	while(this.bufferFrame <= this.TotalFrames ){
+		  
+		// Step world
+		PhysicsWorld.stepSimulation( CLOCK.getDelta(),10);
+		
+		this.updateBuffer(PhysicsBodies,GraphicsObjects);
+	}
+	this.ready = true;
+	console.log('buffer ready')
+}
+
+Graphics_Buffer_Handler.prototype.updateBuffer(PhysicsBodies,GraphicsObjects){
+	
+
+	if(this.bufferFrame < this.TotalFrames) {
+		this.bufferFrame++
+	}else{
+		this.bufferFrame = 0;
+	}
+
+	var IDs = Object.keys(PhysicsBodies);	
+	
+	this.buffer[this.bufferFrame] = new Array();
+	
+	var TotalObjs = 0;
+	
+	// grab current state of things
+	for ( var i = 0; i < IDs.length; i++ ) {
+	
+		//get the objects ID
+		var id = IDs[i]
+		var objGraphic = GraphicsObjects[id];
+		var objPhys = PhysicsBodies[id];
+	
+		var ms = objPhys.getMotionState();
+
+			if ( ms ) {
+			
+				//get the location and orientation of our ACTIVE object
+				ms.getWorldTransform( this.transformAux1 );
+				var p = this.transformAux1.getOrigin();
+				var q = this.transformAux1.getRotation();
+
+					this.buffer[this.bufferFrame][TotalObjs] =  new Array(this.INDEX_total );
+					//update our comparisons for moving objs
+					this.buffer[this.bufferFrame][TotalObjs]this.INDEX_id] = id;
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_x] = p.x();
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_y] = p.y();
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_z] = p.z();
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_Rx] = q.x();
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_Ry] = q.y();
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_Rz] = q.z();
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_Rw] = q.w();
+				
+				TotalObjs++
+			};
+	};
+	
+	//tell renderer what frame from buffer should be drawn
+	//it should always be ONE frame ahead so that after looping around it is one buffer rotation behind
+	if(this.bufferFrame === this.TotalFrames) {
+		return 0;
+	}else{
+		return this.bufferFrame +1;
+	}
+}
+
+
+
 function render() {
        renderer.render( scene, camera );//update graphics
 	   
@@ -878,25 +981,45 @@ function render() {
 };
 
 
-	
+
+
 function animate() {
+	/**************************************
+	
+	MAJOR REVISIONS REQUIRED
+	TODO: JMN Nov14 2016
+	
+	Deleting objects causes issues when rending from buffer
+	graphics and physics should NOT be on a single object, separate them and relate with the ID
+	
+	Different levels of Importance for rendering.  For example Players and bullets need ASAP updates
+	while environment objects can be slower and less frequent
+	
+	Consider drawing objects from different parts of the buffer? example 2 frames behind vs 30
+	
+	
+	****************************************/
 		 //first sync physics with server updates if needed
 		  synchronizer.sync();
 		  	
         checkPlayerOrientation();// this will check if player needs to be reset because of being flipped - it's hacky tho
 	
-		  var deltaTime = clock.getDelta();
+		  var deltaTime = CLOCK.getDelta();
 		
-			// Step world
-			physicsWorld.stepSimulation( deltaTime,10);
+		// Step world
+		physicsWorld.stepSimulation( deltaTime,10);
 
-		  updateGraphics( deltaTime );
+		////update graphics buffer then draw 
+		updateGraphics( graphicsBufferUpdate() );
 		  
-		  //check what buttons are pressed
-	      GAMEPADpolling();   
-  
+		//check what buttons are pressed
+	    GAMEPADpolling();   
+	
+	/* AUTO REGEN PROPS */
+	if(PlayerCube.thrustFuel < 50)PlayerCube.thrustFuel += 0.001;
+	
 	/*CHASE CAMERA EFFECT*/
-		var relativeCameraOffset = new THREE.Vector3(camX,camY,camZ);//camera chase distance
+		var relativeCameraOffset = new THREE.Vector3(CameraPositionX,CameraPositionY,CameraPositionZ);//camera chase distance
 		var cameraOffset = relativeCameraOffset.applyMatrix4( PlayerCube.graphicsBody.matrixWorld );
 		camera.position.x = cameraOffset.x;
 		camera.position.y = cameraOffset.y;
@@ -907,31 +1030,29 @@ function animate() {
     
 
 	
-function updateGraphics( deltaTime ) {
+function updateGraphics(bufferFrame) {
 	
-	var IDs = Object.keys(rigidBodiesLookUp);	
+	// Update graphics from buffer
+	for ( var i = 0; i < RENDERING_BUFFER[bufferFrame].length; i++ ) {
+	
+		try{
+		//get the objects ID
+		var id = RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_id]
+		objThree = rigidBodiesLookUp[id];
 
-	// Update graphics based on what happened with the last physics step
-	for ( var i = 0, objThree,objPhys; i < IDs.length; i++ ) {
-	
-	//get the objects ID
-	var id = IDs[i]
-	objThree = rigidBodiesLookUp[id];
-	objPhys = objThree.userData.physics;
-	
-	var ms = objPhys.getMotionState();
-
-		if ( ms ) {
-			
-			//get the location and orientation of our object
-			ms.getWorldTransform( transformAux1 );
-			var p = transformAux1.getOrigin();
-			var q = transformAux1.getRotation();
-		
-			//update our graphic component using data from our physics component
-			objThree.position.set( p.x(), p.y(), p.z() );
-			objThree.quaternion.set( q.x(), q.y(), q.z(), q.w() );
-		};
+		//update our graphic component using data from our buffer
+		objThree.position.set( 
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_x],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_y],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_z]);
+		objThree.quaternion.set( 
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Rx],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Ry],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Rz],
+			RENDERING_BUFFER[bufferFrame][i][RENDERING_BUFFER_INDEX_Rw]);
+		}catch(err){
+			/*Issue is graphics are deleted so buffer cant render.*/
+			console.log("fix")}
 	};
 	
 	//draw all the new updates
@@ -1011,7 +1132,7 @@ ServerPhysicsSync = function (physicsWorld,rigidBodiesLookUp) {
 	this.transformAux1 = new Ammo.btTransform();
 	this.vector3Aux1 = new Ammo.btVector3();
 	this.quaternionAux1 = new Ammo.btQuaternion();
-	this.divergenceThreshold = 1;
+	this.divergenceThreshold = .5;
 	this.gameClock;
 	this.PlayerCube;
 	
@@ -1155,7 +1276,7 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 				 if(  Math.abs(this.ServerUpdates[i+this.x] - objectPhysics[this.x]) > this.divergenceThreshold ||
 						Math.abs(this.ServerUpdates[i+this.y] - objectPhysics[this.y]) > this.divergenceThreshold ||
 						Math.abs(this.ServerUpdates[i+this.z] - objectPhysics[this.z]) > this.divergenceThreshold ){
-		    
+		 
 		    	    //DIVERGENCE check failed! replace everything locally with what the server says, smooth using interpolation		
 					//get the object
 		      	var objPhys = this.rigidBodiesLookUp[id].userData.physics;
@@ -1169,8 +1290,7 @@ ServerPhysicsSync.prototype.ApplyUpdates = function (){
 						var interpolateZ = objectPhysics[this.z] +(this.ServerUpdates[i+this.z]  - objectPhysics[this.z])* INTERPOLATE_AMT;
 
 					
-						//vector for position update
-						//this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
+						//vector for position update	//this.vector3Aux1.setValue(this.ServerUpdates[i+this.x],this.ServerUpdates[i+this.y],this.ServerUpdates[i+this.z]);
 						this.vector3Aux1.setValue(interpolateX,interpolateY,interpolateZ);
 
 						
@@ -1227,7 +1347,8 @@ init();// start world building
 function init() {
 
 		initGraphics();
-		initPhysics();
+		initPhysics(physicsWorld);
+		initPhysics(physicsWorld_local);
 		
 		//create the synchronizer to merge local and server side physics
 		 synchronizer = new ServerPhysicsSync(physicsWorld,rigidBodiesLookUp);
