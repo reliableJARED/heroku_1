@@ -899,7 +899,7 @@ Graphics_Buffer_Handler = function(TotalFrames){
 	
 }
 
-Graphics_Buffer_Handler.prototype.buffering(PhysicsWorld,PhysicsBodies,GraphicsObjects,clock){
+Graphics_Buffer_Handler.prototype.buffering = function(PhysicsWorld,PhysicsBodies,GraphicsObjects,clock){
 	
 	//first empty existing
 	this.buffer.length = 0;//clear the buffer
@@ -915,7 +915,7 @@ Graphics_Buffer_Handler.prototype.buffering(PhysicsWorld,PhysicsBodies,GraphicsO
 	console.log('buffer ready')
 }
 
-Graphics_Buffer_Handler.prototype.updateBuffer(PhysicsBodies,GraphicsObjects){
+Graphics_Buffer_Handler.prototype.updateBuffer = function(PhysicsBodies,GraphicsObjects){
 	
 
 	if(this.bufferFrame < this.TotalFrames) {
@@ -949,7 +949,7 @@ Graphics_Buffer_Handler.prototype.updateBuffer(PhysicsBodies,GraphicsObjects){
 
 					this.buffer[this.bufferFrame][TotalObjs] =  new Array(this.INDEX_total );
 					//update our comparisons for moving objs
-					this.buffer[this.bufferFrame][TotalObjs]this.INDEX_id] = id;
+					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_id] = id;
 					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_x] = p.x();
 					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_y] = p.y();
 					this.buffer[this.bufferFrame][TotalObjs][this.INDEX_z] = p.z();
