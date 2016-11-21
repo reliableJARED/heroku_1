@@ -24,7 +24,7 @@ GraphicsBufferConstructor.prototype.graphicsBufferUpdate = function(){
 	if(this.currentFrame < this.bufferSize) {
 		this.currentFrame += 1
 	}else{
-		this.currentFrame =0;
+		this.currentFrame = 0;
 	}
 
 	var IDs = Object.keys(this.entitiesObject);	
@@ -75,7 +75,7 @@ GraphicsBufferConstructor.prototype.graphicsBufferUpdate = function(){
 }
 
 
-GraphicsBufferConstructor.prototype.bufferingGraphics= function(){
+GraphicsBufferConstructor.prototype.bufferingGraphics = function(){
 	
 	if(RENDERING_BUFFER_FRAME < RENDERING_BUFFER_TOTAL_FRAMES) {
 		
@@ -95,3 +95,39 @@ GraphicsBufferConstructor.prototype.bufferingGraphics= function(){
 	}
 	
 }
+
+GraphicsBufferConstructor.prototype.removeObj = function(ID){
+	
+	function destructionTimer(ID) {
+	//create promise
+    var p1 = new Promise(
+    // promise constructor takes one argument, a callback with two parameters, resolve and reject.
+        function(resolve, reject) {
+        	//create a timer with time = delay
+            window.setTimeout( function() {
+						scene.remove( rigidBodiesLookUp[msg] )
+						physicsWorld.removeRigidBody( rigidBodiesLookUp[msg].userData.physics );
+						delete rigidBodiesLookUp[msg];			
+				
+				}, 1000);
+           /*I'm not using a reject condition. but typically a promise would be built with:
+           function (resolve,reject) {
+           	if (*all good*) {resolve()} else {reject(reason)}*/
+        }
+    );
+    /*
+    "then" takes two arguments, a callback for a success case, and another for the failure case. Both are optional.
+    Setup as promise.then(*do something*).catch(*do something*) where then() is success, catch() is fail*/
+    p1.then(  
+        function(obj) {	
+        //when promise resolves obj to be destroyed is passed	
+			destroyObj(obj);
+        });/*
+    .catch(
+       //reason would have been passed from reject()
+        function(reason) {
+            console.log(reason);
+        });*/
+	}	
+}
+

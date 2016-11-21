@@ -329,12 +329,16 @@ function initPhysics() {
 };
 
 
-function AddToRigidBodiesIndex(obj){
+function AddToRigidBodiesIndex(obj,level){
+	//indicates if the object is a players cube
+	if(typeof level === 'undefined'){level = 0};
 
+	//indicates if this object can break, if it can - force requied to break it in Newtons
+	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = 0};
 
 	rigidBodiesIndex[obj.id] = new RigidBodyConstructor(obj);
 
-
+	//console.log(rigidBodiesIndex)
 }
 
 function serverTextureLoader(filenameArray) {
