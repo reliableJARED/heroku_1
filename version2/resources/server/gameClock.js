@@ -28,4 +28,7 @@ GameClock.prototype.UpdateTime = function () {
 }
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 
-module.exports = GameClock;
+// Export a convenience function that creates an instance
+module.exports = function(updateFrequency) {
+  return new GameClock(updateFrequency);
+}

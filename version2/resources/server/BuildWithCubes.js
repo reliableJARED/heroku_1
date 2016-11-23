@@ -1,6 +1,6 @@
 
 var BuildWithCubes = function(obj){
-
+	
 	this.vector3 = obj.vector3;
 	this.createPhysicalCube = obj.constructor;
 	this.texture_files_index = obj.texture_files_index;
