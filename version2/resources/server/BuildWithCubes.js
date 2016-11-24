@@ -1,8 +1,8 @@
 
 var BuildWithCubes = function(obj){
-	
+	console.log(obj)
 	this.vector3 = obj.vector3;
-	this.createPhysicalCube = obj.constructor;
+	this.builder = obj.builder;
 	this.texture_files_index = obj.texture_files_index;
 	this.AddToRigidBodiesIndex = obj.addToWorld;
 	this.physicsWorld = obj.physicsWorld;
@@ -46,7 +46,7 @@ BuildWithCubes.prototype.createCubeTower = function (tex_index,height,width,dept
 		
 			for(var d =0; d<depth;d++){
 
-				var block = this.createPhysicalCube({
+				var block = this.builder.createPhysicalCube({
 						mass : blockMass, 
 						w : blockW,
 						h : blockH,

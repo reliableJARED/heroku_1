@@ -1,7 +1,7 @@
 
-physicsWorldManager = function (ammo) {
-	console.log(ammo)
-	this.Ammo = ammo;
+var physicsWorldManager = function (Ammo) {
+	
+	this.Ammo = Ammo;
 	this.vector3Aux1 = new this.Ammo.btVector3();
 	this.transformAux1 = new this.Ammo.btTransform();
 	this.quaternionAux1 = new this.Ammo.btQuaternion();
@@ -10,11 +10,10 @@ physicsWorldManager = function (ammo) {
 
 physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 	
-
 	var mass =  blueprint.mass;
 	
 	/*set the position of our physics object using our reusable vector object*/
-	
+
 	this.vector3Aux1.setValue( blueprint.w * 0.5, blueprint.h * 0.5, blueprint.d * 0.5 )
 	
 	/*set the orientation of our physics object using our reusable quaternion object*/
@@ -50,12 +49,12 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 	var Cube = new this.Ammo.btRigidBody( rbInfo );
 	
 	//clean up our blueprint to be returned as the final object
-	//delete blueprint.x;
-	//delete blueprint.y;
-	//delete blueprint.z;
-	//delete blueprint.Rx;
-	//delete blueprint.Ry;
-	//delete blueprint.Rz;
+	delete blueprint.x;
+	delete blueprint.y;
+	delete blueprint.z;
+	delete blueprint.Rx;
+	delete blueprint.Ry;
+	delete blueprint.Rz;
 	
 	//add new prop holding our object
 	blueprint.physics = Cube;
@@ -68,5 +67,12 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 	return blueprint;
 }
 
+
+
 //IMPORTANT! tells node.js what you'd like to export from this file. 
-module.exports = physicsWorldManager;
+//module.exports = physicsWorldManager;
+
+// Export a convenience function that creates an instance
+module.exports = function(Ammo) {
+  return new physicsWorldManager(Ammo);
+}

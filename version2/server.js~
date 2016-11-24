@@ -30,21 +30,43 @@ app.use(serveStatic(__dirname + '/static/socket.io/'));
 
 //GLOBAL variables
 var physicsWorld; 
-const gravityConstant = -9.8
+const gravityConstant = -9.8;
+
+const RigidBodyConstructor  = require(__dirname +'/resources/server/rigidBodyConstructor.js');//returns constructor
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 
 const updateFrequency = .2;//Seconds
 var clock = require(__dirname +'/resources/server/gameClock.js');//returns constructor for a clock
 clock = new clock(updateFrequency)
 
-const RigidBodyConstructor  = require(__dirname +'/resources/server/rigidBodyConstructor.js');//returns constructor
+
 
 const GUN  = require(__dirname +'/resources/server/gun.js');//returns constructor
+
+
+
 var PlayerGun;//will become an instance of GUN
 
 var physicsWorldManager = require(__dirname +'/resources/server/physicsWorldManager.js')(Ammo);
-console.log(physicsWorldManager)
+
 var cubeBuilder  = require(__dirname +'/resources/server/BuildWithCubes.js');//returns constructor
+
+
+
+//EXAMPLE
+/* inheritence construct example */
+/*******************************************************/
+var aBaseClass  = require(__dirname +'/resources/server/baseClass.js');//returns constructor
+var aChildClass  = require(__dirname +'/resources/server/childClass.js')(aBaseClass);//returns instance
+aChildClass.printBase()
+aChildClass.printChild()
+
+aBaseClass.prototype.oneMoreThing = function(){
+	console.log('an after thought!');
+}
+
+aChildClass.oneMoreThing();
+/*******************************************************/
 
 
 const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
@@ -163,7 +185,7 @@ function createObjects() {
 		
 		//create a tower
 		for (var i = 0; i<10; i++) {
-			cubeBuilder.createCubeTower(TEXTURE_FILES_INDEX.blocks_1);
+		//	cubeBuilder.createCubeTower(TEXTURE_FILES_INDEX.blocks_1);
 		}
 }
 
@@ -178,7 +200,6 @@ function AddToRigidBodiesIndex(obj){
 
 	rigidBodiesIndex[obj.id] = new RigidBodyConstructor(obj,BYTE_COUNT_INT32,BYTE_COUNT_INT8,BYTE_COUNT_F32);
 
-	//console.log(rigidBodiesIndex)
 }
 
 //the object returned from createPhysicalCube has places the Ammo object under the property 'physics'
@@ -269,6 +290,7 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 	//********END COLLISION CHECKS
 
 	if (timeForUpdate){
+
 		//tell users to grab a world state because update is coming next tick
 		io.emit('QC');
 		//by setting this for nextTick the lag it takes QC to reach client should equal
@@ -279,6 +301,7 @@ function updatePhysics( deltaTime, timeForUpdate ) {
 		*/
 		process.nextTick(function (){emitWorldUpdate()} );
 	}
+	
 	
 	//loop our physics at about X fps
 	setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
@@ -463,8 +486,7 @@ function emitWorldUpdate() {
 				var Lv = obj.getLinearVelocity();
 		
 				if (Lv.length() > .1) {
-					
-				//	if(Lv.y() < -5)console.log("count:",objectCount,"Y:",Lv.y());
+				
 				
 				//assign obj's ID to it's starting index position
 				dataToSend[objectCount*PROPERTY_PER_OBJECT] = obj.ptr;
@@ -526,16 +548,20 @@ function emitWorldUpdate() {
 }
 
 function TickPhysics() {
+	
 	   var deltaTime = clock.getDelta();
+	   
 	   var sendUpdate = clock.UpdateTime();//bool that is true every second
+	   
 	   updatePhysics( deltaTime,sendUpdate );
     };
 	
 
 function BuildWorldStateForNewConnection(){
-	
+
 	var msgByteCount = 0;
 	var totalObjs = Object.keys(rigidBodiesIndex);
+	
 	var header = new Int16Array(4);
 	header[0] = totalObjs.length;
 	header[1] = BYTE_COUNT_INT8;
@@ -543,7 +569,7 @@ function BuildWorldStateForNewConnection(){
 	header[3] = BYTE_COUNT_F32;
 
 	var binaryData = Buffer.from(header.buffer);
-
+	
 	for(var i = 0; i < totalObjs.length; i++){
 		
 		//Try/Catch is here mostly for debug
@@ -616,6 +642,7 @@ function AddPlayer(uniqueID){
 		PlayerIndex[uniqueID] =  cube;
 		
 		console.log("913 Ugly way to notify a players of newplayer FIX");
+		//delete cubeObjBlueprint.physics;
 		//cubeObjBlueprint is modified by createPhysicalCube(), but users need pos an quat info
 			cubeObjBlueprint.x = randX;
 			cubeObjBlueprint.y = randY;
@@ -627,7 +654,6 @@ function AddPlayer(uniqueID){
 		
 		//add player to worlds of other players	
 	    io.emit('newPlayer', {[uniqueID]:cubeObjBlueprint});
-
 }
 
 
@@ -752,7 +778,7 @@ initPhysics();
 
 PlayerGun = new GUN({
 	header: fireBullet,
-	constructor: physicsWorldManager.createPhysicalCube,
+	builder: physicsWorldManager,//FIX - blows up memory because copies Ammo for each object
 	vector3: vector3Aux1,
 	destroy: delayedDestruction ,
 	addToWorld: AddToRigidBodiesIndex,
@@ -761,7 +787,7 @@ PlayerGun = new GUN({
 	
 cubeBuilder = new cubeBuilder({
 	texture_files_index: TEXTURE_FILES_INDEX,
-	constructor: physicsWorldManager.createPhysicalCube,
+	builder: physicsWorldManager,//FIX - blows up memory because copies Ammo for each object
 	vector3: vector3Aux1,
 	addToWorld: AddToRigidBodiesIndex,
 	physicsWorld: physicsWorld 
@@ -802,6 +828,7 @@ io.on('connection', function(socket){
 	
 	//get current state of everything, build specs and send out		
 	BuildWorldStateForNewConnection();
+
 	
 	//on first connection begin physics sim
 	if(!PhysicsSimStarted){

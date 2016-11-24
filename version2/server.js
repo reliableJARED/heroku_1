@@ -31,15 +31,20 @@ app.use(serveStatic(__dirname + '/static/socket.io/'));
 //GLOBAL variables
 var physicsWorld; 
 const gravityConstant = -9.8;
+
+const RigidBodyConstructor  = require(__dirname +'/resources/server/rigidBodyConstructor.js');//returns constructor
 var rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 
 const updateFrequency = .2;//Seconds
 var clock = require(__dirname +'/resources/server/gameClock.js');//returns constructor for a clock
 clock = new clock(updateFrequency)
 
-const RigidBodyConstructor  = require(__dirname +'/resources/server/rigidBodyConstructor.js');//returns constructor
+
 
 const GUN  = require(__dirname +'/resources/server/gun.js');//returns constructor
+
+
+
 var PlayerGun;//will become an instance of GUN
 
 var physicsWorldManager = require(__dirname +'/resources/server/physicsWorldManager.js')(Ammo);
@@ -179,8 +184,9 @@ function createObjects() {
 		AddToRigidBodiesIndex(ground);
 		
 		//create a tower
+		console.log('187:cubeTower commented out')
 		for (var i = 0; i<10; i++) {
-			cubeBuilder.createCubeTower(TEXTURE_FILES_INDEX.blocks_1);
+		//	cubeBuilder.createCubeTower(TEXTURE_FILES_INDEX.blocks_1);
 		}
 }
 
@@ -773,7 +779,7 @@ initPhysics();
 
 PlayerGun = new GUN({
 	header: fireBullet,
-	constructor: createPhysicalCube,
+	builder: physicsWorldManager,//FIX - blows up memory because copies Ammo for each object
 	vector3: vector3Aux1,
 	destroy: delayedDestruction ,
 	addToWorld: AddToRigidBodiesIndex,
@@ -782,7 +788,7 @@ PlayerGun = new GUN({
 	
 cubeBuilder = new cubeBuilder({
 	texture_files_index: TEXTURE_FILES_INDEX,
-	constructor: createPhysicalCube,
+	builder: physicsWorldManager,//FIX - blows up memory because copies Ammo for each object
 	vector3: vector3Aux1,
 	addToWorld: AddToRigidBodiesIndex,
 	physicsWorld: physicsWorld 

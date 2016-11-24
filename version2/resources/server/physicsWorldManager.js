@@ -5,15 +5,12 @@ var physicsWorldManager = function (Ammo) {
 	this.vector3Aux1 = new this.Ammo.btVector3();
 	this.transformAux1 = new this.Ammo.btTransform();
 	this.quaternionAux1 = new this.Ammo.btQuaternion();
-};
-
-
-physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
+	this.createPhysicalCube = function (blueprint){
 	
 	var mass =  blueprint.mass;
 	
 	/*set the position of our physics object using our reusable vector object*/
-	
+
 	this.vector3Aux1.setValue( blueprint.w * 0.5, blueprint.h * 0.5, blueprint.d * 0.5 )
 	
 	/*set the orientation of our physics object using our reusable quaternion object*/
@@ -67,7 +64,7 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 	return blueprint;
 }
 
-
+}
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 
 //module.exports = physicsWorldManager;

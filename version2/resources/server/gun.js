@@ -11,7 +11,7 @@ var gun = function(obj){
 	physicsWorld: //the physics world that this weapon exists in}
 	*/
 	this.fireBullet = obj.header;
-	this.createPhysicalCube = obj.constructor;
+	this.createPhysicalCube = obj.builder.createPhysicalCube;
 	this.vector3Aux1 = obj.vector3;
 	this.delayedDestruction = obj.destroy;
 	this.AddToRigidBodiesIndex = obj.addToWorld;
