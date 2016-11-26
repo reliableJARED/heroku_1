@@ -47,7 +47,9 @@ const GUN  = require(__dirname +'/resources/server/gun.js');//returns constructo
 
 var PlayerGun;//will become an instance of GUN
 
-var physicsWorldManager = require(__dirname +'/resources/server/physicsWorldManager.js')(Ammo);
+var physicsWorldManager = require(__dirname +'/resources/server/physicsWorldManager.js')(require('ammo-node'));
+
+console.log(physicsWorldManager)
 
 var cubeBuilder  = require(__dirname +'/resources/server/BuildWithCubes.js');//returns constructor
 
@@ -184,6 +186,7 @@ function createObjects() {
 		AddToRigidBodiesIndex(ground);
 		
 		//create a tower
+		console.log('187:cubeTower commented out')
 		for (var i = 0; i<10; i++) {
 		//	cubeBuilder.createCubeTower(TEXTURE_FILES_INDEX.blocks_1);
 		}

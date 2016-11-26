@@ -40,14 +40,9 @@ var clock = require(__dirname +'/resources/server/gameClock.js');//returns const
 clock = new clock(updateFrequency)
 
 
+var physicsWorldManager = require(__dirname +'/resources/server/physicsWorldManager.js')(require('ammo-node'));
 
-const GUN  = require(__dirname +'/resources/server/gun.js');//returns constructor
-
-
-
-var PlayerGun;//will become an instance of GUN
-
-var physicsWorldManager = require(__dirname +'/resources/server/physicsWorldManager.js')(Ammo);
+console.log(physicsWorldManager)
 
 var cubeBuilder  = require(__dirname +'/resources/server/BuildWithCubes.js');//returns constructor
 
