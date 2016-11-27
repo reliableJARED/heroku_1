@@ -13,7 +13,7 @@ var RigidBodyConstructor = function(obj,byteInt32,byteInt8, byteF32){
 		this.texture = obj.texture;
 		this.player = obj.player;
 		this.breakApartForce = obj.breakApartForce;
-		this.destroyObject = obj.destroyObject;
+		this.destroyObject = false;
 		this.transformAux1 = new Ammo.btTransform();//reusable transform object
 		
 		/*used for binary exporting*/
