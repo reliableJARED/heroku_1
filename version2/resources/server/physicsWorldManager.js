@@ -8,44 +8,55 @@ var physicsWorldManager = function (Ammo) {
 	this.rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 	this.RigidBodyConstructor  = require(__dirname +'/rigidBodyConstructor.js');
 
-	/*Universal reference locations*/
+	/*Universal Arrays Used for Objects*/
+	this.ObjectIDArray = new Int32Array(1);	
+	this.ObjectID = 0;
+	
 	//position array index keys
-	this.PositionArray = new Array();
+	this.PositionArray = new Float32Array(3);
 	this.posX = 0;
 	this.posY = 1;
 	this.posZ = 2;
+	
 	//orientation array index keys
-	this.OrientationArray = new Array();
+	this.OrientationArray = new Float32Array(4);
 	this.QuatX = 0;
 	this.QuatY = 1;
 	this.QuatZ = 2;
 	this.QuatW = 3;
+	
 	//linear velocity array index keys
-	this.LinearVelocityArray = new Array();
+	this.LinearVelocityArray = new Float32Array(3);
 	this.LVx = 0;
 	this.LVy = 1;
 	this.LVz = 2;
+	
 	//angular velocity array index keys
-	this.AngularVelocityArray = new Array();
+	this.AngularVelocityArray = new Float32Array(3);
 	this.AVx = 0;
 	this.AVy = 1;
 	this.AVz = 2;
+
 	//dimensions array index keys
-	this.DimensionsArray = new Array();
-	this.width = 1;
-	this.height = 2;
-	this.depth = 3;
-	this.PropertiesArray = new Array();
-	this.ObjectID = 0;
-	this.mass = 4;
-	this.Shape = 0;//box =0
-	this.blockColor = 0xffffff;//white
-	this.blockTexture = 1;
-	this.blockBreakApartForce = 5 ;
+	this.DimensionsArray = new Float32Array(3);
+	this.width = 0;
+	this.height = 1;
+	this.depth = 2;
+
+	//properties array index keys
+	this.PropertiesArray = new Float32Array();
+	this.mass = 1;
+	this.Shape = 2;
+	this.blockColor = 3; 
+	this.blockTexture = 4;
+	this.blockBreakApartForce = 5;
 	
 	this.dispatcher; //Collision Manager
 	this.physicsWorld;//WORLD
 	this.init();
+	
+	//Fill arrays with defaults	
+	this.setArrays_EnvironmentBlock();
 }	
 
 physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
@@ -109,83 +120,132 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 	var Cube = new this.Ammo.btRigidBody( rbInfo );
 	
 	//assign the objects uniqueID
-	var id = Cube.ptr.toString();
+	var id = Cube.ptr;
 	//blueprint.id = Cube.ptr;
 
 	//return our object which is now ready to be added to the world
 	return {physics:Cube,id:id};
 }
 
-physicsWorldManager.prototype.setDimensionsArray_cube2x2x2 = function () {
-	//shortcut function to set the prop array for 2x2x2 cube
-	this.DimensionsArray[this.width] = 2;
-	this.DimensionsArray[this.height] = 2;
-	this.DimensionsArray[this.depth] = 2;
+physicsWorldManager.prototype.setDimensionsArray = function (w,h,d) {
+	/* defaults deactivated right now	
+	var w = w || 2;
+	var h = h || 2;
+	var d = d || 2;
+	*/
+	this.DimensionsArray[this.width] = w;
+	this.DimensionsArray[this.height] = h;
+	this.DimensionsArray[this.depth] = d;
 
 };
 
+physicsWorldManager.prototype.setPositionArray = function (x,y,z) {
+	/* defaults deactivated right now	
+	var x = x || 0;
+	var y = y || 0;
+	var z = z || 0;
+	*/
+	this.PositionArray[this.posX] = x;
+	this.PositionArray[this.posY] = y;
+	this.PositionArray[this.posZ] = z;
+
+};
+
+physicsWorldManager.prototype.setOrientationArray = function (x,y,z,w) {
+	/* defaults deactivated right now	
+	var x = x || 0;
+	var y = y || 0;
+	var z = z || 0;
+	var w = w || 1;
+	*/
+	this.OrientationArray[this.QuatX ] = x;
+	this.OrientationArray[this.QuatY ] = y;
+	this.OrientationArray[this.QuatZ ] = z;
+	this.OrientationArray[this.QuatW ] = w;
+
+};
+
+physicsWorldManager.prototype.setLinearVelocityArray = function (x,y,z) {
+	// defaults 
+	var x = x || 0;
+	var y = y || 0;
+	var z = z || 0;
+	
+	this.LinearVelocityArray[this.LVx] = x;
+	this.LinearVelocityArray[this.LVy] = y;
+	this.LinearVelocityArray[this.LVz] = z;
+
+};
+
+physicsWorldManager.prototype.setAngularVelocityArray = function (x,y,z) {
+	// defaults
+	var x = x || 0;
+	var y = y || 0;
+	var z = z || 0;
+	
+	this.AngularVelocityArray[this.AVx] = x;
+	this.AngularVelocityArray[this.AVy] = y;
+	this.AngularVelocityArray[this.AVz] = z;
+
+};
 
 physicsWorldManager.prototype.setArrays_EnvironmentBlock = function () {
 
-	this.setDimensionsArray_cube2x2x2();
-
+	this.setDimensionsArray(2,2,2);
+	this.setOrientationArray(0,0,0,1);
+	this.setPositionArray(0,0,0);
+	this.setLinearVelocityArray();//defaults to 0,0,0
+	this.setAngularVelocityArray();//defaults to 0,0,0
+	
 	this.PropertiesArray[this.mass] = 1; //zero mass makes objects static.  Objects can hit them but they dont move or fall 
 	this.PropertiesArray[this.Shape] = 0;//box =0
 	this.PropertiesArray[this.blockColor] = 0xededed;//light gray, rubble will be based on this color
-	this.PropertiesArray[this.blockBreakApartForce] = 5 ;
-	this.OrientationArray[this.QuatX]=0;
-	this.OrientationArray[this.QuatY]=0;
-	this.OrientationArray[this.QuatZ]=0;
-	this.OrientationArray[this.QuatW] =1;
+	this.PropertiesArray[this.blockBreakApartForce] = 5 ;	
 
 };
 
 
-physicsWorldManager.prototype.createEnvironmentBlock = function (resetArrays) {
-	
-	if (this.resetArrays){this.setArrays_EnvironmentBlock()};
-	
-	var block = this.prepArraysAsRigidBodyArgObj(this.createPhysicalCube());
-	this.AddToRigidBodiesIndex(block);
-	
+physicsWorldManager.prototype.createEnvironmentBlock = function () {
+
+	var block = this.AddToRigidBodiesIndex(this.prepArraysAsRigidBodyArgObj(this.createPhysicalCube()));
+
 	return block;
 }
 
 
-physicsWorldManager.prototype.createCubeTower = function (texture_index,towerHeight,towerWidth,towerDepth){
+physicsWorldManager.prototype.createCubeTower = function (towerHeight,towerWidth,towerDepth,texture_index){
 	
 	//create random location for our tower, near other blocks
 	var randX =  Math.floor(Math.random() * 300) - 100;
 	var randZ =  Math.floor(Math.random() * 300) - 100;
 	var randY = 1;//...start at ground level, 'rand' left for convention
-	var block;
+	
 	
 	this.vector3Aux1.setValue(randX,randY,randZ)
 	var pos = this.vector3Aux1;
 
-	this.setArrays_EnvironmentBlock();
-
+	this.setArrays_EnvironmentBlock();//set defaults
+	var block;
+	
+	
 	this.PropertiesArray[this.blockTexture] = texture_index;
 	
 	//three nested loops will create the tower
 	//inner loop lays blocks in a row
 	//mid loop starts a new column
 	//outer loop starts next layer one level up 
-	/*IMPORTANT: the number 2 is hard coded because CreateCube() creates 2x2x2 cubes.  bad form... but be aware!*/
 	for (var h=1;h<=towerHeight;h++) {
 		
 		for (var w=0;w<towerWidth;w++) {
 		
 			for(var d =0; d<towerDepth;d++){
 
-						this.PositionArray[this.posX] = pos.x();
-						this.PositionArray[this.posY] = pos.y();
-						this.PositionArray[this.posZ] = pos.z();
-						block = this.createEnvironmentBlock();
-						this.physicsWorld.addRigidBody( block.physics );
+					this.setPositionArray(pos.x(),pos.y(),pos.z());
+						
+					this.createEnvironmentBlock();//this uses instance arrays
 
-				//add to pos, used in the placement for our next block being created	
-				pos.setX(randX+this.DimensionsArray[this.width]) //+X dimention
+					//add to pos, used in the placement for our next block being created	
+					pos.setX(randX+this.DimensionsArray[this.width]) //+X dimention
 			}
 
 			//Start our new row shifted over depth of our object
@@ -207,6 +267,10 @@ physicsWorldManager.prototype.createCubeTower = function (texture_index,towerHei
 
 physicsWorldManager.prototype.prepArraysAsRigidBodyArgObj = function (obj) {
 		//obj should already have props "physics" and 'id'
+		if(!obj.physics){console.log("no property: physics"); return false};
+		if(!obj.id){console.log("no property: id"); return false};
+		
+		this.ObjectIDArray[this.ObjectID] = parseInt(obj.id);//obj.id is 7 digit number as string
 	   obj.w =  this.DimensionsArray[this.width];
 		obj.h =   this.DimensionsArray[this.height];
 		obj.d =   this.DimensionsArray[this.depth];
@@ -217,7 +281,7 @@ physicsWorldManager.prototype.prepArraysAsRigidBodyArgObj = function (obj) {
 		obj.texture = this.PropertiesArray[this.blockTexture]; 
 	
 		return obj;
-}
+};
 
 
 physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
@@ -231,21 +295,23 @@ physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 
 	//indicates if this object can break, if it can - force requied to break it in Newtons
 	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = 0};
-
-	this.rigidBodiesIndex[obj.id] = new this.RigidBodyConstructor(obj,BYTE_COUNT_INT32,BYTE_COUNT_INT8,BYTE_COUNT_F32);
-
+	
+	//master object organizer
+	this.rigidBodiesIndex[obj.id.toString()] = new this.RigidBodyConstructor(obj,BYTE_COUNT_INT32,BYTE_COUNT_INT8,BYTE_COUNT_F32);
+	
+	//add to the actual physics simulations
+	this.physicsWorld.addRigidBody( obj.physics );
+	
+	return obj;
 }
 
 physicsWorldManager.prototype.AddToPhysicsWorld = function(cubeObjBlueprint){
 	
 		//build the object
 		var cube = this.createPhysicalCube(cubeObjBlueprint);
-		
-		//add to physics world
-		this.physicsWorld.addRigidBody( cube.physics );
-		
+
 		//add to our index used to update clients about objects that have moved
-		//IMPORTANT: AddToRigidBodiesIndex expects that obj.physics is an Ammo object.  NOT the values sent used in the blueprint to build the object
+		//IMPORTANT: AddToRigidBodiesIndex expects that cube.physics is an Ammo object. 
 		this.AddToRigidBodiesIndex(cube);
 		
 		return cube;
@@ -255,11 +321,21 @@ physicsWorldManager.prototype.launchCube = function (data){
 		//first 4 bytes will be headers
 		//last 48 bytes will be data
 
+/*
+TODO:
+this should use the setXYZArray functions
+*/
 		var headers   = new Uint8Array(4);
 		headers[0] = this.fireBullet;
 		headers[1] = 0//not assigned right now
 		headers[2] = 0//not assigned right now
 		headers[3] = 0//not assigned right now
+		
+		
+		this.setDimensionsArray(.5,.5,.5);
+		this.setPositionArray(data.readFloatLE(4),data.readFloatLE(8),data.readFloatLE(12));
+		this.setOrientationArray(0,0,0,1);
+		this.setLinearVelocityArray(data.readFloatLE(16),data.readFloatLE(20),data.readFloatLE(24));		
 		
 		var binaryData   = new Float32Array(12);
 		binaryData[0] = 0.5;//width
@@ -282,7 +358,10 @@ physicsWorldManager.prototype.launchCube = function (data){
 		var cubeObjBlueprint = [binaryData[0],binaryData[1],binaryData[2],binaryData[3],binaryData[5],binaryData[6],binaryData[7],0,0,0,1]
 		
 		//build the object
+		/*TODO: Dont use AddToPhysicsWorld, deprecated function */
 		var cube = this.AddToPhysicsWorld(cubeObjBlueprint);
+		
+		
 		binaryData[11] = cube.physics.ptr;//the NUMBER portion of ptr ID
 		
 		//create a vector to apply shot force to our bullet
