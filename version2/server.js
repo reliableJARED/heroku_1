@@ -82,7 +82,8 @@ var TEXTURE_FILES_INDEX = {
 	envXneg:3,
 	envXpos:4,
 	envYneg:5,
-	envYpos:6};
+	envYpos:6
+	};
 	
 var TEXTURE_FILES =[
 	'snow.png',

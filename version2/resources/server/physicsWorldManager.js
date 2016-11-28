@@ -47,8 +47,8 @@ var physicsWorldManager = function (Ammo) {
 	this.PropertiesArray = new Float32Array();
 	this.mass = 1;
 	this.Shape = 2;
-	this.blockColor = 3; 
-	this.blockTexture = 4;
+	this.blockColor = 3; //STOP THIS!!!! Do not affiliate graphics with physics, figure something else out
+	this.blockTexture = 4;//STOP THIS!!!! Do not affiliate graphics with physics, figure something else out
 	this.blockBreakApartForce = 5;
 	
 	this.dispatcher; //Collision Manager
@@ -68,7 +68,7 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 		warning console.log will be used just encase */
 		if (arguments.length <  11)console.log("FYI:A cube was built using physicsWorldManager instance arrays")
 
-		var   width = blueprint.width || this.DimensionsArray[this.width];
+		var width = blueprint.width || this.DimensionsArray[this.width];
 		var	height = blueprint.height || this.DimensionsArray[this.height];
 		var	depth = blueprint.depth || this.DimensionsArray[this.depth];
 		var	mass = blueprint.mass || this.PropertiesArray[this.mass];
@@ -92,7 +92,7 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 		
 	var physicsShape = new this.Ammo.btBoxShape(this.vector3Aux1);
 	
-	//set the collision margin, don't use zero, default is typically 0.04
+	//set the collision margin
 	physicsShape.setMargin(CollisionMargin);
 	
 	/* use a transform to apply the loc/orient of our new physics object in world space using our reusable transform object*/
@@ -118,13 +118,9 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 	
 	//build our ridgidBody
 	var Cube = new this.Ammo.btRigidBody( rbInfo );
-	
-	//assign the objects uniqueID
-	var id = Cube.ptr;
-	//blueprint.id = Cube.ptr;
 
 	//return our object which is now ready to be added to the world
-	return {physics:Cube,id:id};
+	return {physics:Cube,id:Cube.ptr};
 }
 
 physicsWorldManager.prototype.setDimensionsArray = function (w,h,d) {
@@ -199,7 +195,7 @@ physicsWorldManager.prototype.setArrays_EnvironmentBlock = function () {
 	
 	this.PropertiesArray[this.mass] = 1; //zero mass makes objects static.  Objects can hit them but they dont move or fall 
 	this.PropertiesArray[this.Shape] = 0;//box =0
-	this.PropertiesArray[this.blockColor] = 0xededed;//light gray, rubble will be based on this color
+	this.PropertiesArray[this.blockColor] = 0xededed;//light gray
 	this.PropertiesArray[this.blockBreakApartForce] = 5 ;	
 
 };
@@ -297,7 +293,10 @@ physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = 0};
 	
 	//master object organizer
-	this.rigidBodiesIndex[obj.id.toString()] = new this.RigidBodyConstructor(obj,BYTE_COUNT_INT32,BYTE_COUNT_INT8,BYTE_COUNT_F32);
+	var ID; 
+	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
+	else{ID = obj.id;}
+	this.rigidBodiesIndex[ID] = new this.RigidBodyConstructor(obj,BYTE_COUNT_INT32,BYTE_COUNT_INT8,BYTE_COUNT_F32);
 	
 	//add to the actual physics simulations
 	this.physicsWorld.addRigidBody( obj.physics );
