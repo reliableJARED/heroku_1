@@ -1,29 +1,43 @@
 
 
-var RigidBodyConstructor = function(obj,byteInt32,byteInt8, byteF32){
+var RigidBodyConstructor = function(obj,transform){
 		
 		this.physics = obj.physics;//our AMMO portion of this object
-		this.id = obj.id;
+	
+		var ID;
+		if(typeof obj.id !== 'number'){ID = parseInt(ID,10)}
+		else {ID = this.id};
+		this.id = ID;
+	
 		this.w = obj.w;
 		this.h = obj.h; 
 		this.d = obj.d; 
 		this.mass = obj.mass; 
+		
 		this.shape = obj.shape;
-		this.color = obj.color;
-		this.texture = obj.texture;
-		this.player = obj.player;
+		
 		this.breakApartForce = obj.breakApartForce;
 		this.destroyObject = false;
-		this.transformAux1 = new Ammo.btTransform();//reusable transform object
+		this.transformAux1 = transform;//reusable AMMO transform object
 		
 		/*used for binary exporting*/
-		this.int32Count = byteInt32;//id
-		this.int8Count = byteInt8;//w,h,d,mass,texture,shape,player
-		this.float32Count = byteF32;//color,x,y,z,Rx,Ry,Rz,Rw
+		this.cubeShapeCode = 0;
+		this.dataStructureSetup(obj.shape);
+};
+
+RigidBodyConstructor.prototype.dataStructureSetup = function (shapeCode) {
+	
+	//cube
+	if (shapeCode === this.cubeShapeCode) {	
+		this.int32Count = 1;//id
+		this.int8Count = 1;//shape
+		this.float32Count = 11;//,x,y,z,Rx,Ry,Rz,Rw,mass,w,h,d
 		
 		this.totalBytes = (this.int32Count*4)+(this.int8Count)+(this.float32Count*4);
+	}
 	
-};
+}
+
 
 RigidBodyConstructor.prototype.breakObject = function(impactForce){
 	
@@ -153,9 +167,6 @@ RigidBodyConstructor.prototype.exportJSON = function(){
 		d:this.d,
 		mass:this.mass,
 		shape:this.shape,
-		color:this.color,
-		texture:this.texture,
-		player:this.player
 	};	
 }
 
@@ -165,26 +176,26 @@ RigidBodyConstructor.prototype.exportBinary = function(){
 	var int32 = new Int32Array(this.int32Count);//ORDER: id,w,h,d,mass,
 	var int8 = new Int8Array(this.int8Count);//ORDER: texture,shape,player
 	var f32 = new Float32Array(this.float32Count);//ORDER: color,x,y,z,Rx,Ry,Rz,Rw
-
-	int32[0] = parseInt(this.id.slice(2),10);//remove the 'id' and return as number
-	int32[1] = this.w;
-	int32[2] = this.h;
-	int32[3] = this.d;
-	int32[4] = this.mass;
 	
-	int8[0] = this.texture;
-	int8[1] = this.shape;
-	int8[2] = this.player;
+	var ID;
+	if(typeof this.id !== 'number'){ID = parseInt(ID,10)}
+	else {ID = this.id};
 	
-	f32[0] = this.color;
-	f32[1] = this.x();
-	f32[2] = this.y();
-	f32[3] = this.z();
-	f32[4] = this.Rx();
-	f32[5] = this.Ry();
-	f32[6] = this.Rz();
-	f32[7] = this.Rw();
+	int32[0] = ID;
 	
+	int8[0] = this.shape;
+	
+	f32[0] = this.x();
+	f32[1] = this.y();
+	f32[2] = this.z();
+	f32[3] = this.Rx();
+	f32[4] = this.Ry();
+	f32[5] = this.Rz();
+	f32[6] = this.Rw();
+	f32[7] = this.mass;
+	f32[8] = this.w;
+	f32[9] = this.h;
+	f32[10] = this.d;
 
 	//prepare binary
 	var int32Buffer = Buffer.from(int32.buffer);

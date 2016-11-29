@@ -45,11 +45,9 @@ var physicsWorldManager = function (Ammo) {
 
 	//properties array index keys
 	this.PropertiesArray = new Float32Array();
-	this.mass = 1;
-	this.Shape = 2;
-	this.blockColor = 3; //STOP THIS!!!! Do not affiliate graphics with physics, figure something else out
-	this.blockTexture = 4;//STOP THIS!!!! Do not affiliate graphics with physics, figure something else out
-	this.blockBreakApartForce = 5;
+	this.mass = 0;
+	this.shape = 1;
+	this.blockBreakApartForce = 2;
 	
 	this.dispatcher; //Collision Manager
 	this.physicsWorld;//WORLD
@@ -59,26 +57,26 @@ var physicsWorldManager = function (Ammo) {
 	this.setArrays_EnvironmentBlock();
 }	
 
-physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
+physicsWorldManager.prototype.createPhysicsForCube = function (blueprint){
 
 		/*if called without all args, builder will use instances arrays
 		WARNING! setting it up like this could very easily cause errors
 		if the instance arrays are used when not intended.  However, it's nice to have
 		the flexibility to change one or all, i.e. situations where cube building is happening.
 		warning console.log will be used just encase */
-		if (arguments.length <  11)console.log("FYI:A cube was built using physicsWorldManager instance arrays")
+		if (arguments.length <  11)console.log("FYI:A cube was built using some physicsWorldManager defaults")
 
-		var width = blueprint.width || this.DimensionsArray[this.width];
-		var	height = blueprint.height || this.DimensionsArray[this.height];
-		var	depth = blueprint.depth || this.DimensionsArray[this.depth];
-		var	mass = blueprint.mass || this.PropertiesArray[this.mass];
-		var	x = blueprint.x || this.PositionArray[this.posX];
-		var	y = blueprint.y || this.PositionArray[this.posY];
-		var	z = blueprint.z || this.PositionArray[this.posZ];
-		var	Rx = blueprint.Rx || this.OrientationArray[this.QuatX];
-		var	Ry = blueprint.Ry || this.OrientationArray[this.QuatY];
-		var	Rz = blueprint.Rz || this.OrientationArray[this.QuatZ];
-		var	Rw = blueprint.Rw || this.OrientationArray[this.QuatW];
+		var   width = blueprint.w || 2;
+		var	height = blueprint.h || 2;
+		var	depth = blueprint.d || 2;
+		var	mass = blueprint.mass || 1;
+		var	x = blueprint.x || 0;
+		var	y = blueprint.y || 1;
+		var	z = blueprint.z || 0;
+		var	Rx = blueprint.Rx || 0;
+		var	Ry = blueprint.Ry || 0;
+		var	Rz = blueprint.Rz || 0;
+		var	Rw = blueprint.Rw || 1;
 
 		const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
 		
@@ -123,87 +121,60 @@ physicsWorldManager.prototype.createPhysicalCube = function (blueprint){
 	return {physics:Cube,id:Cube.ptr};
 }
 
-physicsWorldManager.prototype.setDimensionsArray = function (w,h,d) {
-	/* defaults deactivated right now	
-	var w = w || 2;
-	var h = h || 2;
-	var d = d || 2;
-	*/
-	this.DimensionsArray[this.width] = w;
-	this.DimensionsArray[this.height] = h;
-	this.DimensionsArray[this.depth] = d;
-
-};
-
-physicsWorldManager.prototype.setPositionArray = function (x,y,z) {
-	/* defaults deactivated right now	
-	var x = x || 0;
-	var y = y || 0;
-	var z = z || 0;
-	*/
-	this.PositionArray[this.posX] = x;
-	this.PositionArray[this.posY] = y;
-	this.PositionArray[this.posZ] = z;
-
-};
-
-physicsWorldManager.prototype.setOrientationArray = function (x,y,z,w) {
-	/* defaults deactivated right now	
-	var x = x || 0;
-	var y = y || 0;
-	var z = z || 0;
-	var w = w || 1;
-	*/
-	this.OrientationArray[this.QuatX ] = x;
-	this.OrientationArray[this.QuatY ] = y;
-	this.OrientationArray[this.QuatZ ] = z;
-	this.OrientationArray[this.QuatW ] = w;
-
-};
-
-physicsWorldManager.prototype.setLinearVelocityArray = function (x,y,z) {
-	// defaults 
-	var x = x || 0;
-	var y = y || 0;
-	var z = z || 0;
+physicsWorldManager.prototype.prepArraysAsRigidBodyArgObj = function (obj) {
+		//obj should already have props "physics" and 'id'
+		if(!obj.physics){console.log("no property: physics"); return false};
+		if(!obj.id){console.log("no property: id"); return false};
+		
+		var ID; 
+		if(typeof obj.id !== 'number'){ID = parseInt(obj.id,10)}
+		else{ID = obj.id;}
+		this.ObjectIDArray[this.ObjectID] = ID;
+	  
+	   obj.w =  this.DimensionsArray[this.width];
+		obj.h =   this.DimensionsArray[this.height];
+		obj.d =   this.DimensionsArray[this.depth];
+		obj.mass =  this.PropertiesArray[this.mass];
+		obj.shape = this.PropertiesArray[this.shape];
+		obj.breakApartForce = this.PropertiesArray[this.blockBreakApartForce];
 	
-	this.LinearVelocityArray[this.LVx] = x;
-	this.LinearVelocityArray[this.LVy] = y;
-	this.LinearVelocityArray[this.LVz] = z;
-
+		return obj;
 };
 
-physicsWorldManager.prototype.setAngularVelocityArray = function (x,y,z) {
-	// defaults
-	var x = x || 0;
-	var y = y || 0;
-	var z = z || 0;
+physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 	
-	this.AngularVelocityArray[this.AVx] = x;
-	this.AngularVelocityArray[this.AVy] = y;
-	this.AngularVelocityArray[this.AVz] = z;
-
-};
-
-physicsWorldManager.prototype.setArrays_EnvironmentBlock = function () {
-
-	this.setDimensionsArray(2,2,2);
-	this.setOrientationArray(0,0,0,1);
-	this.setPositionArray(0,0,0);
-	this.setLinearVelocityArray();//defaults to 0,0,0
-	this.setAngularVelocityArray();//defaults to 0,0,0
+	//indicates if this object can break. If it can breakApartForce is the force required to break it in Newtons
+	//if it's 0 it means object cant break
+	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = 0};
 	
-	this.PropertiesArray[this.mass] = 1; //zero mass makes objects static.  Objects can hit them but they dont move or fall 
-	this.PropertiesArray[this.Shape] = 0;//box =0
-	this.PropertiesArray[this.blockColor] = 0xededed;//light gray
-	this.PropertiesArray[this.blockBreakApartForce] = 5 ;	
+	//master object organizer
+	var ID; 
+	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
+	else{ID = obj.id;}
 
-};
+	this.rigidBodiesIndex[ID] = new this.RigidBodyConstructor(obj,new this.Ammo.btTransform());
+	
+	//add to the actual physics simulations
+	this.physicsWorld.addRigidBody( obj.physics );
+	
+	return obj;
+}
+
+/*
+REMOVE ALL TRACE OF THE GLOBAL ARRAYs
+	this is a failed concept.  The physicsWorldManager should do what name says.
+	create and manage a physics world
+	need to add or remove objects
+	manage collisions and flag objects that collide
+	
+	DONT"T need to adjust physics of each object, like speed or rotation objects can do that to themselves
+	
+*/
 
 
 physicsWorldManager.prototype.createEnvironmentBlock = function () {
 
-	var block = this.AddToRigidBodiesIndex(this.prepArraysAsRigidBodyArgObj(this.createPhysicalCube()));
+	var block = this.AddToRigidBodiesIndex(this.prepArraysAsRigidBodyArgObj(this.createPhysicsForCube()));
 
 	return block;
 }
@@ -261,53 +232,10 @@ physicsWorldManager.prototype.createCubeTower = function (towerHeight,towerWidth
 };
 
 
-physicsWorldManager.prototype.prepArraysAsRigidBodyArgObj = function (obj) {
-		//obj should already have props "physics" and 'id'
-		if(!obj.physics){console.log("no property: physics"); return false};
-		if(!obj.id){console.log("no property: id"); return false};
-		
-		this.ObjectIDArray[this.ObjectID] = parseInt(obj.id);//obj.id is 7 digit number as string
-	   obj.w =  this.DimensionsArray[this.width];
-		obj.h =   this.DimensionsArray[this.height];
-		obj.d =   this.DimensionsArray[this.depth];
-		obj.mass =  this.PropertiesArray[this.mass];
-		obj.shape = this.PropertiesArray[this.Shape];
-		obj.color = this.PropertiesArray[this.blockColor];
-		obj.breakApartForce = this.PropertiesArray[this.blockBreakApartForce];
-		obj.texture = this.PropertiesArray[this.blockTexture]; 
-	
-		return obj;
-};
-
-
-physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
-	/*used for binary exporting world*/
-	const BYTE_COUNT_INT32 = 5;//id,w,h,d,mass,
-	const BYTE_COUNT_INT8  = 3;//texture,shape,player
-	const BYTE_COUNT_F32 = 8;//color,x,y,z,Rx,Ry,Rz,Rw
-
-	//indicates if the object is a players cube
-	if(typeof obj.player === 'undefined'){obj.player = 0};
-
-	//indicates if this object can break, if it can - force requied to break it in Newtons
-	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = 0};
-	
-	//master object organizer
-	var ID; 
-	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
-	else{ID = obj.id;}
-	this.rigidBodiesIndex[ID] = new this.RigidBodyConstructor(obj,BYTE_COUNT_INT32,BYTE_COUNT_INT8,BYTE_COUNT_F32);
-	
-	//add to the actual physics simulations
-	this.physicsWorld.addRigidBody( obj.physics );
-	
-	return obj;
-}
-
 physicsWorldManager.prototype.AddToPhysicsWorld = function(cubeObjBlueprint){
 	
 		//build the object
-		var cube = this.createPhysicalCube(cubeObjBlueprint);
+		var cube = this.createPhysicsForCube(cubeObjBlueprint);
 
 		//add to our index used to update clients about objects that have moved
 		//IMPORTANT: AddToRigidBodiesIndex expects that cube.physics is an Ammo object. 

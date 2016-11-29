@@ -6,10 +6,14 @@ var graphicsWorldManager = function (texture_files_array,texture_files_index_key
 	this.TEXTURE_FILES = texture_files_array;//an array of image files ['pic.png', 'house.jpg', etc]
 	this.NoAssignment = -1;
 	this.grapicBodiesIndex = new Object();//associates an ID with graphics component
+	
+	//SHAPES:
 	this.cubeShape = 0;
 	this.cubeDataSize = {int32:7, int8:7, f32:3};
 	
-	/*This is strange way to do it, but done this way to easily change key names if needed*/
+	/*This is strange way to do it,
+	but done this way to easily change key names if needed/wanted.  Also makes
+	it easy to export all the internal keys*/
 	this.headerKey = 'header';
 	this.textureKey = 'textures';
 	this.colorKey = 'colors';
@@ -148,3 +152,8 @@ graphicsWorldManager.prototype.exportBinary(ID) = function(ID){
 	}
 	
 }
+
+
+
+//IMPORTANT! tells node.js what you'd like to export from this file. 
+module.exports =  graphicsWorldManager; //constructor
