@@ -1,0 +1,41 @@
+<!doctype html>
+
+<html>
+  <head>
+    <title>A place for tests!</title>
+
+  </head>
+  
+  <style>
+	body{
+		margin:0;
+	}
+	#container{
+		position:fixed;
+	}
+	</style>
+  <body>
+ 
+		<script>
+		var physicsWorldManager = function () {
+
+		this.a = 'a';
+		}	
+	
+	var physicsWorldManager2 = function (xyz) {
+
+		this.xyz = xyz;
+		}	
+
+var tester = new physicsWorldManager();
+
+console.log(tester)
+
+var tester2 = new physicsWorldManager2(new physicsWorldManager())
+
+console.log(tester2.xyz)
+
+</script><!-- KEEP AT BOTTOM -->
+		
+  </body>
+</html>

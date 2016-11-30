@@ -1,6 +1,6 @@
 
 
-var RigidBodyConstructor = function(obj,transform){
+var RigidBodyConstructor = function(obj,transform, vector3){
 		
 		this.physics = obj.physics;//our AMMO portion of this object
 	
@@ -19,6 +19,7 @@ var RigidBodyConstructor = function(obj,transform){
 		this.breakApartForce = obj.breakApartForce;
 		this.destroyObject = false;
 		this.transformAux1 = transform;//reusable AMMO transform object
+		this.vector3Aux1 = vector3;//reusable AMMO transform object
 		
 		/*used for binary exporting*/
 		this.cubeShapeCode = 0;
@@ -37,7 +38,6 @@ RigidBodyConstructor.prototype.dataStructureSetup = function (shapeCode) {
 	}
 	
 }
-
 
 RigidBodyConstructor.prototype.breakObject = function(impactForce){
 	
@@ -69,6 +69,12 @@ RigidBodyConstructor.prototype.getLinearVelocity = function(){
 	
 	var LV =  this.physics.getLinearVelocity();
 	return {x:LV.x(), y:LV.y(), z:LV.z()};
+};
+
+RigidBodyConstructor.prototype.setLinearVelocity = function(x,y,z){
+	
+	this.vector3Aux1.setValue(x,y,z);
+	this.physics.setLinearVelocity(this.vector3Aux1);
 };
 
 RigidBodyConstructor.prototype.getAngularVelocityVelocity = function(){

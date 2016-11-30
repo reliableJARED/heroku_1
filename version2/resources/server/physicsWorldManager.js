@@ -8,85 +8,59 @@ var physicsWorldManager = function (Ammo) {
 	this.rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 	this.RigidBodyConstructor  = require(__dirname +'/rigidBodyConstructor.js');
 
-	/*Universal Arrays Used for Objects*/
-	this.ObjectIDArray = new Int32Array(1);	
-	this.ObjectID = 0;
-	
-	//position array index keys
-	this.PositionArray = new Float32Array(3);
-	this.posX = 0;
-	this.posY = 1;
-	this.posZ = 2;
-	
-	//orientation array index keys
-	this.OrientationArray = new Float32Array(4);
-	this.QuatX = 0;
-	this.QuatY = 1;
-	this.QuatZ = 2;
-	this.QuatW = 3;
-	
-	//linear velocity array index keys
-	this.LinearVelocityArray = new Float32Array(3);
-	this.LVx = 0;
-	this.LVy = 1;
-	this.LVz = 2;
-	
-	//angular velocity array index keys
-	this.AngularVelocityArray = new Float32Array(3);
-	this.AVx = 0;
-	this.AVy = 1;
-	this.AVz = 2;
-
-	//dimensions array index keys
-	this.DimensionsArray = new Float32Array(3);
-	this.width = 0;
-	this.height = 1;
-	this.depth = 2;
-
-	//properties array index keys
-	this.PropertiesArray = new Float32Array();
-	this.mass = 0;
-	this.shape = 1;
-	this.blockBreakApartForce = 2;
-	
 	this.dispatcher; //Collision Manager
 	this.physicsWorld;//WORLD
 	this.init();
 	
 	//Fill arrays with defaults	
-	this.setArrays_EnvironmentBlock();
+	this.cubeShapeCode = 0;
 }	
+
+
+physicsWorldManager.prototype.DefaultBlueprint_cube = function(replacments){
+	
+	var defaults = {
+		w:2,
+		h:2,
+		d:2,
+		mass:1,
+		x:0,
+		y:1,
+		z:0,
+		Rx:0,
+		Ry:0,
+		Rz:0,
+		Rw:1,
+		LVx:0,
+		LVy:0,
+		LVz:0,
+		AVx:0,
+		AVy:0,
+		AVz:0,
+		breakApartForce:0,
+		shape:this.cubeShapeCode
+	}
+
+	//if there are replacement values replace/add them
+	if(arguments.length > 0){
+		var defaults  = Object.assign(defaults,replacments);
+	}
+	
+	return defaults;
+}
+
 
 physicsWorldManager.prototype.createPhysicsForCube = function (blueprint){
 
-		/*if called without all args, builder will use instances arrays
-		WARNING! setting it up like this could very easily cause errors
-		if the instance arrays are used when not intended.  However, it's nice to have
-		the flexibility to change one or all, i.e. situations where cube building is happening.
-		warning console.log will be used just encase */
-		if (arguments.length <  11)console.log("FYI:A cube was built using some physicsWorldManager defaults")
-
-		var   width = blueprint.w || 2;
-		var	height = blueprint.h || 2;
-		var	depth = blueprint.d || 2;
-		var	mass = blueprint.mass || 1;
-		var	x = blueprint.x || 0;
-		var	y = blueprint.y || 1;
-		var	z = blueprint.z || 0;
-		var	Rx = blueprint.Rx || 0;
-		var	Ry = blueprint.Ry || 0;
-		var	Rz = blueprint.Rz || 0;
-		var	Rw = blueprint.Rw || 1;
-
-		const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
+	const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
 		
 	/*set the position of our physics object using our reusable vector object*/
-   //the 0.5 is because bullet uses half extents for boxShape: http://bulletphysics.org/Bullet/BulletFull/btBoxShape_8cpp_source.html
+   //The 0.5 is because bullet uses half extents for boxShape: http://bulletphysics.org/Bullet/BulletFull/btBoxShape_8cpp_source.html
 	//the full extents of the box will be twice the half extents, e. g. from -x to +x on the local x-axis.	
-	this.vector3Aux1.setValue( width*0.5, height*0.5, depth*0.5 )
+	this.vector3Aux1.setValue( blueprint.w*0.5, blueprint.h*0.5, blueprint.d*0.5 )
 	
 	/*set the orientation of our physics object using our reusable quaternion object*/
-	this.quaternionAux1.setValue(Rx,Ry,Rz,Rw);
+	this.quaternionAux1.setValue(blueprint.Rx,blueprint.Ry,blueprint.Rz,blueprint.Rw);
 		
 	var physicsShape = new this.Ammo.btBoxShape(this.vector3Aux1);
 	
@@ -97,7 +71,7 @@ physicsWorldManager.prototype.createPhysicsForCube = function (blueprint){
 	//btTransform() supports rigid transforms with only translation and rotation and no scaling/shear.
 	this.transformAux1.setIdentity();
 	
-	this.vector3Aux1.setValue(x,y,z);
+	this.vector3Aux1.setValue(blueprint.x,blueprint.y,blueprint.z);
 	
 	this.transformAux1.setOrigin( this.vector3Aux1 );
     
@@ -109,37 +83,22 @@ physicsWorldManager.prototype.createPhysicsForCube = function (blueprint){
 	
 	var localInertia = this.vector3Aux1.setValue(0,0,0);
 
-	physicsShape.calculateLocalInertia(mass, localInertia );
+	physicsShape.calculateLocalInertia(blueprint.mass, localInertia );
 	
 	//create our final physics rigid body info
-	var rbInfo = new this.Ammo.btRigidBodyConstructionInfo( mass, motionState, physicsShape, localInertia );
+	var rbInfo = new this.Ammo.btRigidBodyConstructionInfo( blueprint.mass, motionState, physicsShape, localInertia );
 	
 	//build our ridgidBody
 	var Cube = new this.Ammo.btRigidBody( rbInfo );
 
+	blueprint.physics = Cube;
+	blueprint.id = Cube.ptr;
+	
 	//return our object which is now ready to be added to the world
-	return {physics:Cube,id:Cube.ptr};
+	return blueprint;
 }
 
-physicsWorldManager.prototype.prepArraysAsRigidBodyArgObj = function (obj) {
-		//obj should already have props "physics" and 'id'
-		if(!obj.physics){console.log("no property: physics"); return false};
-		if(!obj.id){console.log("no property: id"); return false};
-		
-		var ID; 
-		if(typeof obj.id !== 'number'){ID = parseInt(obj.id,10)}
-		else{ID = obj.id;}
-		this.ObjectIDArray[this.ObjectID] = ID;
-	  
-	   obj.w =  this.DimensionsArray[this.width];
-		obj.h =   this.DimensionsArray[this.height];
-		obj.d =   this.DimensionsArray[this.depth];
-		obj.mass =  this.PropertiesArray[this.mass];
-		obj.shape = this.PropertiesArray[this.shape];
-		obj.breakApartForce = this.PropertiesArray[this.blockBreakApartForce];
-	
-		return obj;
-};
+
 
 physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 	
@@ -152,7 +111,7 @@ physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
 	else{ID = obj.id;}
 
-	this.rigidBodiesIndex[ID] = new this.RigidBodyConstructor(obj,new this.Ammo.btTransform());
+	this.rigidBodiesIndex[ID] = new this.RigidBodyConstructor(obj,(new this.Ammo.btTransform()),new this.Ammo.btVector3());
 	
 	//add to the actual physics simulations
 	this.physicsWorld.addRigidBody( obj.physics );
@@ -160,76 +119,26 @@ physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 	return obj;
 }
 
-/*
-REMOVE ALL TRACE OF THE GLOBAL ARRAYs
-	this is a failed concept.  The physicsWorldManager should do what name says.
-	create and manage a physics world
-	need to add or remove objects
-	manage collisions and flag objects that collide
+
+physicsWorldManager.prototype.createCube = function (blueprint) {
 	
-	DONT"T need to adjust physics of each object, like speed or rotation objects can do that to themselves
 	
-*/
+	/*WARNING! 
+		if createPhysicsForCube() is called without all args, the builder will use some defaults
+		setting it up like this could cause errors
+	    However, it's nice to have defaults and the flexibility to change one or all, i.e. situations where cube building is happening.
+	*/
 
-
-physicsWorldManager.prototype.createEnvironmentBlock = function () {
-
-	var block = this.AddToRigidBodiesIndex(this.prepArraysAsRigidBodyArgObj(this.createPhysicsForCube()));
+			
+	//replace any required build props not supplied by blueprint with defaults 
+	var buildProps = this.DefaultBlueprint_cube(blueprint);
+		
+	
+	var block = this.AddToRigidBodiesIndex(this.createPhysicsForCube(buildProps));
 
 	return block;
 }
 
-
-physicsWorldManager.prototype.createCubeTower = function (towerHeight,towerWidth,towerDepth,texture_index){
-	
-	//create random location for our tower, near other blocks
-	var randX =  Math.floor(Math.random() * 300) - 100;
-	var randZ =  Math.floor(Math.random() * 300) - 100;
-	var randY = 1;//...start at ground level, 'rand' left for convention
-	
-	
-	this.vector3Aux1.setValue(randX,randY,randZ)
-	var pos = this.vector3Aux1;
-
-	this.setArrays_EnvironmentBlock();//set defaults
-	var block;
-	
-	
-	this.PropertiesArray[this.blockTexture] = texture_index;
-	
-	//three nested loops will create the tower
-	//inner loop lays blocks in a row
-	//mid loop starts a new column
-	//outer loop starts next layer one level up 
-	for (var h=1;h<=towerHeight;h++) {
-		
-		for (var w=0;w<towerWidth;w++) {
-		
-			for(var d =0; d<towerDepth;d++){
-
-					this.setPositionArray(pos.x(),pos.y(),pos.z());
-						
-					this.createEnvironmentBlock();//this uses instance arrays
-
-					//add to pos, used in the placement for our next block being created	
-					pos.setX(randX+this.DimensionsArray[this.width]) //+X dimention
-			}
-
-			//Start our new row shifted over depth of our object
-			pos.setX(randX);
-			pos.setZ(randZ+this.DimensionsArray[this.depth]);//+Z dimention;
-
-		}
-		//reset our Z axis
-		//start the new grid up one level
-		//reset for next column
-		pos.setX(randX);
-		pos.setZ(randZ);//+Z dimention;
-			
-		//Start our new layer by moving up the height of our cubes
-		pos.setY(this.DimensionsArray[this.height]*h);
-	}
-};
 
 
 physicsWorldManager.prototype.AddToPhysicsWorld = function(cubeObjBlueprint){
