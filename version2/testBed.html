@@ -15,25 +15,75 @@
 	}
 	</style>
   <body>
- 
+  
+			<script src="../version2/static/ammo.js/ammo.js"></script>
 		<script>
-		var physicsWorldManager = function () {
+		
+		
+var RigidBodyBaseConstructor = function(obj){
 
-		this.a = 'a';
-		}	
+		this.physics = obj.physics;//our AMMO portion of this object
 	
-	var physicsWorldManager2 = function (xyz) {
+		var ID;
+		
+		if(typeof obj.id !== 'number'){ID = parseInt(ID,10)}
+		else {ID = obj.id};
+		this.id = ID;
+	
+		this.x = obj.x;
+		this.y = obj.y; 
+		this.z = obj.z; 
+		this.mass = obj.mass; 
+		this.shape = obj.shape;
+		this.Rx = obj.Rx,
+		this.Ry = obj.Ry, 
+		this.Rz = obj.Rz, 
+		this.Rw = obj.Rw,
+		this.transformAux1 = new Ammo.btTransform();//reusable AMMO transform object
+		this.vector3Aux1 =  new Ammo.btVector3();//reusable AMMO transform object
+		this.quaternionAux1 = new Ammo.btQuaternion();
 
-		this.xyz = xyz;
-		}	
+};
 
-var tester = new physicsWorldManager();
+var RigidBodyCube = function(obj,tools){
+		//RigidBodyBaseConstructor.call(this,obj,tools);
+		
+		this.w = obj.w;
+		this.h = obj.h;
+		this.d = obj.d;
 
-console.log(tester)
+};
 
-var tester2 = new physicsWorldManager2(new physicsWorldManager())
 
-console.log(tester2.xyz)
+
+var ammoTools = {
+
+	vector3: new Ammo.btVector3(),
+	quaternion: new Ammo.btQuaternion()
+}
+
+var blueprint = {
+
+	physics: 'ammo obj',
+	id:1234567,
+	x:0,
+	y:1, 
+	z:0,
+	mass:1,
+	shape:0,
+	Rx:0,
+	Ry:0,
+	Rz:0,
+	Rw:1,
+	w:2,
+	h:2,
+	d:2
+}
+
+
+var myNewObj = new RigidBodyCube(blueprint,ammoTools)
+
+console.log(myNewObj);
 
 </script><!-- KEEP AT BOTTOM -->
 		
