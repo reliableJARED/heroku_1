@@ -155,26 +155,6 @@ RigidBodyConstructor.prototype.AVz = function(){
 	return this.physics.getAngularVelocity().z();
 };
 
-RigidBodyConstructor.prototype.exportJSON = function(){
-	
-	var pos = this.getOrigin();
-	var quat = this.getRotation();
-	return {
-		id:this.id,
-		x:pos.x, 
-		y:pos.y, 
-		z:pos.z,
-		Rx:quat.x,
-		Ry:quat.y, 
-		Rz:quat.z, 
-		Rw:quat.w,
-		w:this.w,
-		h:this.h, 
-		d:this.d,
-		mass:this.mass,
-		shape:this.shape,
-	};	
-}
 
 RigidBodyConstructor.prototype.exportBinary = function(){
 	                   

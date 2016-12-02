@@ -19,71 +19,133 @@
 			<script src="../version2/static/ammo.js/ammo.js"></script>
 		<script>
 		
+var RigidBodyBase = function(obj){
+		//defaults
+		var defaults = {x:1,y:1,z:1,
+					  Rx:0,Ry:0,Rz:0,Rw:1,
+					  mass:1};
+					  
+		var blueprint = Object.assign(defaults,obj);
 		
-var RigidBodyBaseConstructor = function(obj){
-
-		this.physics = obj.physics;//our AMMO portion of this object
-	
-		var ID;
-		
-		if(typeof obj.id !== 'number'){ID = parseInt(ID,10)}
-		else {ID = obj.id};
-		this.id = ID;
-	
-		this.x = obj.x;
-		this.y = obj.y; 
-		this.z = obj.z; 
-		this.mass = obj.mass; 
-		this.shape = obj.shape;
-		this.Rx = obj.Rx,
-		this.Ry = obj.Ry, 
-		this.Rz = obj.Rz, 
-		this.Rw = obj.Rw,
-		this.transformAux1 = new Ammo.btTransform();//reusable AMMO transform object
-		this.vector3Aux1 =  new Ammo.btVector3();//reusable AMMO transform object
-		this.quaternionAux1 = new Ammo.btQuaternion();
-
+		this.x = blueprint.x;
+		this.y = blueprint.y;
+		this.z = blueprint.z;
+		this.Rx = blueprint.Rx;
+		this.Ry = blueprint.Ry;
+		this.Rz = blueprint.Rz;
+		this.Rw = blueprint.Rw;
+		this.mass = blueprint.mass;
+		this.shape;
+		this.physics;
+		this.id;
 };
+RigidBodyBase.prototype ={
+		//note: these are on prototype to reduce memory, they are used as a sort
+		// of 'helper' in executing different function which is why their
+		//absolute values don't matter to an individual object
+		//THESE EXACT INSTANCES ARE USED BY ALL INSTANCES OF RigidBodyBase!
+		transform:new Ammo.btTransform(),
+		vector3:new Ammo.btVector3(),
+		quaternion:new Ammo.btQuaternion(),
+		ShapeIDCodes:function(){
+			var codes ={
+					cube:0,
+					sphere:1
+				}
+			return codes;},
+	
+		//manipulation functions:
+		getOrigin:function(){
+			this.physics.getMotionState().getWorldTransform(this.transform);
+			var pos = this.transform.getOrigin();
+			return {x:pos.x(),y:pos.y(),z:pos.z()};
+			},
+		createPhysics:function (){
+	
+			const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
+			var physicsShape;
+			/*TODO: Shape specific code*/
+			switch (this.shape){
+				case this.ShapeIDCodes().cube:
+					this.vector3.setValue( this.w*0.5, this.h*0.5, this.d*0.5 )
+					physicsShape = new Ammo.btBoxShape(this.vector3);
+					break;
+				case this.ShapeIDCodes().sphere:
+					physicsShape = new Ammo.btSphereShape(this.radius);
+					break;
+				default: console.log('NO SHAPE PROP');
+			}
+	
+	
+			this.quaternion.setValue(this.Rx,this.Ry,this.Rz,this.Rw);
+			physicsShape.setMargin(CollisionMargin);
+			this.transform.setIdentity();
+			this.vector3.setValue(this.x,this.y,this.z);
+			this.transform.setOrigin( this.vector3 );
+			this.transform.setRotation( this.quaternion );
 
-var RigidBodyCube = function(obj,tools){
-		//RigidBodyBaseConstructor.call(this,obj,tools);
+			var motionState = new Ammo.btDefaultMotionState( this.transform );
+	
+			var localInertia = this.vector3.setValue(0,0,0);
+
+			physicsShape.calculateLocalInertia(this.mass, localInertia );
+
+			var rbInfo = new Ammo.btRigidBodyConstructionInfo( this.mass, motionState, physicsShape, localInertia );
+
+			//FINAL OBJECT
+			this.physics = new Ammo.btRigidBody( rbInfo );
+			//UNIQUIE 7 digit number ID
+			this.id = this.physics.ptr;
+		}
+}
+//CUBE
+var CubeConstructorBase = function(obj){
 		
-		this.w = obj.w;
-		this.h = obj.h;
-		this.d = obj.d;
-
-};
-
-
-
-var ammoTools = {
-
-	vector3: new Ammo.btVector3(),
-	quaternion: new Ammo.btQuaternion()
+		RigidBodyBase.call(this,obj);
+		
+		var defaults = {d:1,h:1,w:1};	  
+		var blueprint = Object.assign(defaults,obj);
+		
+		this.w = blueprint.w;
+		this.h = blueprint.h;
+		this.d = blueprint.d;
+		this.shape = this.ShapeIDCodes().cube;
 }
-
-var blueprint = {
-
-	physics: 'ammo obj',
-	id:1234567,
-	x:0,
-	y:1, 
-	z:0,
-	mass:1,
-	shape:0,
-	Rx:0,
-	Ry:0,
-	Rz:0,
-	Rw:1,
-	w:2,
-	h:2,
-	d:2
+CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
+CubeConstructorBase.prototype.constructor = CubeConstructorBase;
+var CubeObject = function(blueprint){
+	CubeConstructorBase.call(this,blueprint);
+	this.createPhysics();
 }
+CubeObject.prototype =  Object.create(CubeConstructorBase.prototype); 
+CubeObject.prototype.constructor = CubeObject;
+/********************************************/
 
+//SPHERE
+var SphereConstructorBase = function(obj){
+		RigidBodyBase.call(this,obj);
+		var defaults = {radius:1};	  
+		var blueprint = Object.assign(defaults,obj);
+		this.radius = blueprint.radius;
+		this.shape = this.ShapeIDCodes().sphere;
+}
+SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
+SphereConstructorBase.prototype.constructor = SphereConstructorBase;
 
-var myNewObj = new RigidBodyCube(blueprint,ammoTools)
+var SphereObject = function(blueprint){
+	SphereConstructorBase.call(this,blueprint);
+	this.createPhysics();
+}
+SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
+SphereObject.prototype.constructor = SphereObject;
+/********************************************/
 
-console.log(myNewObj);
+var myNewCube = new CubeObject({x:10});
+var myNewSphere = new SphereObject({Rx:2})
+
+console.log(myNewCube)
+console.log(myNewSphere)
+
 
 </script><!-- KEEP AT BOTTOM -->
 		
