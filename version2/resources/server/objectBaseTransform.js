@@ -58,4 +58,3 @@ SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype);
 SphereConstructorBase.prototype.constructor = SphereConstructorBase;
 
 
-

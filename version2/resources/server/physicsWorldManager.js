@@ -31,13 +31,6 @@ physicsWorldManager.prototype.DefaultBlueprint_cube = function(replacments){
 		Ry:0,
 		Rz:0,
 		Rw:1,
-		LVx:0,
-		LVy:0,
-		LVz:0,
-		AVx:0,
-		AVy:0,
-		AVz:0,
-		breakApartForce:0,
 		shape:this.cubeShapeCode
 	}
 
@@ -98,8 +91,6 @@ physicsWorldManager.prototype.createPhysicsForCube = function (blueprint){
 	return blueprint;
 }
 
-
-
 physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 	
 	//indicates if this object can break. If it can breakApartForce is the force required to break it in Newtons
@@ -119,7 +110,6 @@ physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
 	return obj;
 }
 
-
 physicsWorldManager.prototype.createCube = function (blueprint) {
 	
 	
@@ -138,8 +128,6 @@ physicsWorldManager.prototype.createCube = function (blueprint) {
 
 	return block;
 }
-
-
 
 physicsWorldManager.prototype.AddToPhysicsWorld = function(cubeObjBlueprint){
 	
