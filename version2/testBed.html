@@ -26,7 +26,7 @@ var objectPhysicsManipulationSuite = function () {
 };
 
 objectPhysicsManipulationSuite.prototype = {
-
+	
 		physics_indexLocations:function () {
 			return {
 						id:0,
@@ -127,7 +127,10 @@ objectPhysicsManipulationSuite.prototype = {
 			this.vector3.setValue(x,y,z);
 			this.physics.setAngularVelocity(this.vector3);
 			},
-			
+//******************
+//Are these functions really needed? or just go direct through physics prop
+//infact using them vs. going direct will slow things down			
+//******************
 		getX:function(){
 			this.physics.getWorldTransform(this.transform);
 			return this.transform.getOrigin().x();
@@ -164,7 +167,7 @@ objectPhysicsManipulationSuite.prototype = {
 			},
 
 //TODO: make set functions for position/rotation
-//Are these get functions really needed? or just go direct through physics prop
+
 		getLVx:function(){
 			return this.physics.getLinearVelocity().x();
 			},
@@ -219,39 +222,31 @@ var RigidBodyBase = function(obj){
 };
 RigidBodyBase.prototype =  Object.create(objectPhysicsManipulationSuite.prototype); 
 RigidBodyBase.prototype.constructor = RigidBodyBase;
-
-RigidBodyBase.prototype.ShapeIDCodes = function(){
-			var codes ={
-					cube:0,
-					sphere:1
-				}
-		return codes;
-	};
 			
 RigidBodyBase.prototype.aux_indexLocations = function () {
 		return {
 				shape:0};
-	};			
+	};	
 RigidBodyBase.prototype.transform = new Ammo.btTransform();
 RigidBodyBase.prototype.vector3 = new Ammo.btVector3();
 RigidBodyBase.prototype.quaternion = new Ammo.btQuaternion();
 RigidBodyBase.prototype.createPhysics = function (){
 	
 			var physicsShape;
-			
-			var shapeCodes = this.ShapeIDcodes();
+			var shapeCodes = this.ShapeIDCodes();
+
 			//TODO: add more shape specific codes
 			
 			switch (this.shape){
 				case shapeCodes.cube:
 					this.vector3.setValue( this.w*0.5, this.h*0.5, this.d*0.5 );
 					physicsShape = new Ammo.btBoxShape(this.vector3);
-					var index = aux_indexLocations().shape;
+					var index = this.aux_indexLocations().shape;
 					this.int8arrayShape[index] = shapeCodes.cube;
 					break;
 				case shapeCodes.sphere:
 					physicsShape = new Ammo.btSphereShape(this.radius);
-					var index = aux_indexLocations().shape;
+					var index = this.aux_indexLocations().shape;
 					this.int8arrayShape[index] = shapeCodes.sphere;
 					break;
 
@@ -284,9 +279,14 @@ RigidBodyBase.prototype.createPhysics = function (){
 			//UNIQUIE 7 digit number ID
 			this.id = this.physics.ptr;
 			//set id index in the float array used in binary data exports
-			this.f32array4export[physics_indexLocations().id] = this.id;
+			this.f32array4export[this.physics_indexLocations().id] = this.id;
 		};
-		
+RigidBodyBase.prototype.ShapeIDCodes = function(){
+		return {
+					cube:0,
+					sphere:1
+				}
+			};		
 		
 RigidBodyBase.prototype.exportBinary = function () {
 	
@@ -307,6 +307,7 @@ var CubeConstructorBase = function(obj){
 		this.w = blueprint.w;
 		this.h = blueprint.h;
 		this.d = blueprint.d;
+
 		this.shape = this.ShapeIDCodes().cube;
 
 		this.f32arrayDimensions = new Float32Array(3);//ORDER: w,h,d
@@ -318,10 +319,8 @@ var CubeConstructorBase = function(obj){
 CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
 CubeConstructorBase.prototype.constructor = CubeConstructorBase;
 
-
-
 CubeConstructorBase.prototype.cube_indexLocations = function () {
-			return {shape:0,
+			return {
 						x:0,
 						y:1,
 						z:2}
@@ -356,6 +355,7 @@ CubeConstructorBase.prototype.initBinaryExportData = function () {
 
 var CubeObject = function(blueprint){
 	CubeConstructorBase.call(this,blueprint);
+	console.log(typeof this.ShapeIDCodes)
 	this.createPhysics();
 	
 }
@@ -386,7 +386,7 @@ var myNewCube = new CubeObject({x:10});
 var myNewSphere = new SphereObject({Rx:2})
 
 console.log(myNewCube)
-console.log(myNewSphere.getOrigin())
+
 
 </script><!-- KEEP AT BOTTOM -->
 		
