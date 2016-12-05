@@ -1,25 +1,12 @@
-<meta charset="utf-8" /> 
-<!doctype html>
 
-<html>
-  <head>
-    <title>A place for tests!</title>
+//http://www.htmlgoodies.com/html5/javascript/javascript-object-chaining-using-prototypal-inheritance.html#fbid=1W1osQ4qGFs
+//https://developer.mozilla.org/en-US/docs/Web/JavaScript/Introduction_to_Object-Oriented_JavaScript#Prototype-based_programming
 
-  </head>
-  
-  <style>
-	body{
-		margin:0;
-	}
-	#container{
-		position:fixed;
-	}
-	</style>
-  <body>
-  
-			<script src="../version2/static/ammo.js/ammo.js"></script>
-		<script>
-		
+if(typeof Ammo === 'undefined'){
+	
+	console.log('there is no instance of \'node-ammo\'.  Please import first with require(node-ammo) before using PhysicsObjectFactory');
+}
+
 var objectPhysicsManipulationSuite = function () {
 			this.physics;
 			this.f32array4export = new Float32Array(14);//ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
@@ -218,6 +205,17 @@ RigidBodyBase.prototype.createPhysics = function (){
 			//set id index in the float array used in binary data exports
 			this.f32array4export[this.physics_indexLocations().id] = this.id;
 			
+			
+			/*To prevent accessing the wrong values, reassign location props to get functions.
+			The reason is these props are currently static, but the object can move.  
+			therefore doing object.x will reference the x at time of creation, not it's current.  we must access the current x position through the physics
+			like: 
+				  this.physics.getWorldTransform(this.transform);
+			      this.x =  this.transform.getOrigin().x();
+			*/
+
+			this.assignPositionPropsToGetFunctions();
+			this.assignRotationPropsToGetFunctions();
 		};
 RigidBodyBase.prototype.assignPositionPropsToGetFunctions = function(){
 
@@ -338,16 +336,6 @@ CubeConstructorBase.prototype.initBinaryExportData = function () {
 var CubeObject = function(blueprint){
 	CubeConstructorBase.call(this,blueprint);
 	this.createPhysics();
-	/*To prevent accessing the wrong values, reassign location props to get functions.
-			The reason is these props are currently static, but the object can move.  
-			therefore doing object.x will reference the x at time of creation, not it's current.  we must access the current x position through the physics
-			like: 
-				  this.physics.getWorldTransform(this.transform);
-			      this.x =  this.transform.getOrigin().x();
-	*/
-
-	this.assignPositionPropsToGetFunctions();
-	this.assignRotationPropsToGetFunctions();
 }
 CubeObject.prototype =  Object.create(CubeConstructorBase.prototype); 
 CubeObject.prototype.constructor = CubeObject;
@@ -370,16 +358,9 @@ var SphereObject = function(blueprint){
 }
 SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;
-/********************************************/
 
-var myNewCube = new CubeObject({x:10});
-var myNewSphere = new SphereObject({Rx:2})
 
-console.log(myNewCube);
-myNewCube.setOrigin(2,2,2);
-console.log(myNewCube.x())
 
-</script><!-- KEEP AT BOTTOM -->
-		
-  </body>
-</html>
+//IMPORTANT! tells node.js what you'd like to export from this file. 
+module.exports = {CubeObject:CubeObject, SphereObject:SphereObject}; //constructors
+
