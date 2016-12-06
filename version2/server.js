@@ -4,7 +4,7 @@ var app = require('express')();
 //https://www.npmjs.com/package/ammo-node
 require('ammo-node');//physics
 var objectFactory = require(__dirname +'/resources/server/PhysicsObjectFactory.js');//returns object constructors
-var physicsWorld = require(__dirname +'/resources/server/PhysicsWorldManager.js');//returns an instance of world manager
+var physicsWorld =  require(__dirname +'/resources/server/PhysicsWorldManager.js');//returns an instance of world manager
 
 
 //Express initializes app to be a function handler that you can supply to an HTTP server
@@ -100,40 +100,15 @@ const 		changeLinearVelocity = 32;
 const 		changeAngularVelocity = 64;		
 const       fireBullet = 128;
 	
-createPhysics = function (){
-			var vector3 = new Ammo.btVector3();
-			var transform = new Ammo.btTransform();
-			var quaternion = new Ammo.btQuaternion();
-	
-			vector3.setValue( 1,1,1);
-			var physicsShape = new Ammo.btBoxShape(vector3);
 
-			//setup require d to build an object
-			quaternion.setValue(0,0,0,1);
-			
-			const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
-			physicsShape.setMargin(CollisionMargin);
-			
-			transform.setIdentity();
-			vector3.setValue(0,0,0);
-			transform.setOrigin( vector3 );
-			transform.setRotation( quaternion );
-
-			var motionState = new Ammo.btDefaultMotionState( transform );
-	
-			var localInertia = vector3.setValue(0,0,0);
-
-			physicsShape.calculateLocalInertia( 1, localInertia );
-
-			var rbInfo = new Ammo.btRigidBodyConstructionInfo( 1, motionState, physicsShape, localInertia );
-
-			//Assign FINAL OBJECT
-			return new Ammo.btRigidBody( rbInfo );
-}
-		
 function SYSTEM_CHECK_DEBUG(){
-	var objs = Object.keys(physicsWorld.rigidBodies)
-	console.log(physicsWorld.rigidBodies[objs[0]].getOrigin())
+	//FASTEST way to iterate through our keys
+	//https://jsperf.com/object-keys-iteration/3
+	for (var body in physicsWorld.rigidBodies) {
+		
+		
+	}
+	
 }
 
 function TickPhysics() {
@@ -142,8 +117,21 @@ function TickPhysics() {
 	   
 	   var sendUpdate = clock.UpdateTime();//bool that is true every second
 
-	   physicsWorld.step( deltaTime );
+	  // physicsWorld.step( deltaTime );
+	   physicsWorld.world.stepSimulation( deltaTime,10);
+	   var collisions = physicsWorld.getCollisionImpulses();
+	   physicsWorld.getCollisionForces()
+	  if(collisions){
+		   for (var rigidBody in collisions) {
+				//console.log(rigidBody,"collision imp:",collisions[rigidBody])
+			}
+	   }
 	   
+	   for (var rigidBody in physicsWorld.getCollisionImpulses()) {
+			//do something with rigidBody
+			//physicsWorld.rigidBodies[rigidBody] => do something
+		}
+	 
 	   //loop our physics at about X fps
 		setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 		
@@ -156,8 +144,10 @@ function TickPhysics() {
 
 
 function init(){
-
-	physicsWorld.add(new objectFactory.CubeObject());
+	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
+	physicsWorld.add(ground);
+	physicsWorld.add(new objectFactory.CubeObject({y:50,mass:50}) );
+	physicsWorld.add(new objectFactory.CubeObject({y:20,mass:5}) );
 	TickPhysics();
 }
 
