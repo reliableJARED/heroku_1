@@ -108,6 +108,14 @@ function SYSTEM_CHECK_DEBUG(){
 		
 		
 	}
+	//FASTEST way to iterate through an array and use the value
+	//may be useful in binary export work
+	//https://jsperf.com/fastest-array-loops-in-javascript/83
+	/*while (i = Arr.pop()) {
+		console.log(i)
+		//someFn(i);
+		//newArr.push(i);
+	}*/
 	
 }
 
@@ -120,18 +128,9 @@ function TickPhysics() {
 	  // physicsWorld.step( deltaTime );
 	   physicsWorld.world.stepSimulation( deltaTime,10);
 	   var collisions = physicsWorld.getCollisionImpulses();
-	   physicsWorld.getCollisionForces()
-	  if(collisions){
-		   for (var rigidBody in collisions) {
-				//console.log(rigidBody,"collision imp:",collisions[rigidBody])
-			}
-	   }
-	   
-	   for (var rigidBody in physicsWorld.getCollisionImpulses()) {
-			//do something with rigidBody
-			//physicsWorld.rigidBodies[rigidBody] => do something
-		}
-	 
+	 //  console.log(collisions)
+	   var collisionArray = physicsWorld.getCollisionPairsArray();
+	   console.log(collisionArray.length)
 	   //loop our physics at about X fps
 		setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 		
@@ -146,8 +145,16 @@ function TickPhysics() {
 function init(){
 	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
 	physicsWorld.add(ground);
-	physicsWorld.add(new objectFactory.CubeObject({y:50,mass:50}) );
-	physicsWorld.add(new objectFactory.CubeObject({y:20,mass:5}) );
+	var player = new objectFactory.CubeObject({y:30,mass:50});
+	player.vector3.setValue(1,1,1);
+	player.physics.setLinearFactor(player.vector3);
+	physicsWorld.add(player);
+	physicsWorld.add(new objectFactory.CubeObject({y:20,mass:50}) );
+	
+	for(var i=0; i<100;i+=2){
+		physicsWorld.add(new objectFactory.CubeObject({y:10+i,mass:50}) );
+	}
+	
 	TickPhysics();
 }
 

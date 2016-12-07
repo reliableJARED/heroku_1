@@ -195,6 +195,13 @@ var RigidBodyBase = function(obj){
 		this.mass = blueprint.mass;
 		this.shape;
 		this.id;
+		
+		//TODO: Should callback() be added to RigidBodyBase?
+		//concept would be to assign a callback that execpts for example an object ID of an object
+		//that was in collision with this object.
+		//so for a player the callback would be able to process the collision with a powerup or other obj
+		//sticking a blank function will help prevent errors when called for objects that don't use
+		this.callbackCollision = function(){null};
 };
 RigidBodyBase.prototype =  Object.create(objectPhysicsManipulationSuite.prototype); 
 RigidBodyBase.prototype.constructor = RigidBodyBase;
@@ -403,7 +410,6 @@ var SphereObject = function(blueprint){
 }
 SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;
-
 
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 

@@ -20,10 +20,58 @@
 			<script src="../version2/static/ammo.js/ammo.js"></script>
 		<script>
 		
+console.log(Ammo)
 
+ function createPhysics (){
+	
+			
+			var transform = new Ammo.btTransform();
+			var vector3 = new Ammo.btVector3();
+			var quaternion = new Ammo.btQuaternion();
+			var blueprint ={
+			x:0,
+			y:0,
+			z:0,
+			width:2,
+			height:2,
+			depth:2,
+			mass:10,
+			Rx:0,
+			Ry:0,
+			Rz:0,
+			Rw:1}
 
-	vector3 = new Ammo.btVector3();
-console.log(vector3)
+			vector3.setValue( blueprint.width*0.5, blueprint.height*0.5, blueprint.depth*0.5 );
+			var physicsShape = new Ammo.btBoxShape(vector3);
+					
+			//setup require d to build an object
+			quaternion.setValue(blueprint.Rx,blueprint.Ry,blueprint.Rz,blueprint.Rw);
+			
+			const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
+			physicsShape.setMargin(CollisionMargin);
+			
+			var transform = new Ammo.btTransform();
+			transform.setIdentity();
+			vector3.setValue(blueprint.x,blueprint.y,blueprint.z);
+			transform.setOrigin( vector3 );
+			transform.setRotation( quaternion );
+
+			var motionState = new Ammo.btDefaultMotionState( transform );
+	
+			var localInertia = this.vector3.setValue(0,0,0);
+
+			physicsShape.calculateLocalInertia( blueprint.mass, localInertia );
+
+			var rbInfo = new Ammo.btRigidBodyConstructionInfo( blueprint.mass, motionState, physicsShape, localInertia );
+
+			//Assign FINAL OBJECT
+			return new Ammo.btRigidBody( rbInfo );
+			
+		};
+
+var obj = createPhysics();
+console.log(obj)
+
 
 </script><!-- KEEP AT BOTTOM -->
 		
