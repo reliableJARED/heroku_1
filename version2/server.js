@@ -50,7 +50,7 @@ var clock = require(__dirname +'/resources/server/gameClock.js');//returns const
 clock = new clock(updateFrequency)
 
 //EXAMPLE
-/* inheritence construct example */
+/*nodeJS inheritence construct example */
 /*******************************************************/
 var aBaseClass  = require(__dirname +'/resources/server/baseClass.js');//returns constructor
 var aChildClass  = require(__dirname +'/resources/server/childClass.js')(aBaseClass);//returns instance
@@ -106,7 +106,7 @@ function SYSTEM_CHECK_DEBUG(){
 	//https://jsperf.com/object-keys-iteration/3
 	for (var body in physicsWorld.rigidBodies) {
 		
-		
+		console.log('server:',physicsWorld.rigidBodies[body].physics.getUserIndex())
 	}
 	//FASTEST way to iterate through an array and use the value
 	//may be useful in binary export work
@@ -130,7 +130,7 @@ function TickPhysics() {
 	   var collisions = physicsWorld.getCollisionImpulses();
 	 //  console.log(collisions)
 	   var collisionArray = physicsWorld.getCollisionPairsArray();
-	   console.log(collisionArray.length)
+	   //console.log(collisionArray.length)
 	   //loop our physics at about X fps
 		setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 		
@@ -144,17 +144,19 @@ function TickPhysics() {
 
 function init(){
 	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
+	ground.physics.setUserPointer(1)
 	physicsWorld.add(ground);
-	var player = new objectFactory.CubeObject({y:30,mass:50});
-	player.vector3.setValue(1,1,1);
-	player.physics.setLinearFactor(player.vector3);
-	physicsWorld.add(player);
-	physicsWorld.add(new objectFactory.CubeObject({y:20,mass:50}) );
+	var player = new objectFactory.CubeObject({y:20,mass:50});
+
+	//player.physics.setUserPointer(2);
 	
+	physicsWorld.add(player);	
+	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
+	/*
 	for(var i=0; i<100;i+=2){
 		physicsWorld.add(new objectFactory.CubeObject({y:10+i,mass:50}) );
 	}
-	
+	*/
 	TickPhysics();
 }
 

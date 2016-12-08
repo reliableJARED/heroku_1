@@ -173,7 +173,21 @@ objectPhysicsManipulationSuite.prototype = {
 			}
 };
 
-/*********************************************/		
+/*********************************************
+IMPORTANT Note on collision objects:------->
+when two rigidbodies collide there is a representitive 'collisionObject' that can be accessed from the
+physics world dispatcher.  Because Ammo is javascript port of a c++ lib, many things pointer related are broken.  However!  there is a 
+
+this.dispatcher.getManifoldByIndexInternal(i).getBody0().getUserPointer() returns an object: VoidPtr{ptr:number}
+or
+this.dispatcher.getManifoldByIndexInternal(i).getBody0().getUserIndex() returns the ptr value of the
+VoidPtr object
+
+This can be used as a flag.  to indicate specific actions.  The ptr can be accessed by the physics property
+of the rigid body.  Its one of the few if only direct links between a collision object and it's coresponding rigid body when using Ammo (obv in bullet you get actual pointers because it's c++)
+there are coresponding set methods setUserPointer(number) setUserIndex(number).  they do what you'd expect.
+--------/>
+*/
 var RigidBodyBase = function(obj){
 		
 		objectPhysicsManipulationSuite.call(this);

@@ -16,20 +16,23 @@ var physicsWorldManager = function () {
 	
 	this.rigidBodies = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
 		
+	this.rigidBodiesArray = new Array(); //holds all objects in the world.
+	
+	
 	/*Private Variables*/
 	const gravityConstant = -9.6;
 	
 	const broadphase = new Ammo.btDbvtBroadphase();//BROAD
 	
-	//IMPORTANT: Don't need this config if no soft bodies!
+	//NOTE: Don't need btSoftBodyRigidBodyCollisionConfiguration() config if no soft bodies!
 	//const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
 	const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
-	
 	
 	const solver = new Ammo.btSequentialImpulseConstraintSolver();//SOLVER
 	
 	//IMPORTANT: Don't need this softBodySolver if no soft bodies!
 	//remove from btSoftRigidDynamicsWorld() args if not using
+	// new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
 	const softBodySolver = new Ammo.btDefaultSoftBodySolver();//SOLVER
 
 	
@@ -38,8 +41,9 @@ var physicsWorldManager = function () {
 	this.dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration );//DISPATCHER
 	
 	//THE VERY IMPORTANT ALL POWERFUL: PHYSICS WORLD
-	this.world = new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)//, softBodySolver);
-				
+	
+	this.world = new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration, softBodySolver);
+	
 	//note: setGravity accepts a vector, you could set gravitationl force in x or z too if you wanted.	
 	this.vector3.setValue( 0, gravityConstant, 0 )	
 	this.world.setGravity( this.vector3 );
@@ -48,6 +52,16 @@ var physicsWorldManager = function () {
 
 physicsWorldManager.prototype.add = function(obj){
 	
+	//Zero Indexed so get the length BEFORE pushing the new obj
+	var UserIndex = this.rigidBodiesArray.length;
+	this.rigidBodiesArray.push(obj);
+	
+	console.log(UserIndex)
+	//IMPORTANT!!!
+	//you can set or get UserIndex.  ONLY this menthod should ever set it
+	//it is a very import attribute that ties collisions back to objects, EFFECIENTLY
+	obj.physics.setUserIndex(UserIndex);
+	
 	//master object organizer
 	var ID; 
 	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
@@ -55,14 +69,15 @@ physicsWorldManager.prototype.add = function(obj){
 
 	//start the object as active
 	obj.physics.setActivationState(1);
+	
 	//add to our master object organizer
 	this.rigidBodies[ID] = obj;
-
+	
 	//add to the actual physics simulations
-	this.world.addRigidBody( this.rigidBodies[ID].physics );
+	this.world.addRigidBody( this.rigidBodiesArray[UserIndex].physics );
 }
 
-physicsWorldManager.prototype.remove = function(obj){
+physicsWorldManager.prototype.removeObj = function(obj){
 	
 	var ID; 
 	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
@@ -72,7 +87,102 @@ physicsWorldManager.prototype.remove = function(obj){
 	
 	//remove from our master object organizer
 	delete this.rigidBodies[ID];
+	
+	//index location in our master array
+	var IndexPosition = obj.physics.getUserIndex();
+	
+	//remove it from our master array
+	this.rigidBodiesArray.splice(IndexPosition,1);
+	
+	//update ALL the indexlocations for elements AFTER this one
+	//....If large numbers of objects are being removed this method sux
+	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
+		
+		this.rigidBodiesArray[i].physics.setUserIndex(i);
+	};
 }
+
+physicsWorldManager.prototype.removeObjByID = function(objID){
+	
+	var ID; 
+	if(typeof objID !== 'string'){ID = objID.toString()}
+	else{ID = objID;}
+
+	//remove from simulation
+	this.world.removeRigidBody( this.rigidBodies[ID].physics);
+	
+	//get index location in our master array
+	var IndexPosition = this.rigidBodies[ID].physics.getUserIndex();
+	
+	//remove from our master object organizer
+	delete objToRemove;
+	
+	//remove it from our master array
+	this.rigidBodiesArray.splice(IndexPosition,1);
+	
+	//update ALL the indexlocations for elements AFTER this one
+	//....If large numbers of objects are being removed this method sux
+	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
+		
+		this.rigidBodiesArray[i].physics.setUserIndex(i);
+	};
+}
+
+physicsWorldManager.prototype.removeObjByIndex = function(IndexPosition){
+	
+	var object = this.ridgidBodiesArray[IndexPosition];
+	
+	//remove from simulation
+	this.world.removeRigidBody( object.physics);
+	
+	//remove from our master object organizer
+	var ID = object.id;
+	if(typeof ID !== 'string'){ID = ID.toString()};
+	delete this.rigidBodies[ID];
+	
+	//remove it from our master array
+	this.rigidBodiesArray.splice(IndexPosition,1);
+	
+	//update ALL the indexlocations for elements AFTER this one
+	//....If large numbers of objects are being removed this method sux
+	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
+		
+		this.rigidBodiesArray[i].physics.setUserIndex(i);
+	};
+};
+
+physicsWorldManager.prototype.removeObjByIndexBatch = function(IndexPositionsArray){
+	
+	//FIRST:
+	//how many objects need to be removed
+	var TotalObjsBeingRemoved = IndexPositionsArray.length;
+	
+	//SECOND:
+	//sort array accending
+	 IndexPositionsArray.sort(function(a, b){return a - b});
+	
+	//THIRD:
+	//
+	var object = this.ridgidBodiesArray[IndexPosition];
+	
+	//remove from simulation
+	this.world.removeRigidBody( object.physics);
+	
+	//remove from our master object organizer
+	var ID = object.id;
+	if(typeof ID !== 'string'){ID = ID.toString()};
+	delete this.rigidBodies[ID];
+	
+	//remove it from our master array
+	this.rigidBodiesArray.splice(IndexPosition,1);
+	
+	//update ALL the indexlocations for elements AFTER this one
+	//....If large numbers of objects are being removed this method sux
+	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
+		this.rigidBodiesArray[i].physics.setUserIndex(i);
+	};
+};
+
 
 physicsWorldManager.prototype.step = function(deltaTime){
 	this.world.stepSimulation( deltaTime,10);
@@ -91,6 +201,16 @@ for this reason the getCollisionPairsArray() menthod was created.  It returns an
 
 you can now tell what two objects collided and with how much force.
 
+IMPORTANT Note on collision objects:------->
+this.dispatcher.getManifoldByIndexInternal(i).getBody0().getUserPointer() returns an object: VoidPtr{ptr:number}
+or
+this.dispatcher.getManifoldByIndexInternal(i).getBody0().getUserIndex() returns the ptr value of the
+VoidPtr object
+
+This can be used as a flag.  to indicate specific actions.  The ptr can be accessed by the physics property
+of the rigid body.  Its one of the few if only direct links between a collision object and it's coresponding rigid body when using Ammo (obv in bullet you get actual pointers because it's c++)
+there are coresponding set methods setUserPointer(number) setUserIndex(number).  they do what you'd expect.
+--------/>
 */
 physicsWorldManager.prototype.getCollisionPairsArray = function(){
 	
@@ -115,9 +235,15 @@ physicsWorldManager.prototype.getCollisionPairsArray = function(){
 
 				//isActive() will help eliminate reporting objects resting on eachother.
 				//they are technically in collision but we don't care.... or do we?!
+				//also objects that are Kinematic (aka static) like the GROUND will return false on .isActive()
 				if(Obj2_collisionObject.isActive() && Obj1_collisionObject.isActive()){
 					
-					collisionPairsArray.push(impactImpulse,Obj1_collisionObject.ptr,Obj2_collisionObject.ptr)
+					console.log("pwm1",Obj1_collisionObject.getUserIndex())
+					console.log("pwm2",Obj2_collisionObject.getUserIndex())
+					
+					console.log(Obj1_collisionObject.ptr)
+					
+					collisionPairsArray.push(impactImpulse,Obj1_collisionObject.getUserIndex(),Obj2_collisionObject.getUserIndex())
 					//collisionPairsArray[IndexPosition] = impactImpulse;
 					//collisionPairsArray[IndexPosition+1] = Obj1_collisionObject.ptr;
 					//collisionPairsArray[IndexPosition+2] = Obj2_collisionObject.ptr;

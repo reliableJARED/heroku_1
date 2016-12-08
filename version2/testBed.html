@@ -20,8 +20,46 @@
 			<script src="../version2/static/ammo.js/ammo.js"></script>
 		<script>
 		
-console.log(Ammo)
+var createWorld = function (){
 
+	//keep these on instance NOT prototype like they are with rigidBodies from the 'PhysicsObjectFactory()'
+	this.vector3 = new Ammo.btVector3();
+	this.transform = new Ammo.btTransform();
+	this.quaternion = new Ammo.btQuaternion();
+	
+	this.rigidBodies = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
+		
+	/*Private Variables*/
+	const gravityConstant = -9.6;
+	
+	this.broadphase = new Ammo.btDbvtBroadphase();//BROAD
+	
+	//IMPORTANT: Don't need this config if no soft bodies!
+	//const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
+	this.collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
+	
+	
+	this.solver = new Ammo.btSequentialImpulseConstraintSolver();//SOLVER
+	
+	//IMPORTANT: Don't need this softBodySolver if no soft bodies!
+	//remove from btSoftRigidDynamicsWorld() args if not using
+	// new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
+	this.softBodySolver = new Ammo.btDefaultSoftBodySolver();//SOLVER
+
+	
+	/*Public Variables*/
+	//dispatcher is used to determine what objects are in collision
+	this.dispatcher = new Ammo.btCollisionDispatcher( this.collisionConfiguration );//DISPATCHER
+	
+	//THE VERY IMPORTANT ALL POWERFUL: PHYSICS WORLD
+	
+	this.world = new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, this.broadphase, this.solver, this.collisionConfiguration, this.softBodySolver);
+	
+	//note: setGravity accepts a vector, you could set gravitationl force in x or z too if you wanted.	
+	this.vector3.setValue( 0, gravityConstant, 0 )	
+	this.world.setGravity( this.vector3 );
+
+}
  function createPhysics (){
 	
 			
@@ -58,7 +96,7 @@ console.log(Ammo)
 
 			var motionState = new Ammo.btDefaultMotionState( transform );
 	
-			var localInertia = this.vector3.setValue(0,0,0);
+			var localInertia = vector3.setValue(0,0,0);
 
 			physicsShape.calculateLocalInertia( blueprint.mass, localInertia );
 
@@ -69,6 +107,9 @@ console.log(Ammo)
 			
 		};
 
+var world = new createWorld();
+console.log(world)
+		
 var obj = createPhysics();
 console.log(obj)
 
