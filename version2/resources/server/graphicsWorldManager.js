@@ -5,7 +5,7 @@ var graphicsWorldManager = function (texture_files_array,texture_files_index_key
 	this.INDEX = texture_files_index_key;// object whos keys represent index of files in the texture files array
 	this.TEXTURE_FILES = texture_files_array;//an array of image files ['pic.png', 'house.jpg', etc]
 	this.NoAssignment = -1;
-	this.grapicBodiesIndex = new Object();//associates an ID with graphics component
+	this.graphicBodiesMasterObject = new Object();//associates an ID with graphics component
 	
 	//SHAPES:
 	this.cubeShape = 0;
@@ -24,7 +24,7 @@ var graphicsWorldManager = function (texture_files_array,texture_files_index_key
 		face3: 'top',
 		face4: 'bottom',
 		face5: 'left',
-		face6: 'right'
+		face6: 'right',
 		width: 'width',
 		height: 'height',
 		depth: 'depth'
@@ -33,8 +33,11 @@ var graphicsWorldManager = function (texture_files_array,texture_files_index_key
 	
 };
 
-graphicsWorldManager.prototype.makeCube = function(obj,texture,color){
-	//obj is typically a physics object built using RigidBodyConstructor(), but all that it really needs to have is ID and dimension props
+graphicsWorldManager.prototype.CubeGraphic = function(arg){
+	var obj = arg.obj;
+	var texture = arg.texture;
+	var color = arg.color;
+	//obj is typically a physics object built using PhysicsObjectFactory(), but all that obj really needs to have is ID and dimension props
 	/*properties that  obj needs to have are: 
 		obj.id; VERY IMPORTANT! uniqueID to associate this graphic with a physics object
 		obj.w; width
@@ -65,7 +68,7 @@ graphicsWorldManager.prototype.makeCube = function(obj,texture,color){
 	*/
 	
 	// replace the defaults with texture arguments passed in:
-	var textures = Object.assign{DefaultNone,texture};
+	var textures = Object.assign(DefaultNone,texture);
 	
 	
 	//COLOR:
@@ -75,7 +78,7 @@ graphicsWorldManager.prototype.makeCube = function(obj,texture,color){
 	INT32:6
 	*/
 	//now replace the defaults with color arguments passed in:
-	var colors = Object.assign{DefaultNone,color}
+	var colors = Object.assign(DefaultNone,color)
 	
 	//HEADER:
 	//indicates what the shape is so client knows how the data is structured and can unpack it
@@ -86,11 +89,11 @@ graphicsWorldManager.prototype.makeCube = function(obj,texture,color){
 	else{ID = obj.id;}
 	
 	
-	this.grapicBodiesIndex[ID] = {
+	this.graphicBodiesMasterObject[ID] = {
 		[this.headerKey]:this.cubeShape ,
 		[this.textureKey]:textures,
 		[this.colorKey]:colors,
-		[this.dimensionKey]:{[this.cubeDataKeys.width]:obj.w,[this.cubeDataKeys.height]:obj.h,[this.cubeDataKeys.depth]:obj.d}
+		[this.dimensionKey]:{[this.cubeDataKeys.width]:obj.width,[this.cubeDataKeys.height]:obj.height,[this.cubeDataKeys.depth]:obj.depth}
 	};
 };
 
@@ -98,13 +101,12 @@ graphicsWorldManager.prototype.binary_cube = function(ID){
 	
 	var int32 = new Int32Array(this.cubeDataSize.int32);//ORDER: id,color:front,back,top,bottom,left,right -> 7
 	var int8 = new Int8Array(this.cubeDataSize.int8);//ORDER: shape,texture:front,back,top,bottom,left,right -> 7
-	var f32 = new Float32Array(this.cubeDataSize.f32);//ORDER: width,height,depth ->3
 	
-	var totalBytes = (this.cubeDataSize.int32 * 4) +(this.cubeDataSize.int8)+(this.cubeDataSize.f32 * 4)
+	var totalBytes = (this.cubeDataSize.int32 * 4) +(this.cubeDataSize.int8)
 	
 	if(typeof ID !== 'number'){ID = parseInt(ID,10)};
 	
-	var graphicsObj = this.grapicBodiesIndex[ID.toString()];
+	var graphicsObj = this.graphicBodiesMasterObject[ID.toString()];
 	
 	int32[0] = ID;
 	int32[1] = graphicsObj[this.colorKey][this.cubeDataKeys.face1];
@@ -121,30 +123,23 @@ graphicsWorldManager.prototype.binary_cube = function(ID){
 	int8[4] = graphicsObj[this.textureKey][this.cubeDataKeys.face4];
 	int8[5] = graphicsObj[this.textureKey][this.cubeDataKeys.face5];
 	int8[6] = graphicsObj[this.textureKey][this.cubeDataKeys.face6];
-	
-	f32[0] =  graphicsObj[this.dimensionKey][this.cubeDataKeys.width];
-	f32[1] =  graphicsObj[this.dimensionKey][this.cubeDataKeys.height];
-	f32[2] =  graphicsObj[this.dimensionKey][this.cubeDataKeys.depth];
-	
-	
 
 	//prepare binary
 	var int32Buffer = Buffer.from(int32.buffer);
 	var int8Buffer = Buffer.from(int8.buffer);
-	var f32Buffer = Buffer.from(f32.buffer);
 
-	var binaryData = Buffer.concat([int32Buffer,int8Buffer,f32Buffer],totalBytes);
+	var binaryData = Buffer.concat([int32Buffer,int8Buffer],totalBytes);
 	
 	return binaryData
 	
 }
 
-graphicsWorldManager.prototype.exportBinary(ID) = function(ID){
+graphicsWorldManager.prototype.BinaryExport_graphic = function(ID){
 	var LookUp;
 	if(typeof ID !== 'string'){LookUp = ID.toString()}
 	else{LookUp = ID};
 	
-	var graphicsObj = this.grapicBodiesIndex[ID];
+	var graphicsObj = this.graphicBodiesMasterObject[ID];
 	
 	//check what kind of shape this is
 	if(graphicsObj[this.headerKey] === this.cubeShape){
@@ -156,4 +151,6 @@ graphicsWorldManager.prototype.exportBinary(ID) = function(ID){
 
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 
-module.exports =  graphicsWorldManager; //constructor
+module.exports =  (function(){
+	return new graphicsWorldManager(); //constructor
+})();

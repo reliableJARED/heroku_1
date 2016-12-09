@@ -6,6 +6,7 @@ require('ammo-node');//physics
 var objectFactory = require(__dirname +'/resources/server/PhysicsObjectFactory.js');//returns object constructors
 var physicsWorld =  require(__dirname +'/resources/server/PhysicsWorldManager.js');//returns an instance of world manager
 
+var graphicsWorldManager = require(__dirname +'/resources/server/graphicsWorldManager.js');//returns an instance of 
 
 //Express initializes app to be a function handler that you can supply to an HTTP server
 var http = require('http').Server(app);
@@ -101,24 +102,9 @@ const 		changeAngularVelocity = 64;
 const       fireBullet = 128;
 	
 
-function SYSTEM_CHECK_DEBUG(){
-	//FASTEST way to iterate through our keys
-	//https://jsperf.com/object-keys-iteration/3
-	for (var body in physicsWorld.rigidBodies) {
-		
-		console.log('server:',physicsWorld.rigidBodies[body].physics.getUserIndex())
-	}
-	//FASTEST way to iterate through an array and use the value
-	//may be useful in binary export work
-	//https://jsperf.com/fastest-array-loops-in-javascript/83
-	/*while (i = Arr.pop()) {
-		console.log(i)
-		//someFn(i);
-		//newArr.push(i);
-	}*/
-	
+function SendUpdateToClients(){
+	/*put stuff here*/
 }
-
 function TickPhysics() {
 	
 	   var deltaTime = clock.getDelta();
@@ -127,32 +113,79 @@ function TickPhysics() {
 
 	  // physicsWorld.step( deltaTime );
 	   physicsWorld.world.stepSimulation( deltaTime,10);
-	   var collisions = physicsWorld.getCollisionImpulses();
-	 //  console.log(collisions)
-	   var collisionArray = physicsWorld.getCollisionPairsArray();
-	   //console.log(collisionArray.length)
+
 	   //loop our physics at about X fps
 		setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 		
 		if (sendUpdate){
-		process.nextTick(function (){SYSTEM_CHECK_DEBUG()} );
+		process.nextTick(function (){SendUpdateToClients()} );
 		}
     };
 	
 
+function BuildWorldStateForNewConnection(){
+	
+	
+	var msgByteCount = 0;
+	var totalObjs = physicsWorld.rigidBodiesMasterArray.length;
+	
+	var header = new Int16Array(4);
+	header[0] = totalObjs;
+	//built in space for future info in header
+	header[1] = 14;//number of f32 props that lead every object
+	header[2] = 0;
+	header[3] = 0;
 
+	var binaryData = Buffer.from(header.buffer);
+
+	for(var i = 0; i < totalObjs; i++){
+		
+		var objBuffer = physicsWorld.rigidBodiesMasterArray[i].BinaryExport_ALL();
+		
+		var objBuffer_len = objBuffer.length;
+		console.log('objbuffsize:',objBuffer_len)
+
+		var currentByteLength = binaryData.length + objBuffer_len;
+		//basically PUSH new binary to end of current binary
+		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength )
+
+	}
+	
+	console.log('binSize',binaryData.length)
+	//create a time stamp
+	var time = Date.now();
+	
+	/*IMPORTANT: See SO link above.  Can't send rigidBodiesIndex directly, had to copy to new array.  */	
+	io.emit('setup',{
+		time:time,
+		data: binaryData,
+		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
+		TEXTURE_FILES:TEXTURE_FILES});
+}
 
 function init(){
-	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
-	ground.physics.setUserPointer(1)
-	physicsWorld.add(ground);
-	var player = new objectFactory.CubeObject({y:20,mass:50});
-
-	//player.physics.setUserPointer(2);
+	var testGraphic = this.cubeDataKeys ={
+		front:TEXTURE_FILES_INDEX.ground,
+		back:TEXTURE_FILES_INDEX.ground,
+		top:TEXTURE_FILES_INDEX.ground,
+		bottom:TEXTURE_FILES_INDEX.ground,
+		left:TEXTURE_FILES_INDEX.ground,
+		right:TEXTURE_FILES_INDEX.ground
+	};
 	
+	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
+	graphicsWorldManager.CubeGraphic({obj:ground,texture:testGraphic,color:{}})
+	physicsWorld.add(ground);
+	
+	var player = new objectFactory.CubeObject({y:20,mass:50});
+	graphicsWorldManager.CubeGraphic({obj:player,texture:testGraphic,color:{}})
 	physicsWorld.add(player);	
-	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
+	
+	console.log("ml",physicsWorld.rigidBodiesMasterArray.length)
+	
 	/*
+	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
+
 	for(var i=0; i<100;i+=2){
 		physicsWorld.add(new objectFactory.CubeObject({y:10+i,mass:50}) );
 	}
@@ -174,7 +207,7 @@ io.on('connection', function(socket){
 	
 	
 	socket.on('disconnect', function(){
-		RemoveAPlayer(this.id);
+		console.log('goodbye')
 	});
 	
 	//log
@@ -185,37 +218,28 @@ io.on('connection', function(socket){
 	console.log('**********');
 	
 	//send the new connection their uniqueID, which happens to be their socketID
-	io.to(socket.id).emit('playerID', socket.id);
+	//use this to send INITIAL SETUP TOO
+	//io.to(socket.id).emit('playerID', socket.id);
 	
-	//create a player instance
-	AddPlayer(socket.id);
-	
+
 	//get current state of everything, build specs and send out		
 	BuildWorldStateForNewConnection();
 
 	
-	//on first connection begin physics sim
-	if(!PhysicsSimStarted){
-		clock.start();
-		TickPhysics();
-	}
-	
-	PhysicsSimStarted = true;
-	
 	socket.on('getMyObj',function () {	
-		socket.emit('yourObj',PlayerIndex[this.id].id)
+	//	socket.emit('yourObj',PlayerIndex[this.id].id)
 	});
 
 
 	
 	socket.on('resetMe',function(){
-		playerResetFromCrash(this.id);
+	//	playerResetFromCrash(this.id);
 	});
 	
 	
 	//player input handler
 	socket.on('I',function(data){
-		PlayerInput(this.id,data);	  
+	//	PlayerInput(this.id,data);	  
 		
 	});
 	

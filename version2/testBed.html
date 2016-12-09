@@ -114,6 +114,46 @@ var obj = createPhysics();
 console.log(obj)
 
 
+var ridgidBodiesArray = new Array();
+
+var size = 100;
+for (var i = 0; i<size; i++){
+ridgidBodiesArray.push({index:i,orig:i});
+}
+
+function removeObjByIndexBatch (IndexPositionsArray){
+	
+	//FIRST:
+	//how many objects need to be removed
+	var TotalObjsBeingRemoved = IndexPositionsArray.length;
+	
+	//SECOND:
+	//sort array deccending
+	IndexPositionsArray.sort(function(a, b){return b - a});
+	
+		//THIRD:
+	//remove the objects from master
+	for(var i=0; i<TotalObjsBeingRemoved;i++){
+		ridgidBodiesArray.splice(IndexPositionsArray[i],1);
+	}
+	
+
+	//FOURTH
+	//get lowest index value that was removed
+	var LowestIndexRemoved = IndexPositionsArray.pop();
+	
+	//FIFTH
+	//loop through our masterArray reassigning index locations
+	//Starting from the lowest indexed object that was removed, all earlier objects DO NOT need index reassigning
+	for(var i = LowestIndexRemoved,count = ridgidBodiesArray.length; i <count; i++ ){
+			ridgidBodiesArray[i].index = i;
+	}
+};
+
+
+removeObjByIndexBatch([5,9,50,75]);
+console.log(ridgidBodiesArray);
+
 </script><!-- KEEP AT BOTTOM -->
 		
   </body>

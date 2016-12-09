@@ -19,10 +19,13 @@ var physicsWorldManager = function () {
 	this.transform = new Ammo.btTransform();
 	this.quaternion = new Ammo.btQuaternion();
 	
-	this.rigidBodies = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
-		
-	this.rigidBodiesArray = new Array(); //holds all objects in the world.
 	
+	//ORGANIZERS: The rigidBodiesMasterObject and rigidBodiesMasterArray hold reference to all objects in the world.
+	
+	//Use rigidBodiesMasterObject to Find Objects by their ptr ID
+	this.rigidBodiesMasterObject = new Object();
+	//Use rigidBodiesMasterArray to Find Objects by their UserIndex
+	this.rigidBodiesMasterArray = new Array(); 
 	
 	/*Private Variables*/
 	const gravityConstant = -9.6;
@@ -46,7 +49,6 @@ var physicsWorldManager = function () {
 	this.dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration );//DISPATCHER
 	
 	//THE VERY IMPORTANT ALL POWERFUL: PHYSICS WORLD
-	
 	this.world = new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration, softBodySolver);
 	
 	//note: setGravity accepts a vector, you could set gravitationl force in x or z too if you wanted.	
@@ -58,10 +60,9 @@ var physicsWorldManager = function () {
 physicsWorldManager.prototype.add = function(obj){
 	
 	//Zero Indexed so get the length BEFORE pushing the new obj
-	var UserIndex = this.rigidBodiesArray.length;
-	this.rigidBodiesArray.push(obj);
+	var UserIndex = this.rigidBodiesMasterArray.length;
+	this.rigidBodiesMasterArray.push(obj);
 	
-	console.log(UserIndex)
 	//IMPORTANT!!!
 	//you can set or get UserIndex.  ONLY this menthod should ever set it
 	//it is a very import attribute that ties collisions back to objects, EFFECIENTLY
@@ -76,35 +77,42 @@ physicsWorldManager.prototype.add = function(obj){
 	obj.physics.setActivationState(1);
 	
 	//add to our master object organizer
-	this.rigidBodies[ID] = obj;
+	this.rigidBodiesMasterObject[ID] = obj;
 	
 	//add to the actual physics simulations
-	this.world.addRigidBody( this.rigidBodiesArray[UserIndex].physics );
+	this.world.addRigidBody( this.rigidBodiesMasterArray[UserIndex].physics );
 }
 
+
+physicsWorldManager.prototype.reassignIndexLocationsAfterIndex = function(IndexPosition){
+	
+	//update ALL the indexlocations for elements AFTER this one
+	//....If large numbers of objects are being removed this method sux
+	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
+		
+		this.rigidBodiesMasterArray[i].physics.setUserIndex(i);
+	};
+	
+}
 physicsWorldManager.prototype.removeObj = function(obj){
 	
 	var ID; 
 	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
 	else{ID = obj.id;}
 
-	this.world.removeRigidBody( this.rigidBodies[ID].physics);
+	this.world.removeRigidBody( this.rigidBodiesMasterObject[ID].physics);
 	
 	//remove from our master object organizer
-	delete this.rigidBodies[ID];
+	delete this.rigidBodiesMasterObject[ID];
 	
 	//index location in our master array
 	var IndexPosition = obj.physics.getUserIndex();
 	
 	//remove it from our master array
-	this.rigidBodiesArray.splice(IndexPosition,1);
+	this.rigidBodiesMasterArray.splice(IndexPosition,1);
 	
 	//update ALL the indexlocations for elements AFTER this one
-	//....If large numbers of objects are being removed this method sux
-	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
-		
-		this.rigidBodiesArray[i].physics.setUserIndex(i);
-	};
+	this.reassignIndexLocationsAfterIndex()
 }
 
 physicsWorldManager.prototype.removeObjByID = function(objID){
@@ -114,23 +122,19 @@ physicsWorldManager.prototype.removeObjByID = function(objID){
 	else{ID = objID;}
 
 	//remove from simulation
-	this.world.removeRigidBody( this.rigidBodies[ID].physics);
+	this.world.removeRigidBody( this.rigidBodiesMasterObject[ID].physics);
 	
-	//get index location in our master array
-	var IndexPosition = this.rigidBodies[ID].physics.getUserIndex();
+	//get objects index location in our master array
+	var IndexPosition = this.rigidBodiesMasterObject[ID].physics.getUserIndex();
 	
 	//remove from our master object organizer
-	delete objToRemove;
+	delete this.rigidBodiesMasterObject[ID];
 	
 	//remove it from our master array
-	this.rigidBodiesArray.splice(IndexPosition,1);
+	this.rigidBodiesMasterArray.splice(IndexPosition,1);
 	
 	//update ALL the indexlocations for elements AFTER this one
-	//....If large numbers of objects are being removed this method sux
-	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
-		
-		this.rigidBodiesArray[i].physics.setUserIndex(i);
-	};
+	this.reassignIndexLocationsAfterIndex(IndexPosition)
 }
 
 physicsWorldManager.prototype.removeObjByIndex = function(IndexPosition){
@@ -143,49 +147,40 @@ physicsWorldManager.prototype.removeObjByIndex = function(IndexPosition){
 	//remove from our master object organizer
 	var ID = object.id;
 	if(typeof ID !== 'string'){ID = ID.toString()};
-	delete this.rigidBodies[ID];
+	delete this.rigidBodiesMasterObject[ID];
 	
 	//remove it from our master array
-	this.rigidBodiesArray.splice(IndexPosition,1);
+	this.rigidBodiesMasterArray.splice(IndexPosition,1);
 	
 	//update ALL the indexlocations for elements AFTER this one
-	//....If large numbers of objects are being removed this method sux
-	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
-		
-		this.rigidBodiesArray[i].physics.setUserIndex(i);
-	};
+	this.reassignIndexLocationsAfterIndex(IndexPosition)
 };
 
 physicsWorldManager.prototype.removeObjByIndexBatch = function(IndexPositionsArray){
 	
 	//FIRST:
-	//how many objects need to be removed
-	var TotalObjsBeingRemoved = IndexPositionsArray.length;
-	
+	//sort array deccending
+	IndexPositionsArray.sort(function(a, b){return b - a});
+
 	//SECOND:
-	//sort array accending
-	 IndexPositionsArray.sort(function(a, b){return a - b});
-	
+	//remove the objects from master locations
+	for(var i=0,count=IndexPositionsArray.length; i<count;i++){
+		
+		var theObject = this.rigidBodiesMasterArray[IndexPositionsArray[i]];
+		
+		var ID = theObject.physics.id.toString();
+		if(typeof ID !== 'string'){ID = ID.toString()};
+		delete this.rigidBodiesMasterObject[ID];
+		
+		this.world.removeRigidBody( theObject.physics);
+			
+		this.rigidBodiesMasterArray.splice(IndexPositionsArray[i],1);
+	}
+
 	//THIRD:
-	//
-	var object = this.ridgidBodiesArray[IndexPosition];
-	
-	//remove from simulation
-	this.world.removeRigidBody( object.physics);
-	
-	//remove from our master object organizer
-	var ID = object.id;
-	if(typeof ID !== 'string'){ID = ID.toString()};
-	delete this.rigidBodies[ID];
-	
-	//remove it from our master array
-	this.rigidBodiesArray.splice(IndexPosition,1);
-	
-	//update ALL the indexlocations for elements AFTER this one
-	//....If large numbers of objects are being removed this method sux
-	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
-		this.rigidBodiesArray[i].physics.setUserIndex(i);
-	};
+	//get lowest index value that was removed with .pop() (remember we sorted so value lowest is at end)
+	//then update ALL the index locations for elements AFTER this lowest index removed
+	this.reassignIndexLocationsAfterIndex(IndexPositionsArray.pop());
 };
 
 

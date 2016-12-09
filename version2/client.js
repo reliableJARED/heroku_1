@@ -117,7 +117,7 @@ var socket = io();
 		};
 		
 		socket.on('setup', function(msg){
-			console.log("setup bytes:",msg.data.byteLength)			
+			console.log("setup bytes:",msg.data)			
 			
 			//msg is an object with 4 props
 			//time: timeStamp from server
@@ -349,78 +349,126 @@ function buildObjectBatch(ObjectsToBuild, requestPlayerObj) {
     requestPlayerObj();
 };
 
+
+var structureOfServerBinaryData = {
+	
+	cube:{
+		//float32
+			id:0,
+			x:1,
+			y:2,
+			z:3,
+			Rx:4,
+			Ry:5,
+			Rz:6,
+			Rw:7,
+			LVx:8,
+			LVy:9,
+			LVz:10,
+			AVx:11,
+			AVy:12,
+			AVz:13,
+		//int8
+			shape:14,
+		//float32
+			width:15,
+			height:16,
+			depth:17
+			
+		}
+	
+}
+function ServerShapePropCount(){
+	return {
+			cube:3,
+			sphere:1
+		}
+};	
+
+function ServerShapeIDCodes(){
+	return {
+			cube:0,
+			sphere:1
+		}
+};	
+
 function unpackServerBinaryData(binaryData){
 	
 	var AllObjectBluePrints = new Array();
+	
 	// binaryData is mixed structure binary data for all objects
 	//first 8 bytes are int16 headers
-				var header = new Uint16Array(binaryData,0,4);
-
-					var totalObjs = header[0];
-					var int8count = header[1];
-					var int32count = header[2];
-					var f32count = header[3];
+		var header = new Uint16Array(binaryData,0,4);
+		console.log("header",header)
+			var totalObjs = header[0];
+			var leadingF32data = header[1];
+			var header3 = header[2];
+			var header4 = header[3];
 					
-					var totalPropsPerObj = (int8count+int32count+f32count) 
-					var totalBytesPerObj = int8count+(int32count*4)+(f32count*4)
-					
-					//order of binary data is int32, int8, f32 
-					//create offsets
-					var startInt32 = 0;
-					var endInt32 = int32count*4;
-					var startInt8 = endInt32;
-					var endInt8 = startInt8 + int8count;
-					var startF32 = endInt8;
-					var endF32 = startF32 + (f32count*4);
-					
-				//now unpack the binary data into objects to be built
-				//skip first 8 because they are headers
-			for(var i =8; i<binaryData.byteLength;i+=totalBytesPerObj){
-				/*TODO:
-				https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
+			//What makes it complicated is it's not uniform.  Cubes for example have more data than sphere
+			//as data is unpacked we will be able to determine what shape is next to be unpacked
+			//the data will ALWAYS have 14 float32 and 1 int8 before the nonuniform shape specific data
+			
+			var BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
+			
+			var initF32Data = (leadingF32data * 4);// f32 are always leading
+			console.log('totaldata',binaryData.byteLength)
+			//skip first 8 because they are headers
+			for(var i =8; i<binaryData.byteLength;i+=BytesOfPreviousObj){
+				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.
 				this is because new typedArray() expects start to be an increment
-				of the base.  ie floats start on multipue of 4.
+				of the base.  ie floats start on multipue of 4. because the total buffer is a mix we cant just
+				itterate through
 				*/
+
+				var offset = i+BytesOfPreviousObj;
+				console.log(offset,offset+initF32Data)
+				var bufferF32 = binaryData.slice(offset,offset+initF32Data)
+				var firstF32 = new Float32Array(bufferF32);
 				
-					//order is int32, int8, f32
-					//int32 buffer slice
-					var bufferInt32 = binaryData.slice(i+startInt32,i+endInt32);
-					var int32 = new Int32Array(bufferInt32);
-					
-					var bufferInt8 = binaryData.slice(i+startInt8,i+endInt8)
-					var int8 = new Int8Array(bufferInt8);
-					
-					var bufferF32 = binaryData.slice(i+startF32,i+endF32)
-					var f32 = new Float32Array(bufferF32);
-					
-					//create object 
-					var objectBluePrint = {
-						id : 'id'+int32[0].toString(),
-						w : int32[1], 
-						h : int32[2],
-						d : int32[3],
-						mass : int32[4], 
-						
-						texture : int8[0],
-						shape : int8[1], 
-						player : int8[2], 
-						
-						color : f32[0],
-						x : f32[1],
-						y : f32[2],
-						z : f32[3], 
-						Rx : f32[4], 
-						Ry : f32[5], 
-						Rz : f32[6], 
-						Rw : f32[7] 
-					};
-					
-					
-					AllObjectBluePrints.push(objectBluePrint)
+				console.log('physics',firstF32)
+				/*DO STUFF WITH THE DATA*/
+				
+				BytesOfPreviousObj += bufferF32.byteLength;
+				
+				offset += initF32Data
+				
+				var shapeBuffer = binaryData.slice(offset,offset+1)
+				var shape = new Int8Array(shapeBuffer);
+				
+				console.log('shape:',shape)
+				/*DO STUFF WITH THE DATA*/
+				
+				BytesOfPreviousObj += shapeBuffer.byteLength;
+				
+				offset += 1;
+				
+				var geometryF32props;
+				switch(shape[0]){
+					//DON"T Hardcode the prop count this was setup during testing
+					case ServerShapeIDCodes().cube: geometryF32props = ServerShapePropCount().cube;//width,height,depth
+					break;
+					case ServerShapeIDCodes().sphere: geometryF32props = ServerShapePropCount().sphere;//radius
+					break;
+					default: console.log('todo');
+				}
+				//multiply by 4 to get bytes
+				geometryF32props *= 4
+				
+				var geometryBuffer = binaryData.slice(offset,offset+geometryF32props)
+				var geof32 = new Float32Array(geometryBuffer);
+				
+				console.log('geometry:',geof32)
+				/*DO STUFF WITH THE DATA*/
+				
+				BytesOfPreviousObj += geometryF32props;
+				
 			}
 			
-	return AllObjectBluePrints;
+	return AllObjectBluePrints;		
+			
+
 }
 
 

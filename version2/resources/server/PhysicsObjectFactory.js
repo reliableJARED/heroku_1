@@ -62,11 +62,12 @@ if(typeof Ammo === 'undefined'){
 var objectPhysicsManipulationSuite = function () {
 			this.physics;
 			this.f32arrayPhysics = new Float32Array(14);//ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
+			
 };
 
 objectPhysicsManipulationSuite.prototype = {
 	
-		physics_indexLocations:function () {
+		physics_indexLocations:function() {
 			return {
 						id:0,
 						x:1,
@@ -85,14 +86,14 @@ objectPhysicsManipulationSuite.prototype = {
 			}
 		},
 		
-		BinaryExport_physics:function () {
+		BinaryExport_physics:function() {
 			//assign this.physics and this.transform locally because we use a few times
 			var objPhys = this.physics;
 			var trans = this.transform;
 			
 			objPhys.getMotionState().getWorldTransform(trans);
 			var pos = trans.getOrigin();
-			var rot = trans.geRotation();
+			var rot = trans.getRotation();
 			var LV =  objPhys.getLinearVelocity();
 			var AV =  objPhys.getAngularVelocity();
 			//Total is 56 bytes (index 0 is ID)
@@ -104,7 +105,7 @@ objectPhysicsManipulationSuite.prototype = {
 			var array = this.f32arrayPhysics;
 			
 			//array[0] is our objects ID it's only set once at instatiation
-			var indexLoc = physics_indexLocations();
+			var indexLoc = this.physics_indexLocations();
 			array[indexLoc.x] = pos.x();
 			array[indexLoc.y] = pos.y();
 			array[indexLoc.z] = pos.z();
@@ -355,12 +356,12 @@ RigidBodyBase.prototype.BinaryExport_ALL = function () {
 	//physics portion - ALL float32
 	//INDEX ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
 	var physicsBuffer = this.BinaryExport_physics();
-	
+	console.log('pof_physicsBinLen',physicsBuffer.poolSize)
 	//shape geometry buffer
 	//INDEX ORDER:shapeCode[int8],geometry props [float32]
 	//geometry props is of varible length depending on shape code.  i.e. cube has w,h,d where sphere has only radius
 	var geometryBuffer = this.BinaryExport_geometry();
-	
+	console.log('pof_geoBinLen',geometryBuffer.byteLength)
 	var totalBytes = physicsBuffer.length + geometryBuffer.length
 	var buffer = Buffer.concat([physicsBuffer,geometryBuffer],totalBytes);
 	
