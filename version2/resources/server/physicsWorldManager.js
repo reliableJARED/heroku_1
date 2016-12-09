@@ -9,6 +9,11 @@ const IMPACT_IMPULSE_MINIMUM = 1;//minimum collision force required to register
 
 var physicsWorldManager = function () {
 
+	/*
+	HAVE Collision handling done by a function that is passed in.  the PWM will get all the collisions, then
+	use the passed in function(s) to determine what to do with them.
+	*/
+
 	//keep these on instance NOT prototype like they are with rigidBodies from the 'PhysicsObjectFactory()'
 	this.vector3 = new Ammo.btVector3();
 	this.transform = new Ammo.btTransform();
