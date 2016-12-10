@@ -414,16 +414,16 @@ function unpackServerBinaryData(binaryData){
 			var initF32Data = (leadingF32data * 4);// f32 are always leading
 			console.log('totaldata',binaryData.byteLength)
 			//skip first 8 because they are headers
-			for(var i =8; i<binaryData.byteLength;i+=BytesOfPreviousObj){
+			for(var i = 8,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.
 				this is because new typedArray() expects start to be an increment
 				of the base.  ie floats start on multipue of 4. because the total buffer is a mix we cant just
 				itterate through
 				*/
-
-				var offset = i+BytesOfPreviousObj;
-				console.log(offset,offset+initF32Data)
+				BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
+				var offset = i;
+				console.log('start from:',offset)
 				var bufferF32 = binaryData.slice(offset,offset+initF32Data)
 				var firstF32 = new Float32Array(bufferF32);
 				
@@ -463,6 +463,7 @@ function unpackServerBinaryData(binaryData){
 				/*DO STUFF WITH THE DATA*/
 				
 				BytesOfPreviousObj += geometryF32props;
+				console.log('finished from',BytesOfPreviousObj, 'to',BytesOfPreviousObj+i)
 				
 			}
 			

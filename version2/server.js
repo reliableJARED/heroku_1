@@ -4,7 +4,7 @@ var app = require('express')();
 //https://www.npmjs.com/package/ammo-node
 require('ammo-node');//physics
 var objectFactory = require(__dirname +'/resources/server/PhysicsObjectFactory.js');//returns object constructors
-var physicsWorld =  require(__dirname +'/resources/server/PhysicsWorldManager.js');//returns an instance of world manager
+var physicsWorld =  require(__dirname +'/resources/server/physicsWorldManager.js');//returns an instance of world manager
 
 var graphicsWorldManager = require(__dirname +'/resources/server/graphicsWorldManager.js');//returns an instance of 
 
@@ -180,6 +180,10 @@ function init(){
 	var player = new objectFactory.CubeObject({y:20,mass:50});
 	graphicsWorldManager.CubeGraphic({obj:player,texture:testGraphic,color:{}})
 	physicsWorld.add(player);	
+	
+	var ball = new objectFactory.SphereObject();
+	console.log(ball.id)
+	physicsWorld.add(ball);	
 	
 	console.log("ml",physicsWorld.rigidBodiesMasterArray.length)
 	

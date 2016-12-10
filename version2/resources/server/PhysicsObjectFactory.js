@@ -120,7 +120,7 @@ objectPhysicsManipulationSuite.prototype = {
 			array[indexLoc.AVy] = AV.y();
 			array[indexLoc.AVz] = AV.z();
 			
-			return Buffer.from(array);
+			return Buffer.from(array.buffer);
 		},
 		
 		getOrigin:function(){
@@ -340,10 +340,10 @@ RigidBodyBase.prototype.BinaryExport_geometry = function () {
 		//https://nodejs.org/api/buffer.html#buffer_buffers_and_character_encodings		
 		var int8Shape = new Int8Array(1);//ORDER: shape	
 		int8Shape[0] = this.shape;
-		var shapeBuffer = Buffer.from(int8Shape);
+		var shapeBuffer = Buffer.from(int8Shape.buffer);
 	
 		//the shapes geometry
-		var geometryBuffer = Buffer.from(this.f32arrayGeometry);
+		var geometryBuffer = Buffer.from(this.f32arrayGeometry.buffer);
 		
 		var totalBytes = geometryBuffer.length + shapeBuffer.length;
 			
@@ -356,7 +356,7 @@ RigidBodyBase.prototype.BinaryExport_ALL = function () {
 	//physics portion - ALL float32
 	//INDEX ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
 	var physicsBuffer = this.BinaryExport_physics();
-	console.log('pof_physicsBinLen',physicsBuffer.poolSize)
+	console.log('pof_physicsBinLen',physicsBuffer.length)
 	//shape geometry buffer
 	//INDEX ORDER:shapeCode[int8],geometry props [float32]
 	//geometry props is of varible length depending on shape code.  i.e. cube has w,h,d where sphere has only radius
