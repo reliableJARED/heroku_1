@@ -384,6 +384,37 @@ function ServerShapeIDCodes(){
 		}
 };	
 
+function unpackServerBinaryData_graphics(binaryData){
+	// binaryData is mixed structure binary data for all objects
+	//first 2 bytes is an int16 header indicating how many objects
+	var header = new Uint16Array(binaryData,0,1);
+	
+	//TODO:
+	//put scene setup info here so server dictates threejs init
+	var totalObjs = header[0];
+	var headerOffset = 2;
+	
+	for(var i = 2,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
+		
+		//first position is an ID.  Use that to look up the object in physics world
+		BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
+		var offset = i;
+		var idBuffer = binaryData.slice(offset,offset+headerOffset)
+		var ID = new Float32Array(idBuffer);
+		
+		var physicsObj = rigidBodiesLookUp[ID[0]];
+		
+		console.log(physicsObj);
+		
+	}
+	
+	
+}
+
+
+
+
+
 function unpackServerBinaryData(binaryData){
 	
 	var AllObjectBluePrints = new Array();

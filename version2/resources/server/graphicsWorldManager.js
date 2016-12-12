@@ -8,7 +8,8 @@ var graphicsWorldManager = function (texture_files_array,texture_files_index_key
 	this.graphicBodiesMasterObject = new Object();//associates an ID with graphics component
 	
 	//SHAPES:
-	this.cubeShape = 0;
+	this.Shapes = {cube:0, sphere:1};
+	
 	this.cubeDataSize = {int32:7, int8:7, f32:3};
 	
 	/*This is strange way to do it,
@@ -17,42 +18,66 @@ var graphicsWorldManager = function (texture_files_array,texture_files_index_key
 	this.headerKey = 'header';
 	this.textureKey = 'textures';
 	this.colorKey = 'colors';
-	this.dimensionKey = 'dimensions';
-	this.cubeDataKeys ={
-		face1: 'front',
-		face2: 'back',
-		face3: 'top',
-		face4: 'bottom',
-		face5: 'left',
-		face6: 'right',
-		width: 'width',
-		height: 'height',
-		depth: 'depth'
+
+	this.DataKeys ={
+		cube:{
+			face1: 'front',
+			face2: 'back',
+			face3: 'top',
+			face4: 'bottom',
+			face5: 'left',
+			face6: 'right'
+		}
 	}
 	
 	
 };
 
+graphicsWorldManager.prototype.ERROR_MSG = function(code,errorSource){
+	var errorSource = errorSource || "an unknown function"
+	var errorCodes = {
+		
+		oneHundred:"bad input, need an ID from physics object",
+		twoHundred:"physics object shape and graphics object shape are different"
+	};
+	
+	console.log('*** ERROR ***');
+	switch (code){
+		
+		case 100: console.log(errorSource,'reports:',errorCodes.oneHundred)
+		break;
+		case 200: console.log(errorSource,'reports:',errorCodes.twoHundred)
+		break;
+		default: console.log('an error without a code happened')
+	}
+	console.log('*************');
+}
+
 graphicsWorldManager.prototype.CubeGraphic = function(arg){
-	var obj = arg.obj;
+	//get our ID from the physics object
+	var ID = arg.obj.id;
+	if(typeof arg.obj.id === 'undefined'){throw this.ERROR_MSG(100,"CubeGraphic")}
+	
+	//check that the physics object has the same shape	
+	if(arg.obj.shape !== this.Shapes.cube){throw this.ERROR_MSG(200,"CubeGraphic")}
+	
+	
 	var texture = arg.texture;
 	var color = arg.color;
-	//obj is typically a physics object built using PhysicsObjectFactory(), but all that obj really needs to have is ID and dimension props
-	/*properties that  obj needs to have are: 
+	//obj is typically a physics object built using PhysicsObjectFactory(), but all that obj really needs to have is an ID 
+	/*	
 		obj.id; VERY IMPORTANT! uniqueID to associate this graphic with a physics object
-		obj.w; width
-		obj.h;  height
-		obj.d; depth
+
 	*/
 	
 	//for color or texture not assigned to an object face, default is none
 	var DefaultNone = {
-		[this.cubeDataKeys.face1]:this.NoAssignment,
-		[this.cubeDataKeys.face2]:this.NoAssignment,
-		[this.cubeDataKeys.face3]:this.NoAssignment,
-		[this.cubeDataKeys.face4]:this.NoAssignment,
-		[this.cubeDataKeys.face5]:this.NoAssignment,
-		[this.cubeDataKeys.face6]:this.NoAssignment
+		[this.DataKeys.cube.face1]:this.NoAssignment,
+		[this.DataKeys.cube.face2]:this.NoAssignment,
+		[this.DataKeys.cube.face3]:this.NoAssignment,
+		[this.DataKeys.cube.face4]:this.NoAssignment,
+		[this.DataKeys.cube.face5]:this.NoAssignment,
+		[this.DataKeys.cube.face6]:this.NoAssignment
 	}
 	//DIMENSIONS:
 	//obj argument has the height,width,depth of the cubeShape
@@ -83,17 +108,10 @@ graphicsWorldManager.prototype.CubeGraphic = function(arg){
 	//HEADER:
 	//indicates what the shape is so client knows how the data is structured and can unpack it
 	// INT8:1
-	
-	var ID;
-	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
-	else{ID = obj.id;}
-	
-	
+	if(typeof ID !== 'string'){ID = ID.toString()};
 	this.graphicBodiesMasterObject[ID] = {
-		[this.headerKey]:this.cubeShape ,
 		[this.textureKey]:textures,
 		[this.colorKey]:colors,
-		[this.dimensionKey]:{[this.cubeDataKeys.width]:obj.width,[this.cubeDataKeys.height]:obj.height,[this.cubeDataKeys.depth]:obj.depth}
 	};
 };
 
@@ -109,20 +127,20 @@ graphicsWorldManager.prototype.binary_cube = function(ID){
 	var graphicsObj = this.graphicBodiesMasterObject[ID.toString()];
 	
 	int32[0] = ID;
-	int32[1] = graphicsObj[this.colorKey][this.cubeDataKeys.face1];
-	int32[2] = graphicsObj[this.colorKey][this.cubeDataKeys.face2];
-	int32[3] = graphicsObj[this.colorKey][this.cubeDataKeys.face3];
-	int32[4] = graphicsObj[this.colorKey][this.cubeDataKeys.face4];
-	int32[5] = graphicsObj[this.colorKey][this.cubeDataKeys.face5];
-	int32[6] = graphicsObj[this.colorKey][this.cubeDataKeys.face6];
+	int32[1] = graphicsObj[this.colorKey][this.DataKeys.cube.face1];
+	int32[2] = graphicsObj[this.colorKey][this.DataKeys.cube.face2];
+	int32[3] = graphicsObj[this.colorKey][this.DataKeys.cube.face3];
+	int32[4] = graphicsObj[this.colorKey][this.DataKeys.cube.face4];
+	int32[5] = graphicsObj[this.colorKey][this.DataKeys.cube.face5];
+	int32[6] = graphicsObj[this.colorKey][this.DataKeys.cube.face6];
 	
 	int8[0] = this.cubeShape;
-	int8[1] = graphicsObj[this.textureKey][this.cubeDataKeys.face1];
-	int8[2] = graphicsObj[this.textureKey][this.cubeDataKeys.face2];
-	int8[3] = graphicsObj[this.textureKey][this.cubeDataKeys.face3];
-	int8[4] = graphicsObj[this.textureKey][this.cubeDataKeys.face4];
-	int8[5] = graphicsObj[this.textureKey][this.cubeDataKeys.face5];
-	int8[6] = graphicsObj[this.textureKey][this.cubeDataKeys.face6];
+	int8[1] = graphicsObj[this.textureKey][this.DataKeys.cube.face1];
+	int8[2] = graphicsObj[this.textureKey][this.DataKeys.cube.face2];
+	int8[3] = graphicsObj[this.textureKey][this.DataKeys.cube.face3];
+	int8[4] = graphicsObj[this.textureKey][this.DataKeys.cube.face4];
+	int8[5] = graphicsObj[this.textureKey][this.DataKeys.cube.face5];
+	int8[6] = graphicsObj[this.textureKey][this.DataKeys.cube.face6];
 
 	//prepare binary
 	var int32Buffer = Buffer.from(int32.buffer);

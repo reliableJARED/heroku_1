@@ -6,8 +6,6 @@ require('ammo-node');//physics
 var objectFactory = require(__dirname +'/resources/server/PhysicsObjectFactory.js');//returns object constructors
 var physicsWorld =  require(__dirname +'/resources/server/physicsWorldManager.js');//returns an instance of world manager
 
-var graphicsWorldManager = require(__dirname +'/resources/server/graphicsWorldManager.js');//returns an instance of 
-
 //Express initializes app to be a function handler that you can supply to an HTTP server
 var http = require('http').Server(app);
 
@@ -129,42 +127,54 @@ function BuildWorldStateForNewConnection(socket_id){
 	var msgByteCount = 0;
 	var totalObjs = physicsWorld.rigidBodiesMasterArray.length;
 	
+	//physics
 	var header = new Int16Array(4);
 	header[0] = totalObjs;
 	//built in space for future info in header
 	header[1] = 14;//number of f32 props that lead every object
 	header[2] = 0;
 	header[3] = 0;
-
 	var binaryData = Buffer.from(header.buffer);
+	
+	//graphics
+	var gheader = new Int16Array(1);
+	gheader[0] = totalObjs;
+	var binaryGraphics  Buffer.from(gheader.buffer);
 
+	//build buffers
 	for(var i = 0; i < totalObjs; i++){
-		
+		//PHYSICS
 		var objBuffer = physicsWorld.rigidBodiesMasterArray[i].BinaryExport_ALL();
-		
 		var objBuffer_len = objBuffer.length;
-
 		var currentByteLength = binaryData.length + objBuffer_len;
+		
+		//GRAPHICS
+		var grapBuffer = physicsWorld.rigidBodiesMasterArray[i].BinaryExport_graphics();
+		var grapBuffer_len = grapBuffer.length;
+		var currentByteLength_g = binaryGraphics.length + grapBuffer_len;
+		
 		//basically PUSH new binary to end of current binary
-		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength )
+		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength_g );
+		binaryGraphics = Buffer.concat([binaryGraphics, grapBuffer], currentByteLength )
 
 	}
 	
-	console.log('binSize',binaryData.length)
+	
 	//create a time stamp
 	var time = Date.now();
 	
-	/*IMPORTANT: See SO link above.  Can't send rigidBodiesIndex directly, had to copy to new array.  */	
+	//Only send to the new connection, NOT every connection
 	io.to(socket_id).emit('setup',{
 		time:time,
 		data: binaryData,
+		graphics:binaryGraphics,
 		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
 		TEXTURE_FILES:TEXTURE_FILES});
 			
 }
 
 function init(){
-	var testGraphic = this.cubeDataKeys ={
+	var groundTextures = {
 		front:TEXTURE_FILES_INDEX.ground,
 		back:TEXTURE_FILES_INDEX.ground,
 		top:TEXTURE_FILES_INDEX.ground,
@@ -174,18 +184,17 @@ function init(){
 	};
 	
 	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
-	graphicsWorldManager.CubeGraphic({obj:ground,texture:testGraphic,color:{}})
+	ground.addGraphics({textures:groundTextures});
+	
 	physicsWorld.add(ground);
 	
 	var player = new objectFactory.CubeObject({y:20,mass:50});
-	graphicsWorldManager.CubeGraphic({obj:player,texture:testGraphic,color:{}})
+
 	physicsWorld.add(player);	
 	
 	var ball = new objectFactory.SphereObject();
-	console.log(ball.id)
 	physicsWorld.add(ball);	
 	
-	console.log("ml",physicsWorld.rigidBodiesMasterArray.length)
 	
 	/*
 	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
@@ -226,8 +235,8 @@ io.on('connection', function(socket){
 	//io.to(socket.id).emit('playerID', socket.id);
 	
 
-	//get current state of everything, build specs and send out		
-	BuildWorldStateForNewConnection();
+	//get current state of everything, build specs and send out	to the NEW connection	
+	BuildWorldStateForNewConnection(socket.id);
 
 	
 	socket.on('getMyObj',function () {	

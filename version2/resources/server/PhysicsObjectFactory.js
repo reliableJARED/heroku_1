@@ -210,6 +210,7 @@ var RigidBodyBase = function(obj){
 		this.mass = blueprint.mass;
 		this.shape;
 		this.id;
+		this.graphics = false;//if obj has associated graphics they will be placed here
 		
 		//TODO: Should callback() be added to RigidBodyBase?
 		//concept would be to assign a callback that execpts for example an object ID of an object
@@ -351,8 +352,54 @@ RigidBodyBase.prototype.BinaryExport_geometry = function () {
 		
 		return buffer;
 };	
+
+RigidBodyBase.prototype.BinaryExport_graphics = function () {
+		
+		//type of shape
+		//**although direct Buffer.from(int shape, 'binary') will work, using typed array
+		//https://nodejs.org/api/buffer.html#buffer_buffers_and_character_encodings		
+		var ID = new Int32Array(1);//ORDER: ID	
+		ID[0] = this.id;
+		var IDbuffer = Buffer.from(ID.buffer);
+	
+		//the shapes MATERIAL
+		var materialArray = new Int8Array(1);
+		materialArray[0] = this.material;
+
+		//base the size of array on number of default properties
+		var propArrayFaces = Object.keys(graphicsDefaultMapping());
+		var propArraySize = propArrayFaces.length;
+		
+		//keep color and texture separate arrays YES, technically could combine, but dont
+		var colorArray = new Float32Array(propArraySize);
+		var textureArray = new Float32Array(propArraySize);
+		for(var face = 0; face<propArraySize;face++){
+			//the shapes COLOR
+			colorArray[face] = this.colors[propArrayFaces[face]];
+			//the shapes TEXTURE
+			textureArray[face] = this.textures[propArrayFaces[face]];
+		}
+		
+		//create the buffers
+		var materialBuffer = Buffer.from(mat.buffer);
+		var colorBuffer = Buffer.from(colorArray.buffer);
+		var textureBuffer = Buffer.from(textureArray.buffer);
+
+		//how big will total buffer be
+		var totalBytes = materialBuffer.length + colorBuffer.length + textureBuffer.length;
+			
+		//combine to single buffer
+		var buffer = Buffer.concat([materialBuffer,colorBuffer,textureBuffer],totalBytes);
+		
+		return buffer;
+};	
 		
 RigidBodyBase.prototype.BinaryExport_ALL = function () {
+	//**********
+	//DOES NOT EXPORT ANY GRAPICS INFO !!!
+	//use: BinaryExport_graphics()
+	//**********
+	
 	//physics portion - ALL float32
 	//INDEX ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
 	var physicsBuffer = this.BinaryExport_physics();
@@ -367,7 +414,137 @@ RigidBodyBase.prototype.BinaryExport_ALL = function () {
 	
 	return buffer;
 }
-		
+	
+RigidBodyBase.prototype.MappingFaceCodes = function(){
+
+	return{
+		cube:{
+			face1: 'front',
+			face2: 'back',
+			face3: 'top',
+			face4: 'bottom',
+			face5: 'left',
+			face6: 'right'
+		},
+		sphere:{
+			face1:'front'
+		}
+	}
+}
+RigidBodyBase.prototype.graphicsDefaultMapping = function(){
+	
+	var NoAssignment = -1;
+	
+	var FaceKeys = this.MappingFaceCodes();
+	var shapeCodes = this.ShapeIDCodes();
+	
+	switch (this.shape){
+			case shapeCodes.cube:
+					return {
+						[FaceKeys.cube.face1]:NoAssignment,
+						[FaceKeys.cube.face2]:NoAssignment,
+						[FaceKeys.cube.face3]:NoAssignment,
+						[FaceKeys.cube.face4]:NoAssignment,
+						[FaceKeys.cube.face5]:NoAssignment,
+						[FaceKeys.cube.face6]:NoAssignment
+						}
+					break;
+				
+			case shapeCodes.sphere:
+					return {
+						//wrapps whole sphere
+						[FaceKeys.sphere.face1]:NoAssignment
+						}
+					break;
+
+				//TODO: ADD MORE SHAPES>>>
+				
+				default: console.log('ERROR: this.shape either not defined or not a value of a known shape code from ShapeIDCodes()');
+			}
+}	
+
+RigidBodyBase.prototype.graphicsMaterialCodes = function(){
+	/*
+	TYPES:
+	MeshBasicMaterial -> https://threejs.org/docs/api/materials/MeshBasicMaterial.html
+	MeshDepthMaterial - > https://threejs.org/docs/api/materials/MeshDepthMaterial.html
+	MeshLambertMaterial -> https://threejs.org/docs/api/materials/MeshLambertMaterial.html
+	MeshNormalMaterial -> https://threejs.org/docs/api/materials/MeshNormalMaterial.html
+	MeshPhongMaterial - https://threejs.org/docs/api/materials/MeshPhongMaterial.html
+	MeshStandardMaterial -> https://threejs.org/docs/api/materials/MeshStandardMaterial.html
+	*/
+	return {
+		basic:0,
+		depth:1,
+		lambert:2,
+		normal:3,
+		phong:4,
+		standard:5
+	}
+
+
+}
+RigidBodyBase.prototype.addGraphics = function(inputObj){
+	//GOOD SPHERE EXAMPLE
+	//http://learningthreejs.com/blog/2013/09/16/how-to-make-the-earth-in-webgl/
+
+	var inputObj = inputObj || {};
+	//for color or texture not assigned to an object face, default is none
+	//note that the wrap prop of passed in arg is used to 'wrap' so don't have to assign each face
+
+	var DefaultNone = this.graphicsDefaultMapping();
+	
+	if(typeof inputObj.textures !== 'undefined'){
+		if(inputObj.textures.wrap){
+			for(var key in DefaultNone){
+				DefaultNone[key] = inputObj.textures.wrap;
+			}
+		}
+	}
+	
+	// replace the defaults with texture arguments passed in:
+	this.textures = Object.assign(DefaultNone,inputObj.textures);
+	
+	//RESET defaults
+	DefaultNone = this.graphicsDefaultMapping();
+	
+	if(typeof inputObj.colors !== 'undefined'){
+		if(inputObj.colors.wrap){
+			for(var key in DefaultNone){
+				DefaultNone[key] = inputObj.colors.wrap;
+			}
+		}
+	}
+	
+	//now replace the defaults with color arguments passed in:
+	this.colors = Object.assign(DefaultNone,inputObj.colors);
+	
+	var matCodes = this.graphicsMaterialCodes();
+	
+	if(typeof mats === 'undefined'){
+		mats = matCodes.basic;
+	}
+	else{
+		var stringNameOfMats = Object.keys(matCodes);
+		switch (mats){
+			
+			case stringNameOfMats[matCodes.basic]: mats = matCodes.basic
+												 break;
+			case stringNameOfMats[matCodes.depth]:mats = matCodes.depth
+												 break;
+			case stringNameOfMats[matCodes.lambert]:mats = matCodes.lambert
+												 break;
+			case stringNameOfMats[matCodes.normal]:mats = matCodes.normal
+												 break;
+			case stringNameOfMats[matCodes.standard]:mats = matCodes.standard
+												 break;
+			default: console.log('error in RigidBodyBase.prototype.addGraphics');
+		}
+	}
+	
+	this.material = mats;
+}
+	
 
 //CUBE
 var CubeConstructorBase = function(obj){
