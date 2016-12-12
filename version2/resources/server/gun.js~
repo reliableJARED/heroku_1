@@ -1,0 +1,98 @@
+
+
+var gun = function(obj){
+	
+	/*INPUT:
+	{header: //a number 0-127 that is known to server and client to mean fireBullet
+	constructor: //pass a physical object builder function
+	vector3: //Ammo instance of vector3
+	destroy: //function that destroys objects after X seconds
+	addToWorld: //function that adds objects toRigidBodiesIndex
+	physicsWorld: //the physics world that this weapon exists in}
+	*/
+	this.fireBullet = obj.header;
+	this.createPhysicalCube = obj.builder;
+	this.vector3Aux1 = obj.vector3;
+	this.delayedDestruction = obj.destroy;
+	this.AddToRigidBodiesIndex = obj.addToWorld;
+	this.physicsWorld = obj.physicsWorld;
+}
+
+gun.prototype.FireShot = function (data){
+		//first 4 bytes will be headers
+		//last 48 bytes will be data
+
+		var headers   = new Uint8Array(4);
+		headers[0] = this.fireBullet;
+		headers[1] = 0//not assigned right now
+		headers[2] = 0//not assigned right now
+		headers[3] = 0//not assigned right now
+		
+		var binaryData   = new Float32Array(12);
+		binaryData[0] = 0.5;//width
+		binaryData[1] = 0.5;//height
+		binaryData[2] = 0.5;//depth
+		binaryData[3] = 10;//mass
+		binaryData[4] = Math.random() * 0xffffff //RANDOM color
+		binaryData[5] = data.readFloatLE(4);//x
+		binaryData[6] = data.readFloatLE(8);//y
+		binaryData[7] = data.readFloatLE(12);//z
+		binaryData[8] = data.readFloatLE(16);//Linear Velocity x
+		binaryData[9] = data.readFloatLE(20);//Linear Velocity y
+		binaryData[10] = data.readFloatLE(24);//Linear Velocity z
+		
+		
+		var cubeObjBlueprint = {
+			w : binaryData[0],
+			h : binaryData[1],
+			d : binaryData[2],
+			mass : binaryData[3],
+			x: binaryData[5],
+			y: binaryData[6],
+			z: binaryData[7],
+			Rx: binaryData[8],
+			Ry: binaryData[9],
+			Rz: binaryData[10]
+		}
+		
+		//build the object
+		var cube = this.createPhysicalCube(cubeObjBlueprint);
+		binaryData[11] = cube.physics.ptr;//the NUMBER portion of ptr ID
+		
+		//create a vector to apply shot force to our bullet
+		this.vector3Aux1.setValue(data.readFloatLE(16),data.readFloatLE(20),data.readFloatLE(24));
+		
+		//apply the movement force of the shot
+		cube.physics.applyCentralImpulse(this.vector3Aux1);
+
+		//keep the cube always active		
+		cube.physics.setActivationState(4);
+
+		//add to physics world
+		this.physicsWorld.addRigidBody( cube.physics );
+		
+		//add to our index used to update clients about objects that have moved
+		/*IMPORTANT: AddToRigidBodiesIndex expects that obj.physics is an Ammo object.  NOT the values sent used in the blueprint to build the object*/
+		this.AddToRigidBodiesIndex(cube);
+
+		//prepare binary data for shipping
+		var dataBuffer = Buffer.from(binaryData.buffer)
+		var headersBuffer = Buffer.from(headers.buffer);
+		//console.log(dataBuffer.byteLength)
+		//console.log(headers.byteLength);
+		
+		var binaryShot = Buffer.concat([headersBuffer,dataBuffer],(dataBuffer.byteLength+headers.byteLength));
+		//console.log(ship.byteLength)
+		
+		//remove shot from world in 5000 mili seconds	
+		this.delayedDestruction(cube.id,5000)
+		
+		//used to add shot to worlds of players
+		return binaryShot;
+		
+}
+
+
+//IMPORTANT! tells node.js what you'd like to export from this file. 
+module.exports = gun;
+

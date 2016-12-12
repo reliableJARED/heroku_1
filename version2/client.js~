@@ -407,6 +407,8 @@ function unpackServerBinaryData(binaryData){
 			console.log('totaldata',binaryData.byteLength)
 			//skip first 8 because they are headers
 			for(var i = 8,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
+				//create a new object
+				AllObjectBluePrints.push(new Object());
 				
 				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.

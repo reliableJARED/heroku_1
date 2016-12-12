@@ -123,7 +123,7 @@ function TickPhysics() {
     };
 	
 
-function BuildWorldStateForNewConnection(){
+function BuildWorldStateForNewConnection(socket_id){
 	
 	
 	var msgByteCount = 0;
@@ -143,7 +143,6 @@ function BuildWorldStateForNewConnection(){
 		var objBuffer = physicsWorld.rigidBodiesMasterArray[i].BinaryExport_ALL();
 		
 		var objBuffer_len = objBuffer.length;
-		console.log('objbuffsize:',objBuffer_len)
 
 		var currentByteLength = binaryData.length + objBuffer_len;
 		//basically PUSH new binary to end of current binary
@@ -156,11 +155,12 @@ function BuildWorldStateForNewConnection(){
 	var time = Date.now();
 	
 	/*IMPORTANT: See SO link above.  Can't send rigidBodiesIndex directly, had to copy to new array.  */	
-	io.emit('setup',{
+	io.to(socket_id).emit('setup',{
 		time:time,
 		data: binaryData,
 		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
 		TEXTURE_FILES:TEXTURE_FILES});
+			
 }
 
 function init(){

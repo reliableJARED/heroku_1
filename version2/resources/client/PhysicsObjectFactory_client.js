@@ -56,7 +56,7 @@
 
 if(typeof Ammo === 'undefined'){
 	
-	console.log('*******ERROR**********************There is no instance of \'node-ammo\'.  Please import first with require(node-ammo) before using PhysicsObjectFactory****************************');
+	console.log('*******ERROR**********************There is no instance of \'Ammo\'.  Please import ammo.js first before using PhysicsObjectFactory_client****************************');
 }
 
 var objectPhysicsManipulationSuite = function () {
@@ -427,9 +427,4 @@ SphereObject.prototype =  Object.create(SphereConstructorBase.prototype);
 SphereObject.prototype.constructor = SphereObject;
 
 
-//IMPORTANT! tells node.js what you'd like to export from this file. 
-module.exports = {
-	//export the constructors
-	CubeObject:CubeObject, 
-	SphereObject:SphereObject}; 
 

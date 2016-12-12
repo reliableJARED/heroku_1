@@ -25,8 +25,6 @@ https://github.com/rauchg/chat-example
 		<script src="ABUDLR.js"></script> 
 		<!-- PLAYER OBJECTS -->
 		<script src="PlayerObjectConstructor.js"></script> 
-		<!-- GENERAL PHYSICS OBJECTS -->
-		<script src="PlayerObjectFactory_client.js"></script> 
 		
 		
 	<!-- Now the good stuff -->
