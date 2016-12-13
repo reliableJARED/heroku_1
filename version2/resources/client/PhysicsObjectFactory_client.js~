@@ -427,4 +427,4 @@ SphereObject.prototype =  Object.create(SphereConstructorBase.prototype);
 SphereObject.prototype.constructor = SphereObject;
 
 
-/
+

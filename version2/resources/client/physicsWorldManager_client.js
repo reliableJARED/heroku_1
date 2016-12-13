@@ -23,6 +23,7 @@ var physicsWorldManager = function () {
 	
 	//Use rigidBodiesMasterObject to Find Objects by their ptr ID
 	this.rigidBodiesMasterObject = new Object();
+	
 	//Use rigidBodiesMasterArray to Find Objects by their UserIndex
 	this.rigidBodiesMasterArray = new Array(); 
 	
@@ -324,6 +325,139 @@ physicsWorldManager.prototype.getCollisionImpulses = function(){
 	}
 };
 
+physicsWorldManager.prototype.getServerBinaryDataStructure_physics = function () {
+	
+	return {
+						id:0,
+						x:1,
+						y:2,
+						z:3,
+						Rx:4,
+						Ry:5,
+						Rz:6,
+						Rw:7,
+						LVx:8,
+						LVy:9,
+						LVz:10,
+						AVx:11,
+						AVy:12,
+						AVz:13
+			}
+}
+
+physicsWorldManager.prototype.unpackServerBinaryData = function(binaryData){
+	
+	
+	// binaryData is mixed structure binary data for all objects
+	//first 8 bytes are int16 headers
+	   var headerCount = 4;
+		var header = new Uint16Array(binaryData,0,headerCount);
+		
+			var totalObjs = header[0];
+			var leadingF32data = header[1];
+			var header3 = header[2];
+			var header4 = header[3];
+					
+			//What makes it complicated is it's not uniform.  Cubes for example have more data than sphere
+			//as data is unpacked we will be able to determine what shape is next to be unpacked
+			//the data will ALWAYS have 14 float32 and 1 int8 before the non-uniform shape specific data
+			
+			
+			
+			var initF32Data = (leadingF32data * 4);// f32 are always leading
+			var physicsDataStructure = this.getServerBinaryDataStructure_physics();
+			
+			//skip first 8 because they are headers
+			var headerOffset = headerCount * 2;//want bytes not number of int16 headers
+			
+			
+			//recycle object blueprint
+			var newObjBlueprint = Object();
+			
+			var BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
+			var offset = headerOffset;
+			for(var i = headerOffset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
+				
+				//Reset
+				newObjBlueprint = {};
+				
+				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
+				need to slice the buffer before converting into typedArray.
+				this is because new typedArray() expects start to be an increment
+				of the base.  ie floats start on multipue of 4. because the total buffer is a mix we cant just
+				iterate through
+				*/
+				BytesOfPreviousObj = 0;//reset
+				offset = i;//buffer shift
+			
+				var bufferF32 = binaryData.slice(offset,offset+initF32Data)
+				var firstF32 = new Float32Array(bufferF32);
+				
+				//Assign unpacked physics properties to blueprint
+				newObjBlueprint.id = firstF32[physicsDataStructure.id]
+				newObjBlueprint.x =firstF32[physicsDataStructure.x]
+			   newObjBlueprint.y =firstF32[physicsDataStructure.y]
+				newObjBlueprint.z =firstF32[physicsDataStructure.z] 
+				newObjBlueprint.Rx =firstF32[physicsDataStructure.Rx] 
+				newObjBlueprint.Ry =firstF32[physicsDataStructure.Ry] 
+				newObjBlueprint.Rz =firstF32[physicsDataStructure.Rz] 
+				newObjBlueprint.Rw =firstF32[physicsDataStructure.Rw] 
+		      newObjBlueprint.LVx =firstF32[physicsDataStructure.LVx] 
+				newObjBlueprint.LVy =firstF32[physicsDataStructure.LVy] 
+				newObjBlueprint.LVz =firstF32[physicsDataStructure.LVz] 
+				newObjBlueprint.AVx =firstF32[physicsDataStructure.AVx] 
+				newObjBlueprint.AVy =firstF32[physicsDataStructure.AVy] 
+				newObjBlueprint.AVz =firstF32[physicsDataStructure.AVz] 
+				
+				
+				BytesOfPreviousObj += bufferF32.byteLength;
+				
+				//slide buffer
+				offset += initF32Data
+				
+				var shapeBuffer = binaryData.slice(offset,offset+1)
+				var shape = new Int8Array(shapeBuffer);
+				
+				newObjBlueprint.shape[0] 
+				
+				
+				BytesOfPreviousObj += shapeBuffer.byteLength;
+				
+				//slide buffer
+				offset += 1;
+				
+				//Unpack geometry
+				var geometryF32props;
+				var geoProps;
+				switch(shape[0]){
+					
+					case ServerShapeIDCodes().cube: geometryF32props = ServerShapePropCount().cube;//width,height,depth
+																geoProps = ['width','height','depth'];
+					break;
+					case ServerShapeIDCodes().sphere: geometryF32props = ServerShapePropCount().sphere;//radius
+																geoProps = ['radius'];
+					break;
+					default: console.log('todo');
+				}
+				//multiply by 4 to get bytes
+				geometryF32props *= 4
+				
+				var geometryBuffer = binaryData.slice(offset,offset+geometryF32props)
+				var geof32 = new Float32Array(geometryBuffer);
+				
+				for (var p=0,geoProps.length;p<geoProps;p++) {
+						newObjBlueprint[geoProps[p]] = geof32[p]	
+				};
+				
+				BytesOfPreviousObj += geometryF32props;
+				
+				switch(newObjBlueprint.shape) {
+					case ServerShapeIDCodes().cube: this.rigidBodiesMasterObject[newObjBlueprint.id] = new CubeObject(newObjBlueprint);		
+				}
+				
+			}
+			
+}
 
 /*********
 getCollisionForces() EXPERIMENTAL METHOD UNDER DEVELOPMENT 

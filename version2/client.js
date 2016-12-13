@@ -392,7 +392,7 @@ function unpackServerBinaryData_graphics(binaryData){
 	//TODO:
 	//put scene setup info here so server dictates threejs init
 	var totalObjs = header[0];
-	var headerOffset = 2;
+	var headerOffset = headerCount * 2;//want bytes not 
 	
 	for(var i = 2,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 		
@@ -421,8 +421,8 @@ function unpackServerBinaryData(binaryData){
 	
 	// binaryData is mixed structure binary data for all objects
 	//first 8 bytes are int16 headers
-		var header = new Uint16Array(binaryData,0,4);
-		
+	   var headerCount = 4;
+		var header = new Uint16Array(binaryData,0,headerCount);
 			var totalObjs = header[0];
 			var leadingF32data = header[1];
 			var header3 = header[2];
@@ -435,9 +435,10 @@ function unpackServerBinaryData(binaryData){
 			var BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
 			
 			var initF32Data = (leadingF32data * 4);// f32 are always leading
-			console.log('totaldata',binaryData.byteLength)
+			
 			//skip first 8 because they are headers
-			for(var i = 8,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
+			var headerOffset = headerCount * 2;//want bytes not number of int16 headers
+			for(var i = headerOffset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 				
 				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.
@@ -483,11 +484,9 @@ function unpackServerBinaryData(binaryData){
 				var geometryBuffer = binaryData.slice(offset,offset+geometryF32props)
 				var geof32 = new Float32Array(geometryBuffer);
 				
-				console.log('geometry:',geof32)
-				/*DO STUFF WITH THE DATA*/
-				
+			
 				BytesOfPreviousObj += geometryF32props;
-				console.log('finished from',BytesOfPreviousObj, 'to',BytesOfPreviousObj+i)
+				
 				
 			}
 			

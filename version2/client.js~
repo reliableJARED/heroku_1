@@ -384,14 +384,45 @@ function ServerShapeIDCodes(){
 		}
 };	
 
+function unpackServerBinaryData_graphics(binaryData){
+	// binaryData is mixed structure binary data for all objects
+	//first 2 bytes is an int16 header indicating how many objects
+	var header = new Uint16Array(binaryData,0,1);
+	
+	//TODO:
+	//put scene setup info here so server dictates threejs init
+	var totalObjs = header[0];
+	var headerOffset = headerCount * 2;//want bytes not 
+	
+	for(var i = 2,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
+		
+		//first position is an ID.  Use that to look up the object in physics world
+		BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
+		var offset = i;
+		var idBuffer = binaryData.slice(offset,offset+headerOffset)
+		var ID = new Float32Array(idBuffer);
+		
+		var physicsObj = rigidBodiesLookUp[ID[0]];
+		
+		console.log(physicsObj);
+		
+	}
+	
+	
+}
+
+
+
+
+
 function unpackServerBinaryData(binaryData){
 	
 	var AllObjectBluePrints = new Array();
 	
 	// binaryData is mixed structure binary data for all objects
 	//first 8 bytes are int16 headers
-		var header = new Uint16Array(binaryData,0,4);
-		
+	   var headerCount = 4;
+		var header = new Uint16Array(binaryData,0,headerCount);
 			var totalObjs = header[0];
 			var leadingF32data = header[1];
 			var header3 = header[2];
@@ -404,11 +435,10 @@ function unpackServerBinaryData(binaryData){
 			var BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
 			
 			var initF32Data = (leadingF32data * 4);// f32 are always leading
-			console.log('totaldata',binaryData.byteLength)
+			
 			//skip first 8 because they are headers
-			for(var i = 8,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
-				//create a new object
-				AllObjectBluePrints.push(new Object());
+			var headerOffset = headerCount * 2;//want bytes not number of int16 headers
+			for(var i = headerOffset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 				
 				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.
