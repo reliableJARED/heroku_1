@@ -25,6 +25,7 @@ app.use(serveStatic(__dirname+'/'));
 app.use(serveStatic(__dirname + '/resources/'));
 app.use(serveStatic(__dirname + '/resources/images/'));
 app.use(serveStatic(__dirname + '/resources/images/textures'));
+app.use(serveStatic(__dirname + '/resources/client/'));
 app.use(serveStatic(__dirname + '/static/three.js/build/'));
 app.use(serveStatic(__dirname + '/static/ammo.js/'));
 app.use(serveStatic(__dirname + '/static/HID/'));
@@ -139,7 +140,7 @@ function BuildWorldStateForNewConnection(socket_id){
 	//graphics
 	var gheader = new Int16Array(1);
 	gheader[0] = totalObjs;
-	var binaryGraphics  Buffer.from(gheader.buffer);
+	var binaryGraphics = Buffer.from(gheader.buffer);
 
 	//build buffers
 	for(var i = 0; i < totalObjs; i++){
@@ -154,8 +155,8 @@ function BuildWorldStateForNewConnection(socket_id){
 		var currentByteLength_g = binaryGraphics.length + grapBuffer_len;
 		
 		//basically PUSH new binary to end of current binary
-		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength_g );
-		binaryGraphics = Buffer.concat([binaryGraphics, grapBuffer], currentByteLength )
+		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength );
+		binaryGraphics = Buffer.concat([binaryGraphics, grapBuffer], currentByteLength_g )
 
 	}
 	

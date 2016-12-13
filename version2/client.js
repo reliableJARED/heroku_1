@@ -1,4 +1,11 @@
 //GLOBAL General variables
+
+//MakePhysicsObject is function from physicsObjectFactory_client.js
+var PWM = new physicsWorldManager(MakePhysicsObject);
+
+
+console.log(MakePhysicsObject)
+
 var connection = false;
 var newPlayer = true;
 var rigidBodiesLookUp = {};
@@ -133,10 +140,19 @@ var socket = io();
 			clock = new GameClock(msg.time);
 			synchronizer.linkGameClock(clock);
 			
-			var ObjectsToBuild = unpackServerBinaryData(msg.data);
+			//var ObjectsToBuild = unpackServerBinaryData(msg.data);
 				
-			//build the objects, and pass a callback requestPlayerObj when world is ready
-			buildObjectBatch(ObjectsToBuild, requestPlayerObj)
+			console.log('total bytes of physics data:',msg.data.byteLength)
+			
+			var UnpackedData = PWM.unpackServerBinaryData_physics(msg.data);
+			
+			for(var obj in UnpackedData){
+				var newObj = MakePhysicsObject(UnpackedData[obj])
+				PWM.add(newObj)
+			}
+			
+			console.log(PWM.rigidBodiesMasterObject)
+			
 		});
 		
 
@@ -417,35 +433,38 @@ function unpackServerBinaryData_graphics(binaryData){
 
 function unpackServerBinaryData(binaryData){
 	
-	var AllObjectBluePrints = new Array();
-	
-	// binaryData is mixed structure binary data for all objects
+	//What makes this complicated is it's not uniform binary data.  Cubes for example have use more bytes than sphere.
+	//As data is unpacked we will be able to determine what shape is next to be unpacked
+	//the data will ALWAYS have 14 float32 and 1 int8 before the nonuniform shape specific data
 	//first 8 bytes are int16 headers
 	   var headerCount = 4;
 		var header = new Uint16Array(binaryData,0,headerCount);
+			
 			var totalObjs = header[0];
 			var leadingF32data = header[1];
-			var header3 = header[2];
-			var header4 = header[3];
+			var header3 = header[2];//not used
+			var header4 = header[3];//not used
 					
-			//What makes it complicated is it's not uniform.  Cubes for example have more data than sphere
-			//as data is unpacked we will be able to determine what shape is next to be unpacked
-			//the data will ALWAYS have 14 float32 and 1 int8 before the nonuniform shape specific data
 			
-			var BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
+			//this will change EVERY pass of the for loop below
+			var BytesOfPreviousObj = 0;
 			
-			var initF32Data = (leadingF32data * 4);// f32 are always leading
+			// f32 are always leading, *4 to get bytes
+			var initF32Data = (leadingF32data * 4);
 			
-			//skip first 8 because they are headers
-			var headerOffset = headerCount * 2;//want bytes not number of int16 headers
+			//want bytes not count of int16 headers
+			var headerOffset = headerCount * 2;
+			
+			//skip header bytes to start
 			for(var i = headerOffset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 				
 				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.
 				this is because new typedArray() expects start to be an increment
 				of the base.  ie floats start on multipue of 4. because the total buffer is a mix we cant just
-				itterate through
+				itterate through. if we didn'td slice, starting at byte 13 for example for a new float will throw error.
 				*/
+				
 				BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
 				var offset = i;
 			
@@ -490,8 +509,7 @@ function unpackServerBinaryData(binaryData){
 				
 			}
 			
-	return AllObjectBluePrints;		
-			
+	return true;		
 
 }
 

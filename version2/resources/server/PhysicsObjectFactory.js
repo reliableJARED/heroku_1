@@ -196,7 +196,7 @@ var RigidBodyBase = function(obj){
 		var defaults = {
 				x:1,y:1,z:1,
 				Rx:0,Ry:0,Rz:0,Rw:1,
-				mass:1};
+				mass:10};
 					  
 		var blueprint = Object.assign(defaults,obj);
 		
@@ -332,7 +332,23 @@ RigidBodyBase.prototype.ShapeIDCodes = function(){
 					cube:0,
 					sphere:1
 				}
-			};	
+	};	
+RigidBodyBase.prototype.geometry_indexLocations = function(shape){
+	
+	var shapeCodes = this.ShapeIDCodes();
+	
+	switch(shape){
+		
+		case shapeCodes.cube: return {mass:0,width:1,height:2,depth:3}
+		break;
+		
+		case shapeCodes.sphere: return{mass:0,radius:1}
+		break;
+		
+		default: console.log("unknown shape arg in RigidBodyBase.prototype.geometry_indexLocations()")
+	}
+		
+};
 			
 RigidBodyBase.prototype.BinaryExport_geometry = function () {
 		
@@ -360,19 +376,19 @@ RigidBodyBase.prototype.BinaryExport_graphics = function () {
 		//https://nodejs.org/api/buffer.html#buffer_buffers_and_character_encodings		
 		var ID = new Int32Array(1);//ORDER: ID	
 		ID[0] = this.id;
-		var IDbuffer = Buffer.from(ID.buffer);
 	
 		//the shapes MATERIAL
 		var materialArray = new Int8Array(1);
 		materialArray[0] = this.material;
 
 		//base the size of array on number of default properties
-		var propArrayFaces = Object.keys(graphicsDefaultMapping());
+		var propArrayFaces = Object.keys(this.graphicsDefaultMapping());
 		var propArraySize = propArrayFaces.length;
 		
 		//keep color and texture separate arrays YES, technically could combine, but dont
 		var colorArray = new Float32Array(propArraySize);
 		var textureArray = new Float32Array(propArraySize);
+		
 		for(var face = 0; face<propArraySize;face++){
 			//the shapes COLOR
 			colorArray[face] = this.colors[propArrayFaces[face]];
@@ -381,15 +397,16 @@ RigidBodyBase.prototype.BinaryExport_graphics = function () {
 		}
 		
 		//create the buffers
-		var materialBuffer = Buffer.from(mat.buffer);
+		var IDbuffer = Buffer.from(ID.buffer);
+		var materialBuffer = Buffer.from(materialArray.buffer);
 		var colorBuffer = Buffer.from(colorArray.buffer);
 		var textureBuffer = Buffer.from(textureArray.buffer);
 
 		//how big will total buffer be
-		var totalBytes = materialBuffer.length + colorBuffer.length + textureBuffer.length;
+		var totalBytes = IDbuffer.length + materialBuffer.length + colorBuffer.length + textureBuffer.length;
 			
 		//combine to single buffer
-		var buffer = Buffer.concat([materialBuffer,colorBuffer,textureBuffer],totalBytes);
+		var buffer = Buffer.concat([IDbuffer,materialBuffer,colorBuffer,textureBuffer],totalBytes);
 		
 		return buffer;
 };	
@@ -415,7 +432,7 @@ RigidBodyBase.prototype.BinaryExport_ALL = function () {
 	return buffer;
 }
 	
-RigidBodyBase.prototype.MappingFaceCodes = function(){
+RigidBodyBase.prototype.MappingGeometricFaceCodes = function(){
 
 	return{
 		cube:{
@@ -435,7 +452,7 @@ RigidBodyBase.prototype.graphicsDefaultMapping = function(){
 	
 	var NoAssignment = -1;
 	
-	var FaceKeys = this.MappingFaceCodes();
+	var FaceKeys = this.MappingGeometricFaceCodes();
 	var shapeCodes = this.ShapeIDCodes();
 	
 	switch (this.shape){
@@ -489,69 +506,84 @@ RigidBodyBase.prototype.addGraphics = function(inputObj){
 	//http://learningthreejs.com/blog/2013/09/16/how-to-make-the-earth-in-webgl/
 
 	var inputObj = inputObj || {};
+	console.log ("POF graphic input:",inputObj)
 	//for color or texture not assigned to an object face, default is none
 	//note that the wrap prop of passed in arg is used to 'wrap' so don't have to assign each face
 
 	var DefaultNone = this.graphicsDefaultMapping();
 	
+	//Deal with key word 'wrap' or NO texture args passed at all
 	if(typeof inputObj.textures !== 'undefined'){
 		if(inputObj.textures.wrap){
 			for(var key in DefaultNone){
 				DefaultNone[key] = inputObj.textures.wrap;
 			}
 		}
+	}else{
+		inputObj.textures = DefaultNone;
 	}
 	
 	// replace the defaults with texture arguments passed in:
 	this.textures = Object.assign(DefaultNone,inputObj.textures);
+	console.log("POF: textures",this.textures)
 	
-	//RESET defaults
+	
+	//Reset
 	DefaultNone = this.graphicsDefaultMapping();
 	
+	//Deal with key word 'wrap' or NO color args passed at all
 	if(typeof inputObj.colors !== 'undefined'){
 		if(inputObj.colors.wrap){
 			for(var key in DefaultNone){
 				DefaultNone[key] = inputObj.colors.wrap;
 			}
 		}
+	}else{
+		inputObj.colors = DefaultNone;
 	}
+	
+	
 	
 	//now replace the defaults with color arguments passed in:
 	this.colors = Object.assign(DefaultNone,inputObj.colors);
+	console.log("POF: colors",this.colors)
 	
 	var matCodes = this.graphicsMaterialCodes();
 	
-	if(typeof mats === 'undefined'){
-		mats = matCodes.basic;
+	if(typeof inputObj.material === 'undefined'){
+		this.material = matCodes.basic;
 	}
 	else{
 		var stringNameOfMats = Object.keys(matCodes);
-		switch (mats){
+		switch (inputObj.material){
 			
-			case stringNameOfMats[matCodes.basic]: mats = matCodes.basic
+			case stringNameOfMats[matCodes.basic]: this.material = matCodes.basic
 												 break;
-			case stringNameOfMats[matCodes.depth]:mats = matCodes.depth
+			case stringNameOfMats[matCodes.depth]:this.material = matCodes.depth
 												 break;
-			case stringNameOfMats[matCodes.lambert]:mats = matCodes.lambert
+			case stringNameOfMats[matCodes.lambert]:this.material = matCodes.lambert
 												 break;
-			case stringNameOfMats[matCodes.normal]:mats = matCodes.normal
+			case stringNameOfMats[matCodes.normal]:this.material = matCodes.normal
 												 break;
-			case stringNameOfMats[matCodes.standard]:mats = matCodes.standard
+			case stringNameOfMats[matCodes.standard]:this.material = matCodes.standard
 												 break;
 			default: console.log('error in RigidBodyBase.prototype.addGraphics');
 		}
 	}
 	
-	this.material = mats;
+	console.log("POF material:",this.material);
 }
 	
 
 //CUBE
 var CubeConstructorBase = function(obj){
 		
+		//inherit
 		RigidBodyBase.call(this,obj);
 		
 		var defaults = {depth:1,height:1,width:1};	  
+		
+		//over write defaults if any build params sent
 		var blueprint = Object.assign(defaults,obj);
 		
 		this.width = blueprint.width;
@@ -559,11 +591,13 @@ var CubeConstructorBase = function(obj){
 		this.depth = blueprint.depth;
 
 		this.shape = this.ShapeIDCodes().cube;
-
-		this.f32arrayGeometry = new Float32Array(3);//ORDER: width,height,depth
-		this.f32arrayGeometry[0] = blueprint.width;
-		this.f32arrayGeometry[1] = blueprint.height;
-		this.f32arrayGeometry[2] = blueprint.depth;
+		var indexLoc = this.geometry_indexLocations(this.shape);
+		
+		this.f32arrayGeometry = new Float32Array(4);//ORDER: mass,width,height,depth
+		this.f32arrayGeometry[indexLoc.mass] = this.mass;
+		this.f32arrayGeometry[indexLoc.width] = this.width;
+		this.f32arrayGeometry[indexLoc.height] = this.height;
+		this.f32arrayGeometry[indexLoc.depth] = this.depth;
 }
 //CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
 CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
@@ -572,16 +606,20 @@ CubeConstructorBase.prototype.constructor = CubeConstructorBase;
 		
 //SPHERE
 var SphereConstructorBase = function(obj){
+		//inherit
 		RigidBodyBase.call(this,obj);
+		
 		var defaults = {radius:1};	  
 		var blueprint = Object.assign(defaults,obj);
 		
 		this.radius = blueprint.radius;
 		
 		this.shape = this.ShapeIDCodes().sphere;
+		var indexLoc = this.geometry_indexLocations(this.shape);
 		
-		this.f32arrayGeometry = new Float32Array(1);//ORDER: radius
-		this.f32arrayGeometry[0] = blueprint.radius;
+		this.f32arrayGeometry = new Float32Array(2);//ORDER: mass,radius
+		this.f32arrayGeometry[indexLoc.mass] = this.mass;
+		this.f32arrayGeometry[indexLoc.radius] = this.radius;
 }
 SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
 SphereConstructorBase.prototype.constructor = SphereConstructorBase;
@@ -591,6 +629,8 @@ SphereConstructorBase.prototype.constructor = SphereConstructorBase;
 var CubeObject = function(blueprint){
 	CubeConstructorBase.call(this,blueprint);
 	this.createPhysics();
+	//DEFAULT call addGraphics to assign 'no assignment'.  call again on the actual obj to assign real graphics.
+	this.addGraphics();
 }
 CubeObject.prototype =  Object.create(CubeConstructorBase.prototype); 
 CubeObject.prototype.constructor = CubeObject;
@@ -599,6 +639,9 @@ CubeObject.prototype.constructor = CubeObject;
 var SphereObject = function(blueprint){
 	SphereConstructorBase.call(this,blueprint);
 	this.createPhysics();
+	
+	//DEFAULT call addGraphics to assign 'no assignment'.  call again on the actual obj to assign real graphics.
+	this.addGraphics();
 }
 SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;
