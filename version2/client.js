@@ -1,10 +1,8 @@
 //GLOBAL General variables
 
-//MakePhysicsObject is function from physicsObjectFactory_client.js
-var PWM = new physicsWorldManager(MakePhysicsObject);
 
-
-console.log(MakePhysicsObject)
+var PWM = new physicsWorldManager();
+var GWM = new graphicsWorldManager();
 
 var connection = false;
 var newPlayer = true;
@@ -74,7 +72,24 @@ const changeALLvelocity = 16;
 const changeLinearVelocity = 32;		
 const changeAngularVelocity = 64;	
 const fireBullet = 128;	
-				
+			
+
+function MakePhysicsObject(instructions){
+	
+	var ShapeIDCodes = RigidBodyBase.prototype.ShapeIDCodes.call();
+	
+	switch (instructions.shape){
+		
+		case ShapeIDCodes.cube: return new CubeObject(instructions);
+		break;
+		case ShapeIDCodes.sphere: return new SphereObject(instructions);
+		break;
+		default: console.log("MakePhysicsObject argument error")
+		
+	}
+}
+
+			
 // exposes a global for our socket connection
 var socket = io();
 
@@ -124,9 +139,10 @@ var socket = io();
 		};
 		
 		socket.on('setup', function(msg){
-			//msg is an object with 4 props
+			//msg is an object with 5 props
 			//time: timeStamp from server
 			//data: binary data of all world objects
+			//graphics: binary data of graphics for world objects
 			//TEXTURE_FILES_INDEX: Object whos keys match files in TEXTURE_FILES array
 			//TEXTURE_FILES: array of file name strings
 		
@@ -139,19 +155,26 @@ var socket = io();
 			//sync clocks
 			clock = new GameClock(msg.time);
 			synchronizer.linkGameClock(clock);
-			
-			//var ObjectsToBuild = unpackServerBinaryData(msg.data);
 				
 			console.log('total bytes of physics data:',msg.data.byteLength)
+			var UnpackedPhysicsData = PWM.unpackServerBinaryData_physics(msg.data);
 			
-			var UnpackedData = PWM.unpackServerBinaryData_physics(msg.data);
+			console.log('total bytes of graphics data:',msg.graphics.byteLength)
+			var UnpackedGraphicsData = GWM.unpackServerBinaryData_graphics(msg.graphics);
 			
-			for(var obj in UnpackedData){
-				var newObj = MakePhysicsObject(UnpackedData[obj])
-				PWM.add(newObj)
+			console.log(UnpackedPhysicsData)
+			console.log(UnpackedGraphicsData)
+			
+			//make
+			for(var ID in UnpackedPhysicsData){
+				var newObject = MakePhysicsObject(UnpackedPhysicsData[ID]);
+				newObject.addGraphics(UnpackedGraphicsData[ID])
+				PWM.add(newObject)
 			}
 			
 			console.log(PWM.rigidBodiesMasterObject)
+			
+
 			
 		});
 		

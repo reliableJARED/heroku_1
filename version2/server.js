@@ -128,18 +128,22 @@ function BuildWorldStateForNewConnection(socket_id){
 	var msgByteCount = 0;
 	var totalObjs = physicsWorld.rigidBodiesMasterArray.length;
 	
-	//physics
+	//PHYSICS
 	var header = new Int16Array(4);
 	header[0] = totalObjs;
-	//built in space for future info in header
 	header[1] = 14;//number of f32 props that lead every object
-	header[2] = 0;
-	header[3] = 0;
+	//built in space for future info in header
+	header[2] = 0;//UNUSED
+	header[3] = 0;//UNUSED
 	var binaryData = Buffer.from(header.buffer);
 	
-	//graphics
-	var gheader = new Int16Array(1);
+	//GRAPHICS
+	var gheader = new Int16Array(4);
 	gheader[0] = totalObjs;
+	//built in space for future info in header
+	gheader[1] = 0;//UNUSED
+	gheader[2] = 0;//UNUSED
+	gheader[3] = 0;//UNUSED
 	var binaryGraphics = Buffer.from(gheader.buffer);
 
 	//build buffers

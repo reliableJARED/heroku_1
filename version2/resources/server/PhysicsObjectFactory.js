@@ -378,11 +378,13 @@ RigidBodyBase.prototype.BinaryExport_graphics = function () {
 		ID[0] = this.id;
 	
 		//the shapes MATERIAL
-		var materialArray = new Int8Array(1);
+		var materialArray = new Int8Array(2);
 		materialArray[0] = this.material;
+		materialArray[1] = this.shape;
 
-		//base the size of array on number of default properties
+		//get string names of all the shapes faces
 		var propArrayFaces = Object.keys(this.graphicsDefaultMapping());
+		//base the size of array on number of default properties
 		var propArraySize = propArrayFaces.length;
 		
 		//keep color and texture separate arrays YES, technically could combine, but dont
@@ -512,14 +514,15 @@ RigidBodyBase.prototype.addGraphics = function(inputObj){
 
 	var DefaultNone = this.graphicsDefaultMapping();
 	
-	//Deal with key word 'wrap' or NO texture args passed at all
 	if(typeof inputObj.textures !== 'undefined'){
+		//Deal with key word 'wrap'
 		if(inputObj.textures.wrap){
-			for(var key in DefaultNone){
-				DefaultNone[key] = inputObj.textures.wrap;
+			for(var face in DefaultNone){
+				DefaultNone[face] = inputObj.textures.wrap;
 			}
 		}
 	}else{
+		//Deal with NO texture args passed at all
 		inputObj.textures = DefaultNone;
 	}
 	
@@ -609,7 +612,8 @@ var SphereConstructorBase = function(obj){
 		//inherit
 		RigidBodyBase.call(this,obj);
 		
-		var defaults = {radius:1};	  
+		var defaults = {radius:1};	
+		
 		var blueprint = Object.assign(defaults,obj);
 		
 		this.radius = blueprint.radius;

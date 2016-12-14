@@ -67,9 +67,7 @@ module.exports = {
 */
 
 var objectPhysicsManipulationSuite = function () {
-			this.physics;
-			this.f32arrayPhysics = new Float32Array(14);//ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
-			
+			this.physics;			
 };
 
 objectPhysicsManipulationSuite.prototype = {
@@ -109,10 +107,11 @@ objectPhysicsManipulationSuite.prototype = {
 			//~11.2kbs
 			//doesn't count header info sent in socket.io
 			
-			var array = this.f32arrayPhysics;
-			
-			//array[0] is our objects ID it's only set once at instatiation
 			var indexLoc = this.physics_indexLocations();
+			
+			var array = new Float32Array(indexLoc.length)
+			
+			array[indexLoc.id] = this.id;
 			array[indexLoc.x] = pos.x();
 			array[indexLoc.y] = pos.y();
 			array[indexLoc.z] = pos.z();
@@ -212,7 +211,7 @@ var RigidBodyBase = function(blueprint){
 		this.Rw = blueprint.physics[index.Rw];
 		this.mass = blueprint.physics[index.mass];
 		this.shape = blueprint.shape;
-		
+		this.graphics = {};//if obj has associated graphics they will be placed here
 		
 		//TODO: Should callback() be added to RigidBodyBase?
 		//concept would be to assign a callback that execpts for example an object ID of an object
@@ -270,9 +269,6 @@ RigidBodyBase.prototype.createPhysics = function (){
 
 			//Assign FINAL OBJECT
 			this.physics = new Ammo.btRigidBody( rbInfo );
-			
-			//set id index in the float array used in binary data exports
-			this.f32arrayPhysics[this.physics_indexLocations().id] = this.id;
 			
 			
 			/*To prevent accessing the wrong values, reassign location props to get functions.
@@ -358,21 +354,19 @@ RigidBodyBase.prototype.MappingGeometricFaceCodes = function(){
 
 	return{
 		cube:{
-			face1: 'front',
-			face2: 'back',
-			face3: 'top',
-			face4: 'bottom',
-			face5: 'left',
-			face6: 'right'
+			front:0,
+			back:1,
+			top:2,
+			bottom:3,
+			left:4,
+			right:5
 		},
 		sphere:{
-			face1:'front'
+			front:0
 		}
 	}
 }
-RigidBodyBase.prototype.graphicsDefaultMapping = function(){
-	
-	var NoAssignment = -1;
+RigidBodyBase.prototype.graphicsDefaultMapping = function(array){
 	
 	var FaceKeys = this.MappingGeometricFaceCodes();
 	var shapeCodes = this.ShapeIDCodes();
@@ -380,19 +374,19 @@ RigidBodyBase.prototype.graphicsDefaultMapping = function(){
 	switch (this.shape){
 			case shapeCodes.cube:
 					return {
-						[FaceKeys.cube.face1]:NoAssignment,
-						[FaceKeys.cube.face2]:NoAssignment,
-						[FaceKeys.cube.face3]:NoAssignment,
-						[FaceKeys.cube.face4]:NoAssignment,
-						[FaceKeys.cube.face5]:NoAssignment,
-						[FaceKeys.cube.face6]:NoAssignment
+						front:array[FaceKeys.cube.front],
+						back:array[FaceKeys.cube.back],
+						top:array[FaceKeys.cube.top],
+						bottom:array[FaceKeys.cube.bottom],
+						left:array[FaceKeys.cube.left],
+						right:array[FaceKeys.cube.right]
 						}
 					break;
 				
 			case shapeCodes.sphere:
 					return {
 						//wrapps whole sphere
-						[FaceKeys.sphere.face1]:NoAssignment
+						front:array[FaceKeys.sphere.front]
 						}
 					break;
 
@@ -427,73 +421,11 @@ RigidBodyBase.prototype.addGraphics = function(inputObj){
 	//GOOD SPHERE EXAMPLE
 	//http://learningthreejs.com/blog/2013/09/16/how-to-make-the-earth-in-webgl/
 
-	var inputObj = inputObj || {};
-	console.log ("POF graphic input:",inputObj)
-	//for color or texture not assigned to an object face, default is none
-	//note that the wrap prop of passed in arg is used to 'wrap' so don't have to assign each face
-
-	var DefaultNone = this.graphicsDefaultMapping();
+	//inputObj has props: material, colors, textures
+	this.graphics.material = inputObj.material;
+	this.graphics.colors = this.graphicsDefaultMapping(inputObj.colors);
+	this.graphics.textures = this.graphicsDefaultMapping(inputObj.textures);
 	
-	//Deal with key word 'wrap' or NO texture args passed at all
-	if(typeof inputObj.textures !== 'undefined'){
-		if(inputObj.textures.wrap){
-			for(var key in DefaultNone){
-				DefaultNone[key] = inputObj.textures.wrap;
-			}
-		}
-	}else{
-		inputObj.textures = DefaultNone;
-	}
-	
-	// replace the defaults with texture arguments passed in:
-	this.textures = Object.assign(DefaultNone,inputObj.textures);
-	console.log("POF: textures",this.textures)
-	
-	
-	//Reset
-	DefaultNone = this.graphicsDefaultMapping();
-	
-	//Deal with key word 'wrap' or NO color args passed at all
-	if(typeof inputObj.colors !== 'undefined'){
-		if(inputObj.colors.wrap){
-			for(var key in DefaultNone){
-				DefaultNone[key] = inputObj.colors.wrap;
-			}
-		}
-	}else{
-		inputObj.colors = DefaultNone;
-	}
-	
-	
-	
-	//now replace the defaults with color arguments passed in:
-	this.colors = Object.assign(DefaultNone,inputObj.colors);
-	console.log("POF: colors",this.colors)
-	
-	var matCodes = this.graphicsMaterialCodes();
-	
-	if(typeof inputObj.material === 'undefined'){
-		this.material = matCodes.basic;
-	}
-	else{
-		var stringNameOfMats = Object.keys(matCodes);
-		switch (inputObj.material){
-			
-			case stringNameOfMats[matCodes.basic]: this.material = matCodes.basic
-												 break;
-			case stringNameOfMats[matCodes.depth]:this.material = matCodes.depth
-												 break;
-			case stringNameOfMats[matCodes.lambert]:this.material = matCodes.lambert
-												 break;
-			case stringNameOfMats[matCodes.normal]:this.material = matCodes.normal
-												 break;
-			case stringNameOfMats[matCodes.standard]:this.material = matCodes.standard
-												 break;
-			default: console.log('error in RigidBodyBase.prototype.addGraphics');
-		}
-	}
-	
-	console.log("POF material:",this.material);
 }
 //*************
 //CUBE
@@ -510,13 +442,6 @@ var CubeConstructorBase = function(blueprint){
 		this.height = blueprint.geometry[indexLoc.height];
 		this.depth = blueprint.geometry[indexLoc.depth];
 
-		
-
-		this.f32arrayGeometry = new Float32Array(4);//ORDER: mass,width,height,depth
-		this.f32arrayGeometry[indexLoc.mass] = this.mass;
-		this.f32arrayGeometry[indexLoc.width] = this.width;
-		this.f32arrayGeometry[indexLoc.height] = this.height;
-		this.f32arrayGeometry[indexLoc.depth] = this.depth;
 }
 //CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
 CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
@@ -531,11 +456,9 @@ var SphereConstructorBase = function(blueprint){
 		
 		var indexLoc  = this.geometry_indexLocations(this.shape);
 		
+		this.mass = blueprint.geometry[indexLoc.mass];
 		this.radius = blueprint.geometry[indexLoc.radius];
-		
-		this.f32arrayGeometry = new Float32Array(2);//ORDER: mass,radius
-		this.f32arrayGeometry[indexLoc.mass] = this.mass;
-		this.f32arrayGeometry[indexLoc.radius] = this.radius;
+
 }
 SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
 SphereConstructorBase.prototype.constructor = SphereConstructorBase;
@@ -558,17 +481,4 @@ SphereObject.prototype =  Object.create(SphereConstructorBase.prototype);
 SphereObject.prototype.constructor = SphereObject;
 
 
-function MakePhysicsObject(instructions){
-	
-	var ShapeIDCodes = RigidBodyBase.prototype.ShapeIDCodes.call();
-	
-	switch (instructions.shape){
-		
-		case ShapeIDCodes.cube: return new CubeObject(instructions);
-		break;
-		case ShapeIDCodes.sphere: return new SphereObject(instructions);
-		break;
-		default: console.log("MakePhysicsObject argument error")
-		
-	}
-}
+

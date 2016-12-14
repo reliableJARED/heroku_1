@@ -344,7 +344,7 @@ physicsWorldManager.prototype.getServerBinaryDataStructure_physics = function ()
 						AVz:13
 			}
 }
-
+	
 
 physicsWorldManager.prototype.ServerShapePropCount = function(){
 	
@@ -378,12 +378,12 @@ physicsWorldManager.prototype.ServerShapeIDCodes = function(){
 
 physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryData){
 	
-	var UnpackedDataObject = new Object();
+	const UnpackedDataObject = new Object();
 	
-	//What makes this complicated is it's not uniform binary data.  Cubes for example have use more bytes than sphere.
-	//As data is unpacked we will be able to determine what shape is next to be unpacked
-	//the data will ALWAYS have 14 float32 and 1 int8 before the nonuniform shape specific data
-	//first 8 bytes are int16 headers
+	//What makes this complicated is it's not uniform binary data.  Cubes for example use more bytes than sphere.
+	//Each object has a uniform set of Float32 bytes and an Int8 Shape code at it's start.  
+	//As data is unpacked we will be able to determine what shape is being unpacked, therefore how many bytes it occupies
+	//first 8 bytes of the ENTIRE buffer are a set of int16 headers
 	   var headerCount = 4;
 	   var header = new Uint16Array(binaryData,0,headerCount);
 		
@@ -391,14 +391,9 @@ physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryDa
 			var leadingF32data = header[1];
 			var header3 = header[2];
 			var header4 = header[3];
-					
-			console.log('totalObj',totalObjs)
 			
 			// f32 are always leading, *4 to get bytes
-			var initF32Data = (leadingF32data * 4);
-			
-			//want bytes not count of int16 headers for offset
-			var headerOffset = headerCount * 2;
+			var leadingF32bytes = (leadingF32data * 4);
 			
 			var physicsDataStructure = this.getServerBinaryDataStructure_physics();
 
@@ -406,7 +401,7 @@ physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryDa
 			var newObjBlueprint = Object();
 			
 			//used to move along ENTIRE buffer
-			var offset = headerOffset;
+			var offset = headerCount * 2;//calculate bytes of headers for offset
 			
 			//used to log byte count of a single unpacked object
 			var BytesOfPreviousObj = 0;
@@ -417,66 +412,60 @@ physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryDa
 			//number to shape code object
 			var ServerShapeIDCodes = this.ServerShapeIDCodes();
 			
-			for(var i = headerOffset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
+			for(var i = offset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 				
 				//Reset
 				newObjBlueprint = {};
 				
 				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.
-				this is because new typedArray() expects start to be an increment
-				of the base.  ie floats start on multipue of 4. because the total buffer is a mix we cant just
-				iterate through
+				 new typedArray() expects start to be an increment of the base bytes.  ie floats base byte is 4. 
 				*/
 				BytesOfPreviousObj = 0;//reset byte counter
-				offset = i;//slide buffer manager
-				console.log('offset',offset)
-			
-			    //Unpack PHYSICS
-				var bufferF32 = binaryData.slice(offset,offset+initF32Data)
-				var physicsArray = new Float32Array(bufferF32);
-				console.log('physicsArray',physicsArray)
+				offset = i;//slide our location in buffer 
 				
-				//slide buffer manager
-				offset += initF32Data
+			    //Unpack PHYSICS
+				//var buffer = binaryData.slice(offset,offset+leadingF32bytes)
+				var physicsArray = new Float32Array(binaryData.slice(offset,offset+leadingF32bytes));
+				
+				
+				//slide our location in buffer 
+				offset += leadingF32bytes
 				//increment byte counter
-				BytesOfPreviousObj += initF32Data;
+				BytesOfPreviousObj += leadingF32bytes;
 				
 				//Unpack SHAPE CODE
 				//HARDCODE WARNING!! 1 byte for shape code.
-				var shapeBuffer = binaryData.slice(offset,offset+1)
-				var shapeCode = new Int8Array(shapeBuffer);//the shape code can be found: shapeCode[0] 
-				console.log('shapeCode',shapeCode)
+			    //buffer = binaryData.slice(offset,offset+1)
+				var shapeCode = new Int8Array(binaryData.slice(offset,offset+1));//the shape code can be found: shapeCode[0] 
 				
-				//slide buffer manager
+				
+				//slide our location in buffer 
 				offset += 1;
 				//increment byte counter
 				BytesOfPreviousObj += 1;
 				
 				//Unpack GEOMETRY
-				var geometryF32props = 4;//will be used as a multiplyer to get byte count
+				var geometryF32bytes = 4;//this will be used as a multiplyer to get byte count
 				
-				//determine how many bytes the geometry data uses
-
+				//determine how many bytes the geometry data occupies
 				switch(shapeCode[0]){
 					
-					case ServerShapeIDCodes.cube: geometryF32props *= ServerShapePropCount.cube;										
+					case ServerShapeIDCodes.cube: geometryF32bytes *= ServerShapePropCount.cube;										
 					break;
-					case ServerShapeIDCodes.sphere: geometryF32props *= ServerShapePropCount.sphere;										
+					case ServerShapeIDCodes.sphere: geometryF32bytes *= ServerShapePropCount.sphere;										
 					break;
 					default: console.log('shape code error in unpackServerBinaryData_physics()');
 				}
 				
-				//make geometry data array now that byte size i known
-				var geometryBuffer = binaryData.slice(offset,offset+geometryF32props)
-				var geometryArray = new Float32Array(geometryBuffer);
-				console.log('geometryArray',geometryArray)
+				//make geometry data array now that byte size is known
+			//	buffer = binaryData.slice(offset,offset+geometryF32bytes)
+				var geometryArray = new Float32Array(binaryData.slice(offset,offset+geometryF32bytes));
 
 					
 				//don't need to slide 'offset' because it will be reassined to value of 'i' on next for loop pass
-				//we DO increment byte counter: BytesOfPreviousObj, which will be added to 'i' of for loop
-				BytesOfPreviousObj += geometryF32props;
-				console.log('BytesOfPreviousObj',BytesOfPreviousObj)
+				//we DO increment byte counter: BytesOfPreviousObj, which will be added to 'i' for next loop
+				BytesOfPreviousObj += geometryF32bytes;
 				
 				//Assign the ID from the unpacked physics data
 				var objID = physicsArray[physicsDataStructure.id];
@@ -491,38 +480,6 @@ physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryDa
 	return UnpackedDataObject;
 }
 
-
-physicsWorldManager.prototype.unpackServerBinaryData_graphics = function(binaryData){
-	// binaryData is mixed structure binary data for all objects
-	//first 2 bytes is an int16 header indicating how many objects
-	var header = new Uint16Array(binaryData,0,1);
-	
-	//TODO:
-	//put scene setup info here so server dictates threejs init
-	var totalObjs = header[0];
-	var headerOffset = headerCount * 2;//want bytes not 
-	
-	for(var i = 2,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
-		
-		//first position is an ID.  Use that to look up the object in physics world
-		BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
-		var offset = i;
-		var idBuffer = binaryData.slice(offset,offset+headerOffset)
-		var ID = new Float32Array(idBuffer);
-		
-		//TODO: actually build this unpacker... 
-		
-	/*
-	*
-	*
-	*
-	*
-	*/
-		
-	}
-	
-	
-}
 
 
 /*********
