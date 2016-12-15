@@ -194,7 +194,8 @@ function init(){
 	physicsWorld.add(ground);
 	
 	var player = new objectFactory.CubeObject({y:20,mass:50});
-
+	player.addGraphics({colors:{wrap:0x0000ff}});
+	
 	physicsWorld.add(player);	
 	
 	var ball = new objectFactory.SphereObject();

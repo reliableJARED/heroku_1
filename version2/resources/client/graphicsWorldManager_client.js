@@ -91,17 +91,19 @@ graphicsWorldManager.prototype.cameraChaseObject = function(obj){
 		this.camera.lookAt( obj.position );
 }
 
+graphicsWorldManager.prototype.NoAssignment = -1;
 
 graphicsWorldManager.prototype.setTextureFilesIndex = function(TFI){
 	this.textureFilesIndex = TFI;
 }
 
-graphicsWorldManager.prototype.loadTextureFiles = function(fileNameArray){
+graphicsWorldManager.prototype.serverTextureLoader = function(fileNameArray){
 	for (f=0, files = fileNameArray.length;f<files;f++) {
  		var texture = this.fileLoader.load(fileNameArray[f]);
  	 	this.textureFiles.push(texture);
  	};
 }
+
 
 graphicsWorldManager.prototype.add = function(obj){
 	
@@ -129,7 +131,7 @@ graphicsWorldManager.prototype.getServerMaterialArrayIndexLoc = function(){
 		}
 };
 
-graphicsWorldManager.prototype.ServerShapeIDCodes = function(){
+graphicsWorldManager.prototype.ShapeIDCodes = function(){
 	
 	//CONSIDER: Server should set this
 
@@ -165,7 +167,7 @@ graphicsWorldManager.prototype.unpackServerBinaryData_graphics = function(binary
 			var ServerShapeGraphicFaceCount = this.ServerShapeGraphicFaceCount();
 			
 			//number to shape code object
-			var ServerShapeIDCodes = this.ServerShapeIDCodes();
+			var ServerShapeIDCodes = this.ShapeIDCodes();
 			
 			//index locations for material array
 			var materialArrayIndex = this.getServerMaterialArrayIndexLoc();
@@ -240,4 +242,173 @@ graphicsWorldManager.prototype.unpackServerBinaryData_graphics = function(binary
 	}
 	
 	return UnpackedDataObject;
+}
+
+graphicsWorldManager.prototype.graphicsMaterialCodes = function(){
+	/*
+	TYPES:
+	MeshBasicMaterial -> https://threejs.org/docs/api/materials/MeshBasicMaterial.html
+	MeshDepthMaterial - > https://threejs.org/docs/api/materials/MeshDepthMaterial.html
+	MeshLambertMaterial -> https://threejs.org/docs/api/materials/MeshLambertMaterial.html
+	MeshNormalMaterial -> https://threejs.org/docs/api/materials/MeshNormalMaterial.html
+	MeshPhongMaterial - https://threejs.org/docs/api/materials/MeshPhongMaterial.html
+	MeshStandardMaterial -> https://threejs.org/docs/api/materials/MeshStandardMaterial.html
+	*/
+	//INDEX KEYS SERVER USES:
+	/*
+		basic:0,
+		depth:1,
+		lambert:2,
+		normal:3,
+		phong:4,
+		standard:5
+	*/
+	return {
+		MeshBasicMaterial:0,
+		MeshDepthMaterial:1,
+		MeshLambertMaterial:2,
+		MeshNormalMaterial:3,
+		MeshPhongMaterial:4,
+		MeshStandardMaterial:5
+	}
+
+}
+
+
+// These two functions seem dumb.... MappingGeometricFaceCodes()  and graphicsDefaultMapping()
+//one knows index locations based on a shape name, one returns the shape specific object
+graphicsWorldManager.prototype.MappingGeometricFaceCodes = function(){
+
+	return{
+		cube:{
+			front:0,
+			back:1,
+			top:2,
+			bottom:3,
+			left:4,
+			right:5
+		},
+		sphere:{
+			front:0
+		}
+	}
+}
+
+graphicsWorldManager.prototype.graphicsDefaultMapping = function(shape){
+	
+	var FaceKeys = this.MappingGeometricFaceCodes();
+	var shapeCodes = this.ShapeIDCodes();
+	
+	switch (shape){
+			case shapeCodes.cube:
+					return {
+						[FaceKeys.cube.front]:'front',
+						[FaceKeys.cube.back]:'back',
+						[FaceKeys.cube.top]:'top',
+						[FaceKeys.cube.bottom]:'bottom',
+						[FaceKeys.cube.left]:'left',
+						[FaceKeys.cube.right]:'right'
+						}
+					break;
+				
+			case shapeCodes.sphere:
+					return {
+						//wrapps whole sphere
+						[FaceKeys.sphere.front]:'front',
+						}
+					break;
+
+				//TODO: ADD MORE SHAPES>>>
+				
+				default: console.log('ERROR: this.shape either not defined or not a value of a known shape code from ShapeIDCodes()');
+			}
+}	
+
+graphicsWorldManager.prototype.createGraphics = function(blueprint) {
+		
+		console.log(this.textureFiles)
+		
+		//blueprint has props: shape,material,colors,textures, geomtry
+		//shape and material are single int, colors and textures are float32 array
+
+		
+		// *** MATERIAL
+		//get object whos keys are names of THREE material types and whos value is an index location
+		var materialSelector = this.graphicsMaterialCodes();
+		
+		//create the array of strings that represent THREE materials
+		var matTypes = Object.keys(materialSelector);
+		
+		//pick the material type based on the value in blueprint.material which is a single number index location 
+		var selectedMat = matTypes[blueprint.material];
+		//Use like: new THREE[selectedMat]( { color:color,map:texture} );
+		
+		//get an object whos KEYS are names of faces, whos and VALUES are index locations
+		var shapeFaceSelector = this.graphicsDefaultMapping(blueprint.shape);
+		
+		console.log(Object.values(shapeFaceSelector))
+		
+		var materialArray = new Array();
+		var notAssigned = this.NoAssignment;
+		
+		for(var face in shapeFaceSelector ){
+			
+			//Yes color, Yes texture
+			if(blueprint.colors[face] !== notAssigned && blueprint.colors[face] !== notAssigned){
+				var mat = new THREE[selectedMat]( { color:this.textureFiles[blueprint.colors[face]] ,map:this.textureFiles[blueprint.textures[face]]} );
+			}
+			//No color, No texture
+			else if(blueprint.colors[face] === notAssigned && blueprint.colors[face] === notAssigned){
+				var mat = new THREE[selectedMat]();
+			}
+			//No color
+			else if(blueprint.colors[face] === notAssigned){
+				mat = new THREE[selectedMat]( { map:this.textureFiles[blueprint.textures[face]]} );
+			}
+			//No texture
+			else if(blueprint.colors[face] === notAssigned){
+				mat = new THREE[selectedMat]( {color:this.textureFiles[blueprint.colors[face]] } );
+			}else{
+				console.log("Error in graphicsWorldManager.createGraphics() material selector")
+			}
+			
+			materialArray.push(mat);
+		}
+		
+		var material = new THREE.MeshFaceMaterial(materialArray);
+		console.log(material)
+		// *** GEOMETRY
+		var geometry;
+		//ALL Geometries - > https://threejs.org/docs/index.html?q=geometry
+		//get object whos keys are names shapes and whos value is a number indicator for that shape
+		var ServerShapeIDCodes = this.ShapeIDCodes();
+		
+		switch(blueprint.shape){
+			
+			//https://threejs.org/docs/index.html?q=geometry#Reference/Geometries/BoxGeometry
+			case ServerShapeIDCodes.cube: geometry = new THREE.BoxGeometry(blueprint.geometry.width,blueprint.geometry.height,blueprint.geometry.depth);
+			break;
+			
+			//https://threejs.org/docs/index.html?q=geometry#Reference/Geometries/SphereGeometry
+			case ServerShapeIDCodes.sphere: geometry = new THREE.SphereGeometry(blueprint.geometry.radius,32,32);
+			break;
+			
+			//TODO: add more geometries
+			
+			default: console.log("Error in graphicsWorldManager.createGraphics() geometry selector")
+		}
+		
+		console.log(geometry)
+		//http://threejs.org/docs/#Reference/Objects/Mesh
+		var MESH =  new THREE.Mesh(geometry, material);
+		console.log(MESH)
+		//add to the MASTER object finder
+		this.graphicsMasterObject[blueprint.id] = MESH;
+		
+		//add to the scene
+		this.scene.add( MESH );
+		
+		//return to the requester
+		return MESH;
+		
 }
