@@ -58,11 +58,16 @@ if(typeof Ammo === 'undefined'){
 	
 	console.log('*******ERROR**********************There is no instance of \'Ammo\'.  Please import ammo.js first before using PhysicsObjectFactory_client****************************');
 }
+/*
+module.exports = {
+	//export the constructors
+	CubeObject:CubeObject, 
+	SphereObject:SphereObject
+	MakePhysicsObject:MakePhysicsObject}; 
+*/
 
 var objectPhysicsManipulationSuite = function () {
-			this.physics;
-			this.f32arrayPhysics = new Float32Array(14);//ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
-			
+			this.physics;			
 };
 
 objectPhysicsManipulationSuite.prototype = {
@@ -102,10 +107,11 @@ objectPhysicsManipulationSuite.prototype = {
 			//~11.2kbs
 			//doesn't count header info sent in socket.io
 			
-			var array = this.f32arrayPhysics;
-			
-			//array[0] is our objects ID it's only set once at instatiation
 			var indexLoc = this.physics_indexLocations();
+			
+			var array = new Float32Array(indexLoc.length)
+			
+			array[indexLoc.id] = this.id;
 			array[indexLoc.x] = pos.x();
 			array[indexLoc.y] = pos.y();
 			array[indexLoc.z] = pos.z();
@@ -120,7 +126,7 @@ objectPhysicsManipulationSuite.prototype = {
 			array[indexLoc.AVy] = AV.y();
 			array[indexLoc.AVz] = AV.z();
 			
-			return Buffer.from(array.buffer);
+			return array;
 		},
 		
 		getOrigin:function(){
@@ -189,27 +195,23 @@ of the rigid body.  Its one of the few if only direct links between a collision 
 there are coresponding set methods setUserPointer(number) setUserIndex(number).  they do what you'd expect.
 --------/>
 */
-var RigidBodyBase = function(obj){
+var RigidBodyBase = function(blueprint){
 		
 		objectPhysicsManipulationSuite.call(this);
+		var index = this.physics_indexLocations();
 		
-		var defaults = {
-				x:1,y:1,z:1,
-				Rx:0,Ry:0,Rz:0,Rw:1,
-				mass:1};
-					  
-		var blueprint = Object.assign(defaults,obj);
+		this.id = blueprint.physics[index.id];
 		
-		this.x = blueprint.x;
-		this.y = blueprint.y;
-		this.z = blueprint.z;
-		this.Rx = blueprint.Rx;
-		this.Ry = blueprint.Ry;
-		this.Rz = blueprint.Rz;
-		this.Rw = blueprint.Rw;
-		this.mass = blueprint.mass;
-		this.shape;
-		this.id;
+		this.x = blueprint.physics[index.x];
+		this.y = blueprint.physics[index.y];
+		this.z = blueprint.physics[index.z];
+		this.Rx = blueprint.physics[index.Rx];
+		this.Ry = blueprint.physics[index.Ry];
+		this.Rz = blueprint.physics[index.Rz];
+		this.Rw = blueprint.physics[index.Rw];
+		this.mass = blueprint.physics[index.mass];
+		this.shape = blueprint.shape;
+		this.graphics = {};//if obj has associated graphics they will be placed here
 		
 		//TODO: Should callback() be added to RigidBodyBase?
 		//concept would be to assign a callback that execpts for example an object ID of an object
@@ -267,10 +269,6 @@ RigidBodyBase.prototype.createPhysics = function (){
 
 			//Assign FINAL OBJECT
 			this.physics = new Ammo.btRigidBody( rbInfo );
-			//UNIQUIE 7 digit number ID
-			this.id = this.physics.ptr;
-			//set id index in the float array used in binary data exports
-			this.f32arrayPhysics[this.physics_indexLocations().id] = this.id;
 			
 			
 			/*To prevent accessing the wrong values, reassign location props to get functions.
@@ -284,6 +282,7 @@ RigidBodyBase.prototype.createPhysics = function (){
 			this.assignPositionPropsToGetFunctions();
 			this.assignRotationPropsToGetFunctions();
 		};
+		
 RigidBodyBase.prototype.assignPositionPropsToGetFunctions = function(){
 
 	this.x = function(){
@@ -325,68 +324,226 @@ RigidBodyBase.prototype.assignRotationPropsToGetFunctions = function(){
 			};	
 };
 
+RigidBodyBase.prototype.geometry_indexLocations = function(shape){
+	
+	var shapeCodes = this.ShapeIDCodes();
+	
+	switch(shape){
+		
+		case shapeCodes.cube: return{mass:0,width:1,height:2,depth:3}
+		break;
+		
+		case shapeCodes.sphere: return{mass:0,radius:1}
+		break;
+		
+		default: console.log("unknown shape arg in RigidBodyBase.prototype.geometry_indexLocations()")
+	}
+		
+};
 
 RigidBodyBase.prototype.ShapeIDCodes = function(){
 		return {
 					cube:0,
 					sphere:1
 				}
-			};	
+	};	
 			
-RigidBodyBase.prototype.BinaryExport_geometry = function () {
-		
-		//type of shape
-		//**although direct Buffer.from(int shape, 'binary') will work, using typed array
-		//https://nodejs.org/api/buffer.html#buffer_buffers_and_character_encodings		
-		var int8Shape = new Int8Array(1);//ORDER: shape	
-		int8Shape[0] = this.shape;
-		var shapeBuffer = Buffer.from(int8Shape.buffer);
-	
-		//the shapes geometry
-		var geometryBuffer = Buffer.from(this.f32arrayGeometry.buffer);
-		
-		var totalBytes = geometryBuffer.length + shapeBuffer.length;
-			
-		var buffer = Buffer.concat([shapeBuffer,geometryBuffer],totalBytes);
-		
-		return buffer;
-};	
-		
-RigidBodyBase.prototype.BinaryExport_ALL = function () {
-	//physics portion - ALL float32
-	//INDEX ORDER: id,x,y,z,Rx,Ry,Rz,Rw,LVx,LVy,LVz,AVx,AVy,AVz
-	var physicsBuffer = this.BinaryExport_physics();
-	
-	//shape geometry buffer
-	//INDEX ORDER:shapeCode[int8],geometry props [float32]
-	//geometry props is of varible length depending on shape code.  i.e. cube has w,h,d where sphere has only radius
-	var geometryBuffer = this.BinaryExport_geometry();
-	
-	var totalBytes = physicsBuffer.length + geometryBuffer.length
-	var buffer = Buffer.concat([physicsBuffer,geometryBuffer],totalBytes);
-	
-	return buffer;
+//*************
+
+RigidBodyBase.prototype.MappingGeometricFaceCodes = function(){
+
+	return{
+		cube:{
+			front:0,
+			back:1,
+			top:2,
+			bottom:3,
+			left:4,
+			right:5
+		},
+		sphere:{
+			front:0
+		}
+	}
 }
+RigidBodyBase.prototype.graphicsDefaultMapping = function(array){
+	
+	var FaceKeys = this.MappingGeometricFaceCodes();
+	var shapeCodes = this.ShapeIDCodes();
+	
+	switch (this.shape){
+			case shapeCodes.cube:
+					return {
+						front:array[FaceKeys.cube.front],
+						back:array[FaceKeys.cube.back],
+						top:array[FaceKeys.cube.top],
+						bottom:array[FaceKeys.cube.bottom],
+						left:array[FaceKeys.cube.left],
+						right:array[FaceKeys.cube.right]
+						}
+					break;
+				
+			case shapeCodes.sphere:
+					return {
+						//wrapps whole sphere
+						front:array[FaceKeys.sphere.front]
+						}
+					break;
+
+				//TODO: ADD MORE SHAPES>>>
+				
+				default: console.log('ERROR: this.shape either not defined or not a value of a known shape code from ShapeIDCodes()');
+			}
+}	
+
+RigidBodyBase.prototype.graphicsMaterialCodes = function(index){
+	/*
+	TYPES:
+	MeshBasicMaterial -> https://threejs.org/docs/api/materials/MeshBasicMaterial.html
+	MeshDepthMaterial - > https://threejs.org/docs/api/materials/MeshDepthMaterial.html
+	MeshLambertMaterial -> https://threejs.org/docs/api/materials/MeshLambertMaterial.html
+	MeshNormalMaterial -> https://threejs.org/docs/api/materials/MeshNormalMaterial.html
+	MeshPhongMaterial - https://threejs.org/docs/api/materials/MeshPhongMaterial.html
+	MeshStandardMaterial -> https://threejs.org/docs/api/materials/MeshStandardMaterial.html
+	*/
+	//INDEX KEYS SERVER USES:
+	/*
+		basic:0,
+		depth:1,
+		lambert:2,
+		normal:3,
+		phong:4,
+		standard:5
+	*/
+
+   var matTypes = ['MeshBasicMaterial','MeshDepthMaterial','MeshLambertMaterial','MeshNormalMaterial','MeshPhongMaterial','MeshStandardMaterial']
+
+	return matTypes[index];
+}
+
+
+RigidBodyBase.prototype.addGraphics = function(inputObj){
+	//GOOD SPHERE EXAMPLE
+	//http://learningthreejs.com/blog/2013/09/16/how-to-make-the-earth-in-webgl/
+
+	//inputObj has props: material, colors, textures
+	this.graphics.shape = inputObj.shape;
+	this.graphics.material = inputObj.material;
+	this.graphics.colors = this.graphicsDefaultMapping(inputObj.colors);
+	this.graphics.textures = this.graphicsDefaultMapping(inputObj.textures);
+	
+}
+
+function createBox(blueprint) {
+	
+		
+		var materialType = this.graphicsMaterialCodes(blueprint.material);
+		//Use like: new THREE[materialType]( { color:color,map:texture} );
+		var shapeCodes = ShapeIDCodes();	
+		
+		switch(material.shape) {
+			
+			case shapeCodes.cube:
+			break;
+			case shapeCodes.sphere:
+			break;
+			default:console.log("error with graphics");
+		}	
+		
+		//COLORS
+		for () {
+	
+		var texture = null;
+		
+		var color = 0xffffff;//default is white
+
+		if (object.hasOwnProperty('color')) {color = object.color};
+		
+		if (object.hasOwnProperty('texture') ){ 
+		
+				 texture = TEXTURE_FILES[object.texture];
+
+			if (object.player === 1) {	
+							
+					//player so only apply texture to FRONT FACE of cube
+					var mat = new THREE.MeshBasicMaterial( { color:color,map:texture} );
+					var a = new THREE.MeshBasicMaterial( { color: color} );
+					//cube texture index map:
+					//0 -left
+					//1 - right
+					//2 - top
+					//3 - bottom
+					//4 - front
+					//5 - back
+					material = new THREE.MeshFaceMaterial( [a,a,a,a,mat,a]);
+				}else {
+					//Cover the WHOLE cube with texture
+					material = new THREE.MeshBasicMaterial( { map:texture} );
+				}
+			}else{
+				material = new THREE.MeshBasicMaterial( { color: color} );
+			}
+		
+		//http://threejs.org/docs/api/extras/geometries/BoxGeometry.html
+		var geometry = new THREE.BoxGeometry(object.w, object.h, object.d );
+	
+		//http://threejs.org/docs/#Reference/Objects/Mesh
+		var Cube = new THREE.Mesh(geometry, material);
+		
+	    Cube.position.set(object.x, object.y, object.z );
+	    Cube.quaternion.set(object.Rx, object.Ry, object.Rz,object.Rw );
+	
+		//used to quickly find our object
+	    GRAPHICS[object.id] = Cube;
+		
+		//object knows it's id 
+		Cube.userData.id = object.id;
+		
+		//add cube to graphics 
+		scene.add( Cube );
+			   
+	    //attach any properties to the graphic object on 'userData' node of Cube objectff
+		var pCube = createBoxPhysicsObject(object);
+		
+		
+		//object knows it's id 
+		pCube.id = object.id;
+		
+		pCube.setActivationState(1);// ACTIVEATEATE
+		
+		//used to quickly find our object
+		if(object.local === 0){
+			rigidBodies_local[object.id] = {graphics:Cube,physics:pCube};
+			//add cube to our physics world
+			physicsWorld_local.addRigidBody( pCube );
+		}else{
+			rigidBodies[object.id] = {graphics:Cube,physics:pCube};
+			//add cube to our physics world
+			physicsWorld.addRigidBody( pCube );
+		}
+		
 		
 
+		if (returnObj) {return Cube};
+}
+
+
+
+//*************
 //CUBE
-var CubeConstructorBase = function(obj){
+var CubeConstructorBase = function(blueprint){
 		
-		RigidBodyBase.call(this,obj);
+		RigidBodyBase.call(this,blueprint);
 		
-		var defaults = {depth:1,height:1,width:1};	  
-		var blueprint = Object.assign(defaults,obj);
+		this.shape = blueprint.shape;
 		
-		this.width = blueprint.width;
-		this.height = blueprint.height;
-		this.depth = blueprint.depth;
+		var indexLoc  = this.geometry_indexLocations(this.shape);
+		
+		this.mass = blueprint.geometry[indexLoc.mass];
+		this.width = blueprint.geometry[indexLoc.width];
+		this.height = blueprint.geometry[indexLoc.height];
+		this.depth = blueprint.geometry[indexLoc.depth];
 
-		this.shape = this.ShapeIDCodes().cube;
-
-		this.f32arrayGeometry = new Float32Array(3);//ORDER: width,height,depth
-		this.f32arrayGeometry[0] = blueprint.width;
-		this.f32arrayGeometry[1] = blueprint.height;
-		this.f32arrayGeometry[2] = blueprint.depth;
 }
 //CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
 CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
@@ -394,17 +551,16 @@ CubeConstructorBase.prototype.constructor = CubeConstructorBase;
 		
 		
 //SPHERE
-var SphereConstructorBase = function(obj){
-		RigidBodyBase.call(this,obj);
-		var defaults = {radius:1};	  
-		var blueprint = Object.assign(defaults,obj);
+var SphereConstructorBase = function(blueprint){
+		RigidBodyBase.call(this,blueprint);
 		
-		this.radius = blueprint.radius;
+		this.shape = blueprint.shape;
 		
-		this.shape = this.ShapeIDCodes().sphere;
+		var indexLoc  = this.geometry_indexLocations(this.shape);
 		
-		this.f32arrayGeometry = new Float32Array(1);//ORDER: radius
-		this.f32arrayGeometry[0] = blueprint.radius;
+		this.mass = blueprint.geometry[indexLoc.mass];
+		this.radius = blueprint.geometry[indexLoc.radius];
+
 }
 SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
 SphereConstructorBase.prototype.constructor = SphereConstructorBase;

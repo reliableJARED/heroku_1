@@ -396,7 +396,7 @@ RigidBodyBase.prototype.graphicsDefaultMapping = function(array){
 			}
 }	
 
-RigidBodyBase.prototype.graphicsMaterialCodes = function(){
+RigidBodyBase.prototype.graphicsMaterialCodes = function(index){
 	/*
 	TYPES:
 	MeshBasicMaterial -> https://threejs.org/docs/api/materials/MeshBasicMaterial.html
@@ -406,27 +406,130 @@ RigidBodyBase.prototype.graphicsMaterialCodes = function(){
 	MeshPhongMaterial - https://threejs.org/docs/api/materials/MeshPhongMaterial.html
 	MeshStandardMaterial -> https://threejs.org/docs/api/materials/MeshStandardMaterial.html
 	*/
-	return {
+	//INDEX KEYS SERVER USES:
+	/*
 		basic:0,
 		depth:1,
 		lambert:2,
 		normal:3,
 		phong:4,
 		standard:5
-	}
+	*/
 
+   var matTypes = ['MeshBasicMaterial','MeshDepthMaterial','MeshLambertMaterial','MeshNormalMaterial','MeshPhongMaterial','MeshStandardMaterial']
 
+	return matTypes[index];
 }
+
+
 RigidBodyBase.prototype.addGraphics = function(inputObj){
 	//GOOD SPHERE EXAMPLE
 	//http://learningthreejs.com/blog/2013/09/16/how-to-make-the-earth-in-webgl/
 
 	//inputObj has props: material, colors, textures
+	this.graphics.shape = inputObj.shape;
 	this.graphics.material = inputObj.material;
 	this.graphics.colors = this.graphicsDefaultMapping(inputObj.colors);
 	this.graphics.textures = this.graphicsDefaultMapping(inputObj.textures);
 	
 }
+
+function createBox(blueprint) {
+	
+		
+		var materialType = this.graphicsMaterialCodes(blueprint.material);
+		//Use like: new THREE[materialType]( { color:color,map:texture} );
+		
+		var shapeCodes = ShapeIDCodes();	
+		
+		switch(material.shape) {
+			
+			case shapeCodes.cube:
+			break;
+			case shapeCodes.sphere:
+			break;
+			default:console.log("error with graphics");
+		}	
+		
+		//COLORS
+		for () {
+	
+		var texture = null;
+		
+		var color = 0xffffff;//default is white
+
+		if (object.hasOwnProperty('color')) {color = object.color};
+		
+		if (object.hasOwnProperty('texture') ){ 
+		
+				 texture = TEXTURE_FILES[object.texture];
+
+			if (object.player === 1) {	
+							
+					//player so only apply texture to FRONT FACE of cube
+					var mat = new THREE.MeshBasicMaterial( { color:color,map:texture} );
+					var a = new THREE.MeshBasicMaterial( { color: color} );
+					//cube texture index map:
+					//0 -left
+					//1 - right
+					//2 - top
+					//3 - bottom
+					//4 - front
+					//5 - back
+					material = new THREE.MeshFaceMaterial( [a,a,a,a,mat,a]);
+				}else {
+					//Cover the WHOLE cube with texture
+					material = new THREE.MeshBasicMaterial( { map:texture} );
+				}
+			}else{
+				material = new THREE.MeshBasicMaterial( { color: color} );
+			}
+		
+		//http://threejs.org/docs/api/extras/geometries/BoxGeometry.html
+		var geometry = new THREE.BoxGeometry(object.w, object.h, object.d );
+	
+		//http://threejs.org/docs/#Reference/Objects/Mesh
+		var Cube = new THREE.Mesh(geometry, material);
+		
+	    Cube.position.set(object.x, object.y, object.z );
+	    Cube.quaternion.set(object.Rx, object.Ry, object.Rz,object.Rw );
+	
+		//used to quickly find our object
+	    GRAPHICS[object.id] = Cube;
+		
+		//object knows it's id 
+		Cube.userData.id = object.id;
+		
+		//add cube to graphics 
+		scene.add( Cube );
+			   
+	    //attach any properties to the graphic object on 'userData' node of Cube objectff
+		var pCube = createBoxPhysicsObject(object);
+		
+		
+		//object knows it's id 
+		pCube.id = object.id;
+		
+		pCube.setActivationState(1);// ACTIVEATEATE
+		
+		//used to quickly find our object
+		if(object.local === 0){
+			rigidBodies_local[object.id] = {graphics:Cube,physics:pCube};
+			//add cube to our physics world
+			physicsWorld_local.addRigidBody( pCube );
+		}else{
+			rigidBodies[object.id] = {graphics:Cube,physics:pCube};
+			//add cube to our physics world
+			physicsWorld.addRigidBody( pCube );
+		}
+		
+		
+
+		if (returnObj) {return Cube};
+}
+
+
+
 //*************
 //CUBE
 var CubeConstructorBase = function(blueprint){
