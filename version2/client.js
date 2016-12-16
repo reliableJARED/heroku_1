@@ -48,20 +48,17 @@ var socket = io();
 			//TEXTURE_FILES: array of file name strings
 		
 			//assign the lookup index for textures
-			GWM.textureFilesIndex = msg.TEXTURE_FILES_INDEX ;
-				
+			GWM.setTextureFilesIndex = msg.TEXTURE_FILES_INDEX ;
+			
 			//load all textures
 			GWM.serverTextureLoader( msg.TEXTURE_FILES);
-				
+			
 			console.log('total bytes of physics data:',msg.data.byteLength)
 			var UnpackedPhysicsData = PWM.unpackServerBinaryData_physics(msg.data);
 			
 			console.log('total bytes of graphics data:',msg.graphics.byteLength)
 			var UnpackedGraphicsData = GWM.unpackServerBinaryData_graphics(msg.graphics);
-			
-			console.log(UnpackedPhysicsData)
-			console.log(UnpackedGraphicsData)
-			
+
 			//make
 			for(var ID in UnpackedPhysicsData){
 				var newObject = MakePhysicsObject(UnpackedPhysicsData[ID]);
@@ -69,9 +66,10 @@ var socket = io();
 				PWM.add(newObject)
 			}
 			
-			console.log(PWM.rigidBodiesMasterObject)
+			//all our objects
+			console.log(PWM.rigidBodiesMasterObject)		
 			
-
+			//Show time!
 			render();
 			
 		});

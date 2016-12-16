@@ -435,15 +435,21 @@ RigidBodyBase.prototype.BinaryExport_ALL = function () {
 }
 	
 RigidBodyBase.prototype.MappingGeometricFaceCodes = function(){
-
+	//cube texture index map:
+					//0 -left
+					//1 - right
+					//2 - top
+					//3 - bottom
+					//4 - front
+					//5 - back
 	return{
 		cube:{
-			face1: 'front',
-			face2: 'back',
+			face1: 'left',
+			face2: 'right',
 			face3: 'top',
 			face4: 'bottom',
-			face5: 'left',
-			face6: 'right'
+			face5: 'front',
+			face6: 'back'
 		},
 		sphere:{
 			face1:'front'
@@ -503,53 +509,42 @@ RigidBodyBase.prototype.graphicsMaterialCodes = function(){
 
 
 }
+
+
+RigidBodyBase.prototype.visualComponentMaker = function(visualComponent){
+	
+	var DefaultNone = this.graphicsDefaultMapping();
+	
+	//check if a texture arg was passed in
+	if(typeof visualComponent !== 'undefined'){
+		//Deal with key word 'wrap'
+		if(typeof visualComponent.wrap !== 'undefined'){
+			//for each face that shape has, apply the arg in wrap to that face
+			for(var face in DefaultNone){
+				
+				visualComponent[face] = visualComponent.wrap;
+			}
+		}
+	}else{
+		//Deal with NO texture args passed at all
+		visualComponent = DefaultNone;
+	}
+	
+	// replace the defaults with arguments passed in and return
+	return Object.assign(DefaultNone,visualComponent);
+}
+
 RigidBodyBase.prototype.addGraphics = function(inputObj){
 	//GOOD SPHERE EXAMPLE
 	//http://learningthreejs.com/blog/2013/09/16/how-to-make-the-earth-in-webgl/
 
 	var inputObj = inputObj || {};
-	console.log ("POF graphic input:",inputObj)
+	
 	//for color or texture not assigned to an object face, default is none
-	//note that the wrap prop of passed in arg is used to 'wrap' so don't have to assign each face
-
-	var DefaultNone = this.graphicsDefaultMapping();
+	//note that the wrap prop of passed in arg is used to 'wrap' so don't have to assign each face	
+	this.textures = this.visualComponentMaker(inputObj.textures);
 	
-	if(typeof inputObj.textures !== 'undefined'){
-		//Deal with key word 'wrap'
-		if(inputObj.textures.wrap){
-			for(var face in DefaultNone){
-				DefaultNone[face] = inputObj.textures.wrap;
-			}
-		}
-	}else{
-		//Deal with NO texture args passed at all
-		inputObj.textures = DefaultNone;
-	}
-	
-	// replace the defaults with texture arguments passed in:
-	this.textures = Object.assign(DefaultNone,inputObj.textures);
-	console.log("POF: textures",this.textures)
-	
-	
-	//Reset
-	DefaultNone = this.graphicsDefaultMapping();
-	
-	//Deal with key word 'wrap' or NO color args passed at all
-	if(typeof inputObj.colors !== 'undefined'){
-		if(inputObj.colors.wrap){
-			for(var key in DefaultNone){
-				DefaultNone[key] = inputObj.colors.wrap;
-			}
-		}
-	}else{
-		inputObj.colors = DefaultNone;
-	}
-	
-	
-	
-	//now replace the defaults with color arguments passed in:
-	this.colors = Object.assign(DefaultNone,inputObj.colors);
-	console.log("POF: colors",this.colors)
+	this.colors = this.visualComponentMaker(inputObj.colors);
 	
 	var matCodes = this.graphicsMaterialCodes();
 	
@@ -574,7 +569,7 @@ RigidBodyBase.prototype.addGraphics = function(inputObj){
 		}
 	}
 	
-	console.log("POF material:",this.material);
+	
 }
 	
 

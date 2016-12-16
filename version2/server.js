@@ -179,6 +179,8 @@ function BuildWorldStateForNewConnection(socket_id){
 }
 
 function init(){
+	
+	//making a texture map for a cube
 	var groundTextures = {
 		front:TEXTURE_FILES_INDEX.ground,
 		back:TEXTURE_FILES_INDEX.ground,
@@ -188,19 +190,45 @@ function init(){
 		right:TEXTURE_FILES_INDEX.ground
 	};
 	
+	//OBJECT 1
+	//make a cube object, use defaults EXCEPT for width, depth and mass
 	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
+	//apply our graphic
 	ground.addGraphics({textures:groundTextures});
-	
+	//add to the world
 	physicsWorld.add(ground);
 	
+	//OBJECT 2
+	//make another box, use defaults EXCEPT for y location and mass 
 	var player = new objectFactory.CubeObject({y:20,mass:50});
-	player.addGraphics({colors:{wrap:0x0000ff}});
-	
+	//don't add a texture, but set its color to yellow
+	player.addGraphics({colors:{wrap:0xffff00}});//YELLOW
+	//add to world
 	physicsWorld.add(player);	
 	
-	var ball = new objectFactory.SphereObject();
+	//OBJECT 3
+	//make a sphere, use defaults EXCEPT for Ry rotation; 
+	var ball = new objectFactory.SphereObject({Ry:1.5});
+	//wrap it with texture
+	ball.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
+	//add to the world
 	physicsWorld.add(ball);	
 	
+	//OBJECT 4
+	//another box, use defaults EXCEPT for width,depth, height
+	var box = new objectFactory.CubeObject({width:2,depth:2,height:2});
+	//instead of doing a texture for each face like OBJECT 1, just use wrap
+	box.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
+	//add to world
+	physicsWorld.add(box);
+
+	//OBJECT 5
+	//another box, use all defaults
+	var box2 = new objectFactory.CubeObject();
+	//instead of doing a texture for each face, only texture the back
+	box2.addGraphics({textures:{back:TEXTURE_FILES_INDEX.playerFace}});
+	//add to world
+	physicsWorld.add(box2);	
 	
 	/*
 	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );

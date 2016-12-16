@@ -22,7 +22,9 @@ var graphicsWorldManager = function (config) {
 		rendererClearColor: 0xf0f0f0,
 		cameraPerspectiveX: 0,
 		cameraPerspectiveY: 5,
-		cameraPerspectiveZ: -50,
+		cameraPerspectiveZ: -15,
+		defaultColor: 0x0000ff,
+		//consider adding a link back to the PWM
 		physicsWorldManager: false
 	}
 	
@@ -61,12 +63,16 @@ var graphicsWorldManager = function (config) {
 	
 	//UTILITY
 	this.vector3 = new THREE.Vector3(0,0,0);
-	this.textureFiles = [];
+	this.textureFiles = new Array();
 	this.textureFilesIndex;
 	this.fileLoader = new THREE.TextureLoader();
+	this.defaultColor = config.defaultColor;
 	
 	//Use graphicsMasterObject to Find Objects by their ID from PHYSICS! not their uuid from threejs
 	this.graphicsMasterObject = new Object();
+	
+	//lights, camera, action!
+	this.camera.lookAt( this.scene.position );
     				
 }
 
@@ -278,15 +284,21 @@ graphicsWorldManager.prototype.graphicsMaterialCodes = function(){
 // These two functions seem dumb.... MappingGeometricFaceCodes()  and graphicsDefaultMapping()
 //one knows index locations based on a shape name, one returns the shape specific object
 graphicsWorldManager.prototype.MappingGeometricFaceCodes = function(){
-
+//cube texture index map:
+					//0 -left
+					//1 - right
+					//2 - top
+					//3 - bottom
+					//4 - front
+					//5 - back
 	return{
 		cube:{
-			front:0,
-			back:1,
+			front:4,
+			back:5,
 			top:2,
 			bottom:3,
-			left:4,
-			right:5
+			left:0,
+			right:1
 		},
 		sphere:{
 			front:0
@@ -326,8 +338,6 @@ graphicsWorldManager.prototype.graphicsDefaultMapping = function(shape){
 
 graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 		
-		console.log(this.textureFiles)
-		
 		//blueprint has props: shape,material,colors,textures, geomtry
 		//shape and material are single int, colors and textures are float32 array
 
@@ -346,28 +356,34 @@ graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 		//get an object whos KEYS are names of faces, whos and VALUES are index locations
 		var shapeFaceSelector = this.graphicsDefaultMapping(blueprint.shape);
 		
-		console.log(Object.values(shapeFaceSelector))
 		
 		var materialArray = new Array();
 		var notAssigned = this.NoAssignment;
 		
+		console.log("BUILD",blueprint.geometry)
+		
 		for(var face in shapeFaceSelector ){
-			
+			console.log('TEXTURE',blueprint.textures[face])
+			console.log('COLORS',blueprint.colors[face])
 			//Yes color, Yes texture
-			if(blueprint.colors[face] !== notAssigned && blueprint.colors[face] !== notAssigned){
-				var mat = new THREE[selectedMat]( { color:this.textureFiles[blueprint.colors[face]] ,map:this.textureFiles[blueprint.textures[face]]} );
+			if(blueprint.colors[face] !== notAssigned && blueprint.textures[face] !== notAssigned){
+				console.log('yes texture and color')
+				var mat = new THREE[selectedMat]( { color:blueprint.colors[face] ,map:this.textureFiles[blueprint.textures[face]]} );
 			}
 			//No color, No texture
-			else if(blueprint.colors[face] === notAssigned && blueprint.colors[face] === notAssigned){
-				var mat = new THREE[selectedMat]();
+			else if(blueprint.colors[face] === notAssigned && blueprint.textures[face] === notAssigned){
+				console.log('no texture or color')
+				var mat = new THREE[selectedMat]({color:this.defaultColor});//consider NOT passing a default color, which will make it white
 			}
 			//No color
 			else if(blueprint.colors[face] === notAssigned){
+				console.log('no color')
 				mat = new THREE[selectedMat]( { map:this.textureFiles[blueprint.textures[face]]} );
 			}
 			//No texture
-			else if(blueprint.colors[face] === notAssigned){
-				mat = new THREE[selectedMat]( {color:this.textureFiles[blueprint.colors[face]] } );
+			else if(blueprint.textures[face] === notAssigned){
+				console.log('no texture')
+				mat = new THREE[selectedMat]( {color:blueprint.colors[face]} );
 			}else{
 				console.log("Error in graphicsWorldManager.createGraphics() material selector")
 			}
@@ -376,7 +392,11 @@ graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 		}
 		
 		var material = new THREE.MeshFaceMaterial(materialArray);
-		console.log(material)
+		
+		
+		//TESTING material assignment
+		//var material = new THREE[selectedMat]({color:this.defaultColor});
+		
 		// *** GEOMETRY
 		var geometry;
 		//ALL Geometries - > https://threejs.org/docs/index.html?q=geometry
@@ -398,10 +418,10 @@ graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 			default: console.log("Error in graphicsWorldManager.createGraphics() geometry selector")
 		}
 		
-		console.log(geometry)
+		
 		//http://threejs.org/docs/#Reference/Objects/Mesh
 		var MESH =  new THREE.Mesh(geometry, material);
-		console.log(MESH)
+		
 		//add to the MASTER object finder
 		this.graphicsMasterObject[blueprint.id] = MESH;
 		

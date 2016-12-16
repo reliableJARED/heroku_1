@@ -375,8 +375,9 @@ RigidBodyBase.prototype.addGraphics = function(blueprint){
 	//now get a graphic
 	this.graphics = this.graphicsWorldManager.createGraphics(blueprint); 
 	
-	this.graphics.position.set(this.x, this.y, this.z );
-	this.graphics.quaternion.set(this.Rx, this.Ry, this.Rz,this.Rw );
+	//now position the graphic where the physics are
+	this.graphics.position.set(this.x(), this.y(), this.z() );
+	this.graphics.quaternion.set(this.Rx(), this.Ry(), this.Rz(),this.Rw() );
 }
 
 
