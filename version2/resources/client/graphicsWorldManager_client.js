@@ -71,9 +71,63 @@ var graphicsWorldManager = function (config) {
 	//Use graphicsMasterObject to Find Objects by their ID from PHYSICS! not their uuid from threejs
 	this.graphicsMasterObject = new Object();
 	
+	//total count of frames the buffer holds
+	this.totalFramesInBuffer = 10;
+	this.renderingFrame = 0;
+	this.bufferingFrame = 0;
+	
+	//2D array used to hold previous positions of objects in a buffer
+	this.renderingBuffer = new Array(this.totalFramesInBuffer);
+	
+	//fill the renderingBuffer with arrays which will hold each frame of object data
+	for (var frame = 0;frame<this.totalFramesInBuffer;frame++) {
+		this.renderingBuffer[frame] = new Array();		
+	}
+	
 	//lights, camera, action!
 	this.camera.lookAt( this.scene.position );
     				
+}
+
+graphicsWorldManager.prototype.renderingBuffer_update = function (objectUpdate) {
+
+	//the positions of objects in the physics world are sent to the rendering buffer
+	//rendering is done from the buffer NOT directly from the world state
+	//objects send their own updates to the graphics buffer
+	//they send the update as a float32 array whos first index is ID
+	//the remaining 13 array index positions hold position and orientation info
+	this.renderingBuffer[this.bufferingFrame].push(objectUpdate);
+}
+
+graphicsWorldManager.prototype.drawFromBuffer = function () {
+
+	//var serverIndexLoc = this.physics_indexLocations;
+	
+	//loop through the buffer
+	for(var obj =0, serverIndexLoc = this.physics_indexLocations,totalObjs = this.renderingBuffer[this.renderingFrame];obj<totalObjs;obj++){		
+		
+		//load the data
+		var objUpdateData = this.renderingBuffer[this.renderingFrame][obj];
+		
+		//get the graphic for the objects data
+		var objToUpdate = this.graphicsMasterObject[objUpdateData[serverIndexLoc.id]];
+		
+		//update the graphic		
+		objToUpdate.position.set(objUpdateData[serverIndexLoc.x], objUpdateData[serverIndexLoc.y], objUpdateData[serverIndexLoc.z] );
+		objToUpdate.quaternion.set(objUpdateData[serverIndexLoc.Rx], objUpdateData[serverIndexLoc.Ry], objUpdateData[serverIndexLoc.Rz], objUpdateData[serverIndexLoc.Rw] );
+	
+	}
+	
+	//since the arrays are filled and emptied, just set to empty
+	this.renderingBuffer[this.renderingFrame].length = 0;
+	
+	//tell renderer what frame from buffer should be drawn
+	//it should always be ONE frame ahead so that after looping around it is one buffer rotation behind
+	if(this.renderingFrame === this.totalFramesInBuffer) {
+		this.renderingFrame =  0;
+	}else{
+		this.renderingFrame += 1;
+	}
 }
 
 graphicsWorldManager.prototype.displayInHTMLElementId = function(elementID){
@@ -432,3 +486,16 @@ graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 		return MESH;
 		
 }
+
+graphicsWorldManager.prototype.physics_indexLocations = {
+
+//If needed can set this, but this is default	
+						id:0,
+						x:1,
+						y:2,
+						z:3,
+						Rx:4,
+						Ry:5,
+						Rz:6,
+						Rw:7
+	}
