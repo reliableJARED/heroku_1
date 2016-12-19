@@ -20,8 +20,8 @@ var physicsWorldManager = function () {
 	this.quaternion = new Ammo.btQuaternion();
 	
 	
-	//ORGANIZERS: The rigidBodiesMasterObject and rigidBodiesMasterArray hold reference to all objects in the world.
-	
+	//ORGANIZERS: 
+	//The rigidBodiesMasterObject and rigidBodiesMasterArray hold reference to all objects in the world.
 	//Use rigidBodiesMasterObject to Find Objects by their ptr ID
 	this.rigidBodiesMasterObject = new Object();
 	//Use rigidBodiesMasterArray to Find Objects by their UserIndex
@@ -408,6 +408,78 @@ physicsWorldManager.prototype.getCollisionForces = function(timeStep){
 	}
 	
 };
+
+physicsWorldManager.prototype.BinaryExporter = function(HeaderBufferObject){
+	
+	//used determine what binary export function to call on an object
+	var binaryExportMethod;
+	
+	//the incomming header buffer to be added to
+	var binaryData
+	
+	//HeaderBufferObject has keys graphics or physics
+	if(HeaderBufferObject.hasOwnProperty('physics')){
+
+		binaryExportMethod = 'BinaryExport_ALL';
+		binaryData = HeaderBufferObject.physics;
+
+	}else if(HeaderBufferObject.hasOwnProperty('graphics')){
+		
+		binaryExportMethod = 'BinaryExport_graphics';
+		binaryData = HeaderBufferObject.graphics;
+	}else{
+		
+		console.log('unrecognized binary export type passed to BinaryExporter(). Use "physics" or "graphics" ');
+	}
+	
+	//build buffers
+	for(var i = 0,totalObjs = this.rigidBodiesMasterArray.length; i < totalObjs; i++){
+		//PHYSICS
+		var objBuffer = this.rigidBodiesMasterArray[i][binaryExportMethod]();
+		var objBuffer_len = objBuffer.length;
+		var currentByteLength = binaryData.length + objBuffer_len;
+		
+		// PUSH new binary to end of current binary
+		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength );
+
+	}
+	
+	return binaryData;
+}
+
+
+physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
+		//TIME STAMP HEADER
+		var header = new Float32Array(1);
+		header[0] = Date.now();
+		var binaryData = Buffer.from(header.buffer);
+		
+		//******************
+		//HARDCODE WARNING!!
+		//******************
+		
+		//to determine the bytes each object uses see file:
+		// PhysicsObjectFactory.js -> base class: objectPhysicsManipulationSuite() , this.f32arrayPhysics, for a Float32 count
+		const bytesPerObj = 56;
+	
+		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
+		for(var object in this.rigidBodiesMasterObject){
+			
+			//check activation state
+			if(this.rigidBodiesMasterObject[object].physics.isActive()){
+				
+				//get physics data as float 32 array BUFFER. NOTE: index 0 is the objects ID
+				var physicsDataBuffer = this.rigidBodiesMasterObject[object].BinaryExport_physics();
+				var currentByteLength = binaryData.length + bytesPerObj;
+		
+				// PUSH new binary to end of current binary
+				binaryData = Buffer.concat([binaryData, physicsDataBuffer], currentByteLength );
+			}
+		}
+		
+		return binaryData;
+	
+}
 
 
 

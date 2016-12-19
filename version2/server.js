@@ -102,8 +102,11 @@ const       fireBullet = 128;
 	
 
 function SendUpdateToClients(){
-	/*put stuff here*/
+	var buffer = physicsWorld.getWorldUpdateBuffer();
+	io.emit('U', buffer);
+	console.log('update sent')
 }
+
 function TickPhysics() {
 	
 	   var deltaTime = clock.getDelta();
@@ -137,6 +140,9 @@ function BuildWorldStateForNewConnection(socket_id){
 	header[3] = 0;//UNUSED
 	var binaryData = Buffer.from(header.buffer);
 	
+	var physicsBinary = physicsWorld.BinaryExporter({physics:binaryData});
+	
+	
 	//GRAPHICS
 	var gheader = new Int16Array(4);
 	gheader[0] = totalObjs;
@@ -145,25 +151,7 @@ function BuildWorldStateForNewConnection(socket_id){
 	gheader[2] = 0;//UNUSED
 	gheader[3] = 0;//UNUSED
 	var binaryGraphics = Buffer.from(gheader.buffer);
-
-	//build buffers
-	for(var i = 0; i < totalObjs; i++){
-		//PHYSICS
-		var objBuffer = physicsWorld.rigidBodiesMasterArray[i].BinaryExport_ALL();
-		var objBuffer_len = objBuffer.length;
-		var currentByteLength = binaryData.length + objBuffer_len;
-		
-		//GRAPHICS
-		var grapBuffer = physicsWorld.rigidBodiesMasterArray[i].BinaryExport_graphics();
-		var grapBuffer_len = grapBuffer.length;
-		var currentByteLength_g = binaryGraphics.length + grapBuffer_len;
-		
-		//basically PUSH new binary to end of current binary
-		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength );
-		binaryGraphics = Buffer.concat([binaryGraphics, grapBuffer], currentByteLength_g )
-
-	}
-	
+	var graphicsBinary = physicsWorld.BinaryExporter({graphics:binaryGraphics})
 	
 	//create a time stamp
 	var time = Date.now();
@@ -171,8 +159,8 @@ function BuildWorldStateForNewConnection(socket_id){
 	//Only send to the new connection, NOT every connection
 	io.to(socket_id).emit('setup',{
 		time:time,
-		data: binaryData,
-		graphics:binaryGraphics,
+		data: physicsBinary,
+		graphics:graphicsBinary,
 		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
 		TEXTURE_FILES:TEXTURE_FILES});
 			
@@ -200,7 +188,7 @@ function init(){
 	
 	//OBJECT 2
 	//make another box, use defaults EXCEPT for y location and mass 
-	var player = new objectFactory.CubeObject({y:20,mass:50});
+	var player = new objectFactory.CubeObject({x:2,y:20,mass:50});
 	//don't add a texture, but set its color to yellow
 	player.addGraphics({colors:{wrap:0xffff00}});//YELLOW
 	//add to world
@@ -230,6 +218,7 @@ function init(){
 	//add to world
 	physicsWorld.add(box2);	
 	
+	
 	/*
 	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
 
@@ -238,6 +227,7 @@ function init(){
 	}
 	*/
 	TickPhysics();
+
 }
 
 

@@ -565,6 +565,25 @@ physicsWorldManager.prototype.getCollisionForces = function(timeStep){
 	
 };
 
+physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
+		
+		var frameDataArray = new Array();
+		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
+		for(var object in this.rigidBodiesMasterObject){
+			
+			//check activation state
+			if(this.rigidBodiesMasterObject[object].physics.isActive()){
+				
+				//get physics data as float 32 array. NOTE: index 0 is the objects ID
+				var physicsDataBuffer = this.rigidBodiesMasterObject[object].BinaryExport_physics();
+
+				frameDataArray.push(physicsDataBuffer)
+			}
+		}
+		
+		return frameDataArray;
+	
+}
 
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 

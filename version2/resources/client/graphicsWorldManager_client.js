@@ -89,22 +89,24 @@ var graphicsWorldManager = function (config) {
     				
 }
 
-graphicsWorldManager.prototype.renderingBuffer_update = function (objectUpdate) {
+graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectData) {
 
 	//the positions of objects in the physics world are sent to the rendering buffer
 	//rendering is done from the buffer NOT directly from the world state
 	//objects send their own updates to the graphics buffer
 	//they send the update as a float32 array whos first index is ID
 	//the remaining 13 array index positions hold position and orientation info
-	this.renderingBuffer[this.bufferingFrame].push(objectUpdate);
+	//ArrayOfObjectData is ALL data from the physics simulation for objects that are active, and therefore require their 
+	//grahic to be drawn again in the new location.
+	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
 }
 
 graphicsWorldManager.prototype.drawFromBuffer = function () {
 
-	//var serverIndexLoc = this.physics_indexLocations;
+	var serverIndexLoc = this.physics_indexLocations;
 	
-	//loop through the buffer
-	for(var obj =0, serverIndexLoc = this.physics_indexLocations,totalObjs = this.renderingBuffer[this.renderingFrame];obj<totalObjs;obj++){		
+	//loop through the array of updates for the objects
+	for(var obj = 0, serverIndexLoc = this.physics_indexLocations,totalObjs = this.renderingBuffer[this.renderingFrame].length;obj<totalObjs;obj++){		
 		
 		//load the data
 		var objUpdateData = this.renderingBuffer[this.renderingFrame][obj];
@@ -118,17 +120,39 @@ graphicsWorldManager.prototype.drawFromBuffer = function () {
 	
 	}
 	
+	//TESTING**************
+	console.log('Buffering Frame')
+	//**********************
+	
 	//since the arrays are filled and emptied, just set to empty
 	this.renderingBuffer[this.renderingFrame].length = 0;
 	
-	//tell renderer what frame from buffer should be drawn
-	//it should always be ONE frame ahead so that after looping around it is one buffer rotation behind
-	if(this.renderingFrame === this.totalFramesInBuffer) {
-		this.renderingFrame =  0;
-	}else{
-		this.renderingFrame += 1;
-	}
+	//update the renderer to know what frame from buffer should be drawn next
+	//it should always be ONE frame ahead so that after looping around the renderingBuffer is one buffer rotation behind the current bufferingFrame
+	this.moveRenderingBufferIndexes();
+	
 }
+
+
+graphicsWorldManager.prototype.moveRenderingBufferIndexes = function(){
+	
+	//bufferingFrame should always be 1 index BEHIND renderingFrame
+	//this way by the time we render the frame that was just buffered we have gone through one loop of the whole buffer
+	
+	//end of array, loop back to start
+	if(this.renderingFrame === (this.totalFramesInBuffer-1)) {
+		this.renderingFrame =  0;
+		this.bufferingFrame += 1;
+	}else if(this.bufferingFrame === (this.totalFramesInBuffer-1)){
+			this.bufferingFrame = 0;
+			this.renderingFrame += 1;
+	}else{
+			
+			this.bufferingFrame +=1;
+			this.renderingFrame += 1;
+		}
+}
+
 
 graphicsWorldManager.prototype.displayInHTMLElementId = function(elementID){
 	
@@ -232,25 +256,26 @@ graphicsWorldManager.prototype.unpackServerBinaryData_graphics = function(binary
 			//index locations for material array
 			var materialArrayIndex = this.getServerMaterialArrayIndexLoc();
 			
-			//recycle object blueprint
-			var newObjBlueprint = Object();
-			
-			
 			//Graphics packing STRUCTURE and ORDER: ID,material,color,texture
 			var IDarray;//Int32
 			var materialArray;//Int8
 			var colorArray;//float32
-			var textureArray;//float32
+			var textureArray;//Int16
 			
+			//bytes occupied by a shapes ID
 			const IDByteSize = 4;			
+			
+			//bytes occupied by a shapes material type (ie. basic, phong, lambert,etc..)
 			const materialByteSize = 2;
 			
 		for(var i = offset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 			
-			newObjBlueprint = {};//reset
-			
 			BytesOfPreviousObj = 0;//reset byte counter
 			offset = i;//slide our location in buffer 
+			
+			//new object blueprint to be constructed with the unpacked data
+			var newObjBlueprint = Object();
+			
 		
 			//leading 4 bytes are a Int32 single element array with the IDarray of object.  
 			IDarray = new Int32Array(binaryData.slice(offset,offset+IDByteSize));
@@ -271,26 +296,29 @@ graphicsWorldManager.prototype.unpackServerBinaryData_graphics = function(binary
 			newObjBlueprint.material = materialArray[materialArrayIndex.material];//DON"T pass the array, just the single value it holds
 			newObjBlueprint.shape = materialArray[materialArrayIndex.shape];//DON"T pass the array, just the single value it holds
 			
-			var graphicF32props = 4;//4 is initially used as multiplyer to get byte count, then graphicF32props is set total bytes
+			var colorF32props = 4; //4 is initially used as multiplyer to get byte count, then colorF32props is set total bytes
+			var textureI16props = 2;//2 is initially used as multiplyer to get byte count, then textureI16props is set total bytes
 			
 			//based on shape,determine how many bytes graphics data occupies
 			switch(newObjBlueprint.shape){
-					case ServerShapeIDCodes.cube: graphicF32props *= ServerShapeGraphicFaceCount.cube;										
+					case ServerShapeIDCodes.cube: colorF32props *= ServerShapeGraphicFaceCount.cube;		
+												  textureI16props *= ServerShapeGraphicFaceCount.cube;		
 					break;
-					case ServerShapeIDCodes.sphere: graphicF32props *= ServerShapeGraphicFaceCount.sphere;										
+					case ServerShapeIDCodes.sphere: colorF32props *= ServerShapeGraphicFaceCount.sphere;	
+													textureI16props *= ServerShapeGraphicFaceCount.sphere;							
 					break;
 					default: console.log('shape code error in unpackServerBinaryData_physics()');
 				}
 			
-			colorArray = new Float32Array(binaryData.slice(offset,offset+graphicF32props));
+			colorArray = new Float32Array(binaryData.slice(offset,offset+colorF32props));
 			//slide our location in buffer 
-			offset += graphicF32props;
+			offset += colorF32props;
 			//increment byte counter
-			BytesOfPreviousObj += graphicF32props;
+			BytesOfPreviousObj += colorF32props;
 			
-			textureArray = new Float32Array(binaryData.slice(offset,offset+graphicF32props));
+			textureArray = new Int16Array(binaryData.slice(offset,offset+textureI16props));
 			//increment byte counter, no longer need to move offset as it will be set to 'i' on next pass of loop and 'i' will be increased by BytesOfPreviousObj
-			BytesOfPreviousObj += graphicF32props;
+			BytesOfPreviousObj += textureI16props;
 			
 			//add to blueprint
 			newObjBlueprint.colors = colorArray;

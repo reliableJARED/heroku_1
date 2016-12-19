@@ -73,11 +73,15 @@ var socket = io();
 			render();
 			
 		});
+
+
 		
-
-/*******************************/
-//          TESTING
-
+		socket.on('U',function(msg){
+			console.log(msg.byteLength);
+			var array = new Float32Array(msg);
+			console.log(array)
+		});
+		
 function render() {
 	
        GWM.renderer.render( GWM.scene, GWM.camera );//update graphics
@@ -86,6 +90,15 @@ function render() {
 	    requestAnimationFrame( render );//https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
 };
 
+function updateAnimation(){
+	
+	//first get the position of all active objects
+	//format is an array of Float32Arrays
+	var dataArray = PWM.getWorldUpdateBuffer();//note, function name convention due to server side. NO buffer is returned.
+	
+	//now add this info to the current buffering frame
+	GWM.bufferingFrame_update(dataArray);
+}
 
 /*******************************/
 

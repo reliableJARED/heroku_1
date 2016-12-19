@@ -389,7 +389,7 @@ RigidBodyBase.prototype.BinaryExport_graphics = function () {
 		
 		//keep color and texture separate arrays YES, technically could combine, but dont
 		var colorArray = new Float32Array(propArraySize);
-		var textureArray = new Float32Array(propArraySize);
+		var textureArray = new Int16Array(propArraySize);
 		
 		for(var face = 0; face<propArraySize;face++){
 			//the shapes COLOR
