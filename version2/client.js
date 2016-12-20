@@ -5,6 +5,7 @@ var PWM = new physicsWorldManager();
 var GWM = new graphicsWorldManager();
 GWM.displayInHTMLElementId('container');
 
+
 //IMPORTANT!! 
 //The rigidBody class must have a link the the GWM 
 //we also link to the PWM but it's not really needed... yet :)
@@ -69,8 +70,17 @@ var socket = io();
 			//all our objects
 			console.log(PWM.rigidBodiesMasterObject)		
 			
+			//sync with server time, this might not be needed....
+			PWM.GameClock(msg.time);
+			
+			
+			//buffer graphics
+			while( GWM.Buffering(PWM.getWorldUpdateBuffer())){
+				PWM.world.stepSimulation( PWM.GameClock.getDelta(),10);
+			}
+			
 			//Show time!
-			render();
+			updateWorld();
 			
 		});
 
@@ -83,21 +93,27 @@ var socket = io();
 		});
 		
 function render() {
-	
-       GWM.renderer.render( GWM.scene, GWM.camera );//update graphics
+	   
+	   //draw all the updates
+	   GWM.drawFromBuffer();
+		
+	   //render the updates
+	   GWM.renderer.render( GWM.scene, GWM.camera );//update graphics
 	   
 	  // run game loop again
-	    requestAnimationFrame( render );//https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
+	    requestAnimationFrame( updateWorld );//https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
 };
 
-function updateAnimation(){
+function updateWorld(){
 	
-	//first get the position of all active objects
-	//format is an array of Float32Arrays
-	var dataArray = PWM.getWorldUpdateBuffer();//note, function name convention due to server side. NO buffer is returned.
+	PWM.world.stepSimulation( PWM.GameClock.getDelta(),10);
 	
-	//now add this info to the current buffering frame
-	GWM.bufferingFrame_update(dataArray);
+	//first get the position of all active objects with PWM.getWorldUpdateBuffer()
+	//and add this info to the current buffering frame
+	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());
+	
+	//draw the updates
+	render();
 }
 
 /*******************************/

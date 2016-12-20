@@ -45,6 +45,10 @@ http.listen(port, function(){
 
 //GLOBAL variables
 const updateFrequency = 1;//Seconds
+physicsWorld.GameClock(updateFrequency);
+
+
+
 const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
 var clock = require(__dirname +'/resources/server/gameClock.js');//returns constructor for a clock
 clock = new clock(updateFrequency)
@@ -109,18 +113,15 @@ function SendUpdateToClients(){
 
 function TickPhysics() {
 	
-	   var deltaTime = clock.getDelta();
-	   
-	   var sendUpdate = clock.UpdateTime();//bool that is true every second
-
 	  // physicsWorld.step( deltaTime );
-	   physicsWorld.world.stepSimulation( deltaTime,10);
+	   physicsWorld.world.stepSimulation( physicsWorld.GameClock.getDelta(),10);
 
 	   //loop our physics at about X fps
 		setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 		
-		if (sendUpdate){
-		process.nextTick(function (){SendUpdateToClients()} );
+		//return bool that is true every 'updateFrequency' seconds
+		if (physicsWorld.GameClock.UpdateTime()){
+			process.nextTick(function (){SendUpdateToClients()} );
 		}
     };
 	
@@ -226,7 +227,12 @@ function init(){
 		physicsWorld.add(new objectFactory.CubeObject({y:10+i,mass:50}) );
 	}
 	*/
+	//Start our world clock
+	physicsWorld.GameClock.start();
+	
+	//start physics simulation
 	TickPhysics();
+	
 
 }
 

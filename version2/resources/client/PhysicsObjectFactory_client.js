@@ -95,9 +95,10 @@ objectPhysicsManipulationSuite.prototype = {
 			//assign this.physics and this.transform locally because we use a few times
 			var objPhys = this.physics;
 			var trans = this.transform;
-			
-			objPhys.getMotionState().getWorldTransform(trans);
+				
+			objPhys.getWorldTransform(trans);
 			var pos = trans.getOrigin();
+
 			var rot = trans.getRotation();
 			var LV =  objPhys.getLinearVelocity();
 			var AV =  objPhys.getAngularVelocity();
@@ -109,7 +110,7 @@ objectPhysicsManipulationSuite.prototype = {
 			
 			var indexLoc = this.physics_indexLocations();
 			
-			var array = new Float32Array(indexLoc.length)
+			var array = new Float32Array(14);
 			
 			array[indexLoc.id] = this.id;
 			array[indexLoc.x] = pos.x();
@@ -125,8 +126,9 @@ objectPhysicsManipulationSuite.prototype = {
 			array[indexLoc.AVx] = AV.x();
 			array[indexLoc.AVy] = AV.y();
 			array[indexLoc.AVz] = AV.z();
-			
+
 			return array;
+			
 		},
 		
 		getOrigin:function(){

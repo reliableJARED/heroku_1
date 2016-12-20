@@ -7,7 +7,13 @@ if(typeof Ammo === 'undefined'){
 const IMPACT_IMPULSE_MINIMUM = 1;//minimum collision force required to register
 
 var physicsWorldManager = function () {
-
+	//GAME CLOCK VARS
+	this.startTime;
+	this.oldTime;
+	this.timeToSendUpdate;
+	this.clientPhysicsUpdateFrequency;
+	
+	
 	/*
 	HAVE Collision handling done by a function that is passed in.  the PWM will get all the collisions, then
 	use the passed in function(s) to determine what to do with them.
@@ -568,12 +574,13 @@ physicsWorldManager.prototype.getCollisionForces = function(timeStep){
 physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		
 		var frameDataArray = new Array();
+		
 		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
 		for(var object in this.rigidBodiesMasterObject){
 			
 			//check activation state
 			if(this.rigidBodiesMasterObject[object].physics.isActive()){
-				
+
 				//get physics data as float 32 array. NOTE: index 0 is the objects ID
 				var physicsDataBuffer = this.rigidBodiesMasterObject[object].BinaryExport_physics();
 
@@ -584,6 +591,25 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		return frameDataArray;
 	
 }
+
+physicsWorldManager.prototype.GameClock = function (serverTime) {
+	this.startTime = serverTime || Date.now();
+	this.oldTime = serverTime || Date.now();
+	this.timeToSendUpdate = false;
+	
+};
+
+
+physicsWorldManager.prototype.GameClock.getDelta = function () {
+	var delta = 0;
+	var newTime = Date.now();
+	//convert from mili seconds to seconds 
+	delta = 0.001 * ( newTime - this.oldTime );
+	this.oldTime = newTime;
+	this.timeToSendUpdate += delta;
+	return delta;
+};
+
 
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 

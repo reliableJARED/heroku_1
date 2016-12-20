@@ -8,10 +8,16 @@ if(typeof Ammo === 'undefined'){
 const IMPACT_IMPULSE_MINIMUM = 1;//minimum collision force required to register
 
 var physicsWorldManager = function () {
-
+	//GAME CLOCK VARS
+	this.startTime;
+	this.oldTime;
+	this.timeToSendUpdate;
+	this.clientPhysicsUpdateFrequency;
+	
 	/*
-	HAVE Collision handling done by a function that is passed in.  the PWM will get all the collisions, then
-	use the passed in function(s) to determine what to do with them.
+	HAVE Collision handling done by a callback?  the PWM will get all the collisions, then
+	use the passed in function(s) to determine what to do with them?
+	this.collisionHandler = callback;
 	*/
 
 	//keep these on instance NOT prototype like they are with rigidBodies from the 'PhysicsObjectFactory()'
@@ -481,7 +487,36 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 	
 }
 
+physicsWorldManager.prototype.GameClock = function (clientPhysicsUpdateFrequency) {
+	this.startTime = Date.now();
+	this.oldTime = Date.now();
+	this.timeToSendUpdate = false;
+	this.clientPhysicsUpdateFrequency =clientPhysicsUpdateFrequency;
+	
+};
 
+
+physicsWorldManager.prototype.GameClock.getDelta = function () {
+	var delta = 0;
+	var newTime = Date.now();
+	//convert from mili seconds to seconds 
+	delta = 0.001 * ( newTime - this.oldTime );
+	this.oldTime = newTime;
+	this.timeToSendUpdate += delta;
+	return delta;
+};
+
+physicsWorldManager.prototype.GameClock.start = function () {
+	this.startTime = Date.now();
+	this.oldTime = Date.now();
+};
+
+physicsWorldManager.prototype.GameClock.UpdateTime = function () {
+	//Change frequence of updates here
+	var update = Boolean(this.timeToSendUpdate > this.clientPhysicsUpdateFrequency);	
+	if(update)this.timeToSendUpdate = 0;
+	return update;
+}
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 
 //module.exports = physicsWorldManager; //constructor

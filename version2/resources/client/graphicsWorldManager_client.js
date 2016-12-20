@@ -89,6 +89,22 @@ var graphicsWorldManager = function (config) {
     				
 }
 
+graphicsWorldManager.prototype.Buffering = function(ArrayOfObjectData){
+		
+		
+		
+		if(this.bufferingFrame === this.totalFramesInBuffer){
+			this.bufferingFrame = 0;
+			return false;
+			
+		}else{
+			console.log("buffering frame",this.bufferingFrame)
+			this.bufferingFrame_update(ArrayOfObjectData);
+			this.bufferingFrame +=1;
+			return true;
+		}
+}
+
 graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectData) {
 
 	//the positions of objects in the physics world are sent to the rendering buffer
@@ -101,28 +117,29 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
 }
 
+
+
 graphicsWorldManager.prototype.drawFromBuffer = function () {
 
 	var serverIndexLoc = this.physics_indexLocations;
 	
+	//load the data
+	var AllDataForFrame = this.renderingBuffer[this.renderingFrame];
+	
 	//loop through the array of updates for the objects
-	for(var obj = 0, serverIndexLoc = this.physics_indexLocations,totalObjs = this.renderingBuffer[this.renderingFrame].length;obj<totalObjs;obj++){		
+	for(var obj = 0,totalObjs = this.renderingBuffer[this.renderingFrame].length; obj<totalObjs;obj++){		
 		
 		//load the data
-		var objUpdateData = this.renderingBuffer[this.renderingFrame][obj];
-		
+		var objUpdateData = AllDataForFrame[obj];
+
 		//get the graphic for the objects data
 		var objToUpdate = this.graphicsMasterObject[objUpdateData[serverIndexLoc.id]];
-		
+
 		//update the graphic		
 		objToUpdate.position.set(objUpdateData[serverIndexLoc.x], objUpdateData[serverIndexLoc.y], objUpdateData[serverIndexLoc.z] );
 		objToUpdate.quaternion.set(objUpdateData[serverIndexLoc.Rx], objUpdateData[serverIndexLoc.Ry], objUpdateData[serverIndexLoc.Rz], objUpdateData[serverIndexLoc.Rw] );
 	
 	}
-	
-	//TESTING**************
-	console.log('Buffering Frame')
-	//**********************
 	
 	//since the arrays are filled and emptied, just set to empty
 	this.renderingBuffer[this.renderingFrame].length = 0;
