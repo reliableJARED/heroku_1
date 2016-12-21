@@ -421,7 +421,7 @@ physicsWorldManager.prototype.BinaryExporter = function(HeaderBufferObject){
 	var binaryExportMethod;
 	
 	//the incomming header buffer to be added to
-	var binaryData
+	var binaryData;
 	
 	//HeaderBufferObject has keys graphics or physics
 	if(HeaderBufferObject.hasOwnProperty('physics')){
@@ -439,9 +439,9 @@ physicsWorldManager.prototype.BinaryExporter = function(HeaderBufferObject){
 	}
 	
 	//build buffers
-	for(var i = 0,totalObjs = this.rigidBodiesMasterArray.length; i < totalObjs; i++){
+	for(var i in this.rigidBodiesMasterObject){
 		//PHYSICS
-		var objBuffer = this.rigidBodiesMasterArray[i][binaryExportMethod]();
+		var objBuffer = this.rigidBodiesMasterObject[i][binaryExportMethod]();
 		var objBuffer_len = objBuffer.length;
 		var currentByteLength = binaryData.length + objBuffer_len;
 		
@@ -487,6 +487,7 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 	
 }
 
+
 physicsWorldManager.prototype.GameClock = function (clientPhysicsUpdateFrequency) {
 	this.startTime = Date.now();
 	this.oldTime = Date.now();
@@ -496,7 +497,7 @@ physicsWorldManager.prototype.GameClock = function (clientPhysicsUpdateFrequency
 };
 
 
-physicsWorldManager.prototype.GameClock.getDelta = function () {
+physicsWorldManager.prototype.GameClock_getDelta = function () {
 	var delta = 0;
 	var newTime = Date.now();
 	//convert from mili seconds to seconds 
@@ -506,15 +507,16 @@ physicsWorldManager.prototype.GameClock.getDelta = function () {
 	return delta;
 };
 
-physicsWorldManager.prototype.GameClock.start = function () {
+physicsWorldManager.prototype.GameClock_start = function () {
 	this.startTime = Date.now();
 	this.oldTime = Date.now();
 };
 
-physicsWorldManager.prototype.GameClock.UpdateTime = function () {
+physicsWorldManager.prototype.GameClock_UpdateTime = function () {
 	//Change frequence of updates here
 	var update = Boolean(this.timeToSendUpdate > this.clientPhysicsUpdateFrequency);	
 	if(update)this.timeToSendUpdate = 0;
+
 	return update;
 }
 

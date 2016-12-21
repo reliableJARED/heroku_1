@@ -194,9 +194,11 @@ var RigidBodyBase = function(obj){
 		objectPhysicsManipulationSuite.call(this);
 		
 		var defaults = {
-				x:1,y:1,z:1,
+				x:0,y:0,z:0,
 				Rx:0,Ry:0,Rz:0,Rw:1,
-				mass:10};
+				LVx:0,LVy:0,LVz:0,
+				AVx:0,AVy:0,AVz:0,
+				mass:1};
 					  
 		var blueprint = Object.assign(defaults,obj);
 		
@@ -207,6 +209,12 @@ var RigidBodyBase = function(obj){
 		this.Ry = blueprint.Ry;
 		this.Rz = blueprint.Rz;
 		this.Rw = blueprint.Rw;
+		this.LVx = blueprint.LVx;
+		this.LVy = blueprint.LVy;
+		this.LVz = blueprint.LVz;
+		this.AVx = blueprint.AVx;
+		this.AVy = blueprint.AVy;
+		this.AVz = blueprint.AVz;
 		this.mass = blueprint.mass;
 		this.shape;
 		this.id;
@@ -272,6 +280,12 @@ RigidBodyBase.prototype.createPhysics = function (){
 			this.id = this.physics.ptr;
 			//set id index in the float array used in binary data exports
 			this.f32arrayPhysics[this.physics_indexLocations().id] = this.id;
+			
+			//Apply velocity, if any
+			this.vector3.setValue(this.LVx,this.LVy,this.LVz);
+			this.physics.setLinearVelocity(this.vector3);
+			this.vector3.setValue(this.AVx,this.AVy,this.AVz);
+			this.physics.setAngularVelocity(this.vector3);
 			
 			
 			/*To prevent accessing the wrong values, reassign location props to get functions.

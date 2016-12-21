@@ -91,17 +91,20 @@ var graphicsWorldManager = function (config) {
 
 graphicsWorldManager.prototype.Buffering = function(ArrayOfObjectData){
 		
+		//CONSIDER!!! does this need to be closure? worth the extra memory?
+		var stillBuffering = true;
 		
-		
-		if(this.bufferingFrame === this.totalFramesInBuffer){
+		if(this.bufferingFrame === this.totalFramesInBuffer || this.bufferingFrame >= this.totalFramesInBuffer){
 			this.bufferingFrame = 0;
-			return false;
+			stillBuffering = false;
+			return stillBuffering;
 			
 		}else{
 			console.log("buffering frame",this.bufferingFrame)
 			this.bufferingFrame_update(ArrayOfObjectData);
 			this.bufferingFrame +=1;
-			return true;
+			stillBuffering = true;
+			return stillBuffering;
 		}
 }
 
@@ -114,6 +117,7 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 	//the remaining 13 array index positions hold position and orientation info
 	//ArrayOfObjectData is ALL data from the physics simulation for objects that are active, and therefore require their 
 	//grahic to be drawn again in the new location.
+	
 	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
 }
 
@@ -121,13 +125,16 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 
 graphicsWorldManager.prototype.drawFromBuffer = function () {
 
+	console.log("buffer frame:",this.bufferingFrame)
+	console.log("render frame:",this.renderingFrame)
+	
 	var serverIndexLoc = this.physics_indexLocations;
 	
 	//load the data
 	var AllDataForFrame = this.renderingBuffer[this.renderingFrame];
 	
 	//loop through the array of updates for the objects
-	for(var obj = 0,totalObjs = this.renderingBuffer[this.renderingFrame].length; obj<totalObjs;obj++){		
+	for(var obj = 0,totalObjs = AllDataForFrame.length; obj<totalObjs;obj++){		
 		
 		//load the data
 		var objUpdateData = AllDataForFrame[obj];
@@ -159,12 +166,11 @@ graphicsWorldManager.prototype.moveRenderingBufferIndexes = function(){
 	//end of array, loop back to start
 	if(this.renderingFrame === (this.totalFramesInBuffer-1)) {
 		this.renderingFrame =  0;
-		this.bufferingFrame += 1;
+		this.bufferingFrame = this.totalFramesInBuffer-1;
 	}else if(this.bufferingFrame === (this.totalFramesInBuffer-1)){
 			this.bufferingFrame = 0;
 			this.renderingFrame += 1;
 	}else{
-			
 			this.bufferingFrame +=1;
 			this.renderingFrame += 1;
 		}
@@ -458,30 +464,28 @@ graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 		
 		var materialArray = new Array();
 		var notAssigned = this.NoAssignment;
-		
-		console.log("BUILD",blueprint.geometry)
+	
 		
 		for(var face in shapeFaceSelector ){
-			console.log('TEXTURE',blueprint.textures[face])
-			console.log('COLORS',blueprint.colors[face])
+		
 			//Yes color, Yes texture
 			if(blueprint.colors[face] !== notAssigned && blueprint.textures[face] !== notAssigned){
-				console.log('yes texture and color')
+				
 				var mat = new THREE[selectedMat]( { color:blueprint.colors[face] ,map:this.textureFiles[blueprint.textures[face]]} );
 			}
 			//No color, No texture
 			else if(blueprint.colors[face] === notAssigned && blueprint.textures[face] === notAssigned){
-				console.log('no texture or color')
-				var mat = new THREE[selectedMat]({color:this.defaultColor});//consider NOT passing a default color, which will make it white
+				//consider NOT passing a default color, which will make it white
+				var mat = new THREE[selectedMat]({color:this.defaultColor});
 			}
 			//No color
 			else if(blueprint.colors[face] === notAssigned){
-				console.log('no color')
+				
 				mat = new THREE[selectedMat]( { map:this.textureFiles[blueprint.textures[face]]} );
 			}
 			//No texture
 			else if(blueprint.textures[face] === notAssigned){
-				console.log('no texture')
+				
 				mat = new THREE[selectedMat]( {color:blueprint.colors[face]} );
 			}else{
 				console.log("Error in graphicsWorldManager.createGraphics() material selector")

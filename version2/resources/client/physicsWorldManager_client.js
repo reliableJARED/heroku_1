@@ -86,7 +86,8 @@ physicsWorldManager.prototype.add = function(obj){
 	this.rigidBodiesMasterObject[ID] = obj;
 	
 	//add to the actual physics simulations
-	this.world.addRigidBody( this.rigidBodiesMasterArray[UserIndex].physics );
+	//this.world.addRigidBody( this.rigidBodiesMasterArray[UserIndex].physics );
+	this.world.addRigidBody( this.rigidBodiesMasterObject[ID].physics );
 }
 
 
@@ -593,20 +594,23 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 }
 
 physicsWorldManager.prototype.GameClock = function (serverTime) {
-	this.startTime = serverTime || Date.now();
-	this.oldTime = serverTime || Date.now();
-	this.timeToSendUpdate = false;
-	
+	//create a 'lag' attribute?
+	console.log('setClock',serverTime)
+	console.log('current time',Date.now())
+	this.startTime = Date.now();//serverTime || Date.now();
+	this.oldTime = Date.now();//serverTime || Date.now();
 };
 
 
-physicsWorldManager.prototype.GameClock.getDelta = function () {
+physicsWorldManager.prototype.GameClock_getDelta = function () {
 	var delta = 0;
 	var newTime = Date.now();
+
 	//convert from mili seconds to seconds 
 	delta = 0.001 * ( newTime - this.oldTime );
+
 	this.oldTime = newTime;
-	this.timeToSendUpdate += delta;
+	
 	return delta;
 };
 

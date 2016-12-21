@@ -6,6 +6,13 @@ var GWM = new graphicsWorldManager();
 GWM.displayInHTMLElementId('container');
 
 
+//TESTING!!! ***********
+//orbital control, remove for actual game
+var ORBIT_Control = new THREE.OrbitControls( GWM.camera );
+//	ORBIT_Control.target.y = 10;
+	
+//***********************
+
 //IMPORTANT!! 
 //The rigidBody class must have a link the the GWM 
 //we also link to the PWM but it's not really needed... yet :)
@@ -75,12 +82,12 @@ var socket = io();
 			
 			
 			//buffer graphics
-			while( GWM.Buffering(PWM.getWorldUpdateBuffer())){
-				PWM.world.stepSimulation( PWM.GameClock.getDelta(),10);
+			while( GWM.Buffering(PWM.getWorldUpdateBuffer()) ){
+				PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
 			}
 			
 			//Show time!
-			updateWorld();
+			nextWorldFrame();
 			
 		});
 
@@ -97,16 +104,21 @@ function render() {
 	   //draw all the updates
 	   GWM.drawFromBuffer();
 		
+		//TESTING!!! *****************
+		//remove for live game
+		ORBIT_Control.update();//view control
+		//************************
+		
 	   //render the updates
 	   GWM.renderer.render( GWM.scene, GWM.camera );//update graphics
 	   
 	  // run game loop again
-	    requestAnimationFrame( updateWorld );//https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
+	    requestAnimationFrame( nextWorldFrame );//https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame
 };
 
-function updateWorld(){
+function nextWorldFrame(){
 	
-	PWM.world.stepSimulation( PWM.GameClock.getDelta(),10);
+	PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
 	
 	//first get the position of all active objects with PWM.getWorldUpdateBuffer()
 	//and add this info to the current buffering frame

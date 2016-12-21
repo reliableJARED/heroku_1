@@ -27,6 +27,7 @@ app.use(serveStatic(__dirname + '/resources/images/'));
 app.use(serveStatic(__dirname + '/resources/images/textures'));
 app.use(serveStatic(__dirname + '/resources/client/'));
 app.use(serveStatic(__dirname + '/static/three.js/build/'));
+app.use(serveStatic(__dirname + '/static/three.js/controls/'));
 app.use(serveStatic(__dirname + '/static/ammo.js/'));
 app.use(serveStatic(__dirname + '/static/HID/'));
 app.use(serveStatic(__dirname + '/static/socket.io/'));
@@ -46,12 +47,7 @@ http.listen(port, function(){
 //GLOBAL variables
 const updateFrequency = 1;//Seconds
 physicsWorld.GameClock(updateFrequency);
-
-
-
 const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
-var clock = require(__dirname +'/resources/server/gameClock.js');//returns constructor for a clock
-clock = new clock(updateFrequency)
 
 //EXAMPLE
 /*nodeJS inheritence construct example */
@@ -107,20 +103,29 @@ const       fireBullet = 128;
 
 function SendUpdateToClients(){
 	var buffer = physicsWorld.getWorldUpdateBuffer();
+
 	io.emit('U', buffer);
 	console.log('update sent')
+	
 }
 
 function TickPhysics() {
-	
+		
+	 //:::TESTING:::
+	//for(var object in physicsWorld.rigidBodiesMasterObject){
+		
+	//	console.log(object," X ", physicsWorld.rigidBodiesMasterObject[object].x());
+	//}
+	//:::::::::::::
+	 
 	  // physicsWorld.step( deltaTime );
-	   physicsWorld.world.stepSimulation( physicsWorld.GameClock.getDelta(),10);
+	   physicsWorld.world.stepSimulation( physicsWorld.GameClock_getDelta(),10);
 
 	   //loop our physics at about X fps
 		setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 		
 		//return bool that is true every 'updateFrequency' seconds
-		if (physicsWorld.GameClock.UpdateTime()){
+		if (physicsWorld.GameClock_UpdateTime()){
 			process.nextTick(function (){SendUpdateToClients()} );
 		}
     };
@@ -157,6 +162,10 @@ function BuildWorldStateForNewConnection(socket_id){
 	//create a time stamp
 	var time = Date.now();
 	
+	console.log("send WORLD data to:",socket_id);
+	console.log("physics bytes sent:",physicsBinary.length);
+	console.log("graphics bytes sent:",graphicsBinary.length);
+	
 	//Only send to the new connection, NOT every connection
 	io.to(socket_id).emit('setup',{
 		time:time,
@@ -181,7 +190,7 @@ function init(){
 	
 	//OBJECT 1
 	//make a cube object, use defaults EXCEPT for width, depth and mass
-	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
+	var ground = new objectFactory.CubeObject({y:0,width:50,depth:50,mass:0}); 
 	//apply our graphic
 	ground.addGraphics({textures:groundTextures});
 	//add to the world
@@ -196,8 +205,8 @@ function init(){
 	physicsWorld.add(player);	
 	
 	//OBJECT 3
-	//make a sphere, use defaults EXCEPT for Ry rotation; 
-	var ball = new objectFactory.SphereObject({Ry:1.5});
+	//make a sphere, use defaults EXCEPT for Ry,rotation y,x position and apply a linear velocity on X axis; 
+	var ball = new objectFactory.SphereObject({Ry:1.5,y:10,x:3,LVx:10});
 	//wrap it with texture
 	ball.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
 	//add to the world
@@ -205,15 +214,15 @@ function init(){
 	
 	//OBJECT 4
 	//another box, use defaults EXCEPT for width,depth, height
-	var box = new objectFactory.CubeObject({width:2,depth:2,height:2});
+	var box = new objectFactory.CubeObject({width:2,depth:2,height:2,y:20});
 	//instead of doing a texture for each face like OBJECT 1, just use wrap
 	box.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
 	//add to world
 	physicsWorld.add(box);
 
 	//OBJECT 5
-	//another box, use all defaults
-	var box2 = new objectFactory.CubeObject();
+	//another box, use all defaults except y
+var box2 = new objectFactory.CubeObject({y:50,z:3});
 	//instead of doing a texture for each face, only texture the back
 	box2.addGraphics({textures:{back:TEXTURE_FILES_INDEX.playerFace}});
 	//add to world
@@ -228,7 +237,7 @@ function init(){
 	}
 	*/
 	//Start our world clock
-	physicsWorld.GameClock.start();
+	physicsWorld.GameClock_start();
 	
 	//start physics simulation
 	TickPhysics();
