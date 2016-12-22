@@ -63,15 +63,16 @@ var socket = io();
 			
 			console.log('total bytes of physics data:',msg.data.byteLength)
 			var UnpackedPhysicsData = PWM.unpackServerBinaryData_physics(msg.data);
+			console.log('unpacked physics',UnpackedPhysicsData)
 			
 			console.log('total bytes of graphics data:',msg.graphics.byteLength)
 			var UnpackedGraphicsData = GWM.unpackServerBinaryData_graphics(msg.graphics);
 
-			//make
+			//make objects from the unpacked data
 			for(var ID in UnpackedPhysicsData){
 				var newObject = MakePhysicsObject(UnpackedPhysicsData[ID]);
-				newObject.addGraphics(UnpackedGraphicsData[ID])
-				PWM.add(newObject)
+				newObject.addGraphics(UnpackedGraphicsData[ID]);
+				PWM.add(newObject);
 			}
 			
 			//all our objects
@@ -86,6 +87,9 @@ var socket = io();
 				PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
 			}
 			
+			//TESTING
+			console.log(GWM.graphicsMasterObject);
+			
 			//Show time!
 			nextWorldFrame();
 			
@@ -94,9 +98,9 @@ var socket = io();
 
 		
 		socket.on('U',function(msg){
-			console.log(msg.byteLength);
+		//	console.log(msg.byteLength);
 			var array = new Float32Array(msg);
-			console.log(array)
+		//	console.log(array)
 		});
 		
 function render() {
@@ -117,9 +121,14 @@ function render() {
 };
 
 function nextWorldFrame(){
-	
+
 	PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
 	
+	//*******TESTING !@!
+	for(var object in PWM.rigidBodiesMasterObject){
+			var obj = PWM.rigidBodiesMasterObject[object].physics.activate();
+		}
+			
 	//first get the position of all active objects with PWM.getWorldUpdateBuffer()
 	//and add this info to the current buffering frame
 	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());

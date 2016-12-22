@@ -39,14 +39,14 @@ var physicsWorldManager = function () {
 	const broadphase = new Ammo.btDbvtBroadphase();//BROAD
 	
 	//NOTE: Don't need btSoftBodyRigidBodyCollisionConfiguration() config if no soft bodies!
-	//const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
-	const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
+	const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
+	//const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
 	
 	const solver = new Ammo.btSequentialImpulseConstraintSolver();//SOLVER
 	
 	//IMPORTANT: Don't need this softBodySolver if no soft bodies!
 	//remove from btSoftRigidDynamicsWorld() args if not using
-	// new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
+	//const softBodySolver = new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
 	const softBodySolver = new Ammo.btDefaultSoftBodySolver();//SOLVER
 
 	
@@ -64,7 +64,7 @@ var physicsWorldManager = function () {
 
 
 physicsWorldManager.prototype.add = function(obj){
-	
+	console.log("adding:",obj)
 	//Zero Indexed so get the length BEFORE pushing the new obj
 	var UserIndex = this.rigidBodiesMasterArray.length;
 	this.rigidBodiesMasterArray.push(obj);
@@ -79,15 +79,12 @@ physicsWorldManager.prototype.add = function(obj){
 	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
 	else{ID = obj.id;}
 
-	//start the object as active
-	obj.physics.setActivationState(1);
-	
 	//add to our master object organizer
 	this.rigidBodiesMasterObject[ID] = obj;
 	
 	//add to the actual physics simulations
 	//this.world.addRigidBody( this.rigidBodiesMasterArray[UserIndex].physics );
-	this.world.addRigidBody( this.rigidBodiesMasterObject[ID].physics );
+	this.world.addRigidBody( obj.physics );
 }
 
 
@@ -579,9 +576,11 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
 		for(var object in this.rigidBodiesMasterObject){
 			
+			console.log(object," X,Y,Z ",this.rigidBodiesMasterObject[object].x(),this.rigidBodiesMasterObject[object].y(),this.rigidBodiesMasterObject[object].z())
+			
 			//check activation state
 			if(this.rigidBodiesMasterObject[object].physics.isActive()){
-
+		
 				//get physics data as float 32 array. NOTE: index 0 is the objects ID
 				var physicsDataBuffer = this.rigidBodiesMasterObject[object].BinaryExport_physics();
 

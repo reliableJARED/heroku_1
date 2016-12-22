@@ -96,9 +96,9 @@ objectPhysicsManipulationSuite.prototype = {
 			var objPhys = this.physics;
 			var trans = this.transform;
 				
-			objPhys.getWorldTransform(trans);
+			objPhys.getMotionState().getWorldTransform(trans);
 			var pos = trans.getOrigin();
-
+			
 			var rot = trans.getRotation();
 			var LV =  objPhys.getLinearVelocity();
 			var AV =  objPhys.getAngularVelocity();
@@ -126,7 +126,7 @@ objectPhysicsManipulationSuite.prototype = {
 			array[indexLoc.AVx] = AV.x();
 			array[indexLoc.AVy] = AV.y();
 			array[indexLoc.AVz] = AV.z();
-
+			
 			return array;
 			
 		},
@@ -217,8 +217,10 @@ var RigidBodyBase = function(blueprint){
 		this.AVx = blueprint.physics[index.AVx];
 		this.AVy = blueprint.physics[index.AVy];
 		this.AVz = blueprint.physics[index.AVz];
-		this.mass = blueprint.physics[index.mass];
-		this.shape = blueprint.shape;
+		
+		//IMPORTANT: mass is in geometry branch, not physics
+
+		
 		this.graphics = {};//if obj has associated graphics they will be placed here
 		
 		//TODO: Should callback() be added to RigidBodyBase?
@@ -236,7 +238,7 @@ RigidBodyBase.prototype.transform = new Ammo.btTransform();
 RigidBodyBase.prototype.vector3 = new Ammo.btVector3();
 RigidBodyBase.prototype.quaternion = new Ammo.btQuaternion();
 RigidBodyBase.prototype.createPhysics = function (){
-	
+		
 			var physicsShape;
 			var shapeCodes = this.ShapeIDCodes();
 
@@ -255,29 +257,37 @@ RigidBodyBase.prototype.createPhysics = function (){
 				
 				default: console.log('ERROR: this.shape either not defined or not a value of a known shape code from ShapeIDCodes()');
 			}
-	
-			//setup require d to build an object
-			this.quaternion.setValue(this.Rx,this.Ry,this.Rz,this.Rw);
 			
 			const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
 			physicsShape.setMargin(CollisionMargin);
 			
+			
+			//clear transform
 			this.transform.setIdentity();
+			//set position vector
 			this.vector3.setValue(this.x,this.y,this.z);
 			this.transform.setOrigin( this.vector3 );
+			//set rotation quaternion
+			this.quaternion.setValue(this.Rx,this.Ry,this.Rz,this.Rw);
 			this.transform.setRotation( this.quaternion );
 
 			var motionState = new Ammo.btDefaultMotionState( this.transform );
-	
-			var localInertia = this.vector3.setValue(0,0,0);
+			
+			//reset
+			var localInertia = new Ammo.btVector3( 0, 0, 0 );
 
 			physicsShape.calculateLocalInertia( this.mass, localInertia );
 
 			var rbInfo = new Ammo.btRigidBodyConstructionInfo( this.mass, motionState, physicsShape, localInertia );
 
 			//Assign FINAL OBJECT
-			this.physics = new Ammo.btRigidBody( rbInfo );
+			this.physics = new Ammo.btRigidBody( rbInfo );			
 			
+			//Apply velocity, if any
+			this.vector3.setValue(this.LVx,this.LVy,this.LVz);
+			this.physics.setLinearVelocity(this.vector3);
+			this.vector3.setValue(this.AVx,this.AVy,this.AVz);
+			this.physics.setAngularVelocity(this.vector3);
 			
 			/*To prevent accessing the wrong values, reassign location props to get functions.
 			The reason is these props are currently static, but the object can move.  
@@ -401,10 +411,11 @@ var CubeConstructorBase = function(blueprint){
 		var indexLoc  = this.geometry_indexLocations(this.shape);
 		
 		this.geometry = {};
-		this.mass = blueprint.geometry[indexLoc.mass];
+		
 		this.geometry.width = blueprint.geometry[indexLoc.width];
 		this.geometry.height = blueprint.geometry[indexLoc.height];
 		this.geometry.depth = blueprint.geometry[indexLoc.depth];
+		this.mass = blueprint.geometry[indexLoc.mass];
 
 }
 //CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
@@ -421,8 +432,9 @@ var SphereConstructorBase = function(blueprint){
 		var indexLoc  = this.geometry_indexLocations(this.shape);
 		
 		this.geometry = {};
-		this.mass = blueprint.geometry[indexLoc.mass];
+		
 		this.geometry.radius = blueprint.geometry[indexLoc.radius];
+		this.mass = blueprint.geometry[indexLoc.mass];
 
 }
 SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
@@ -433,6 +445,7 @@ SphereConstructorBase.prototype.constructor = SphereConstructorBase;
 var CubeObject = function(blueprint){
 	CubeConstructorBase.call(this,blueprint);
 	this.createPhysics();
+	//if(this.mass>0)this.physics.forceActivationState(1);
 }
 CubeObject.prototype =  Object.create(CubeConstructorBase.prototype); 
 CubeObject.prototype.constructor = CubeObject;
@@ -441,6 +454,7 @@ CubeObject.prototype.constructor = CubeObject;
 var SphereObject = function(blueprint){
 	SphereConstructorBase.call(this,blueprint);
 	this.createPhysics();
+	if(this.mass>0)this.physics.activate(true);
 }
 SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;

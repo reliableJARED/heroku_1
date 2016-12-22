@@ -268,7 +268,9 @@ RigidBodyBase.prototype.createPhysics = function (){
 
 			var motionState = new Ammo.btDefaultMotionState( this.transform );
 	
-			var localInertia = this.vector3.setValue(0,0,0);
+			//reset
+		//	this.vector3.setValue(0,0,0);
+			var localInertia = new Ammo.btVector3( 0, 0, 0 );
 
 			physicsShape.calculateLocalInertia( this.mass, localInertia );
 

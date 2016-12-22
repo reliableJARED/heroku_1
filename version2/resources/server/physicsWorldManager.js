@@ -39,14 +39,14 @@ var physicsWorldManager = function () {
 	const broadphase = new Ammo.btDbvtBroadphase();//BROAD
 	
 	//NOTE: Don't need btSoftBodyRigidBodyCollisionConfiguration() config if no soft bodies!
-	//const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
-	const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
+	const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
+	//const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
 	
 	const solver = new Ammo.btSequentialImpulseConstraintSolver();//SOLVER
 	
 	//IMPORTANT: Don't need this softBodySolver if no soft bodies!
 	//remove from btSoftRigidDynamicsWorld() args if not using
-	// new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
+	//const softBodySolver =  new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
 	const softBodySolver = new Ammo.btDefaultSoftBodySolver();//SOLVER
 
 	

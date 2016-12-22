@@ -118,6 +118,7 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 	//ArrayOfObjectData is ALL data from the physics simulation for objects that are active, and therefore require their 
 	//grahic to be drawn again in the new location.
 	
+	//console.log("load buffer with:", ArrayOfObjectData)
 	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
 }
 
@@ -125,8 +126,8 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 
 graphicsWorldManager.prototype.drawFromBuffer = function () {
 
-	console.log("buffer frame:",this.bufferingFrame)
-	console.log("render frame:",this.renderingFrame)
+	//console.log("buffer frame:",this.bufferingFrame)
+	//console.log("render frame:",this.renderingFrame)
 	
 	var serverIndexLoc = this.physics_indexLocations;
 	
@@ -141,10 +142,11 @@ graphicsWorldManager.prototype.drawFromBuffer = function () {
 
 		//get the graphic for the objects data
 		var objToUpdate = this.graphicsMasterObject[objUpdateData[serverIndexLoc.id]];
-
+		//console.log("update ",objToUpdate," with ",objUpdateData)
 		//update the graphic		
 		objToUpdate.position.set(objUpdateData[serverIndexLoc.x], objUpdateData[serverIndexLoc.y], objUpdateData[serverIndexLoc.z] );
 		objToUpdate.quaternion.set(objUpdateData[serverIndexLoc.Rx], objUpdateData[serverIndexLoc.Ry], objUpdateData[serverIndexLoc.Rz], objUpdateData[serverIndexLoc.Rw] );
+		
 	
 	}
 	

@@ -105,7 +105,13 @@ function SendUpdateToClients(){
 	var buffer = physicsWorld.getWorldUpdateBuffer();
 
 	io.emit('U', buffer);
-	console.log('update sent')
+	//console.log('update sent')
+	 //:::TESTING:::
+	for(var object in physicsWorld.rigidBodiesMasterObject){
+		
+		console.log(object," X,Y,Z:", ~~physicsWorld.rigidBodiesMasterObject[object].x(),~~physicsWorld.rigidBodiesMasterObject[object].y(),~~physicsWorld.rigidBodiesMasterObject[object].z()," Rx,Ry,Rz:", physicsWorld.rigidBodiesMasterObject[object].Rx(),physicsWorld.rigidBodiesMasterObject[object].Ry(), physicsWorld.rigidBodiesMasterObject[object].Rz());
+	}
+	//:::::::::::::
 	
 }
 
@@ -190,12 +196,12 @@ function init(){
 	
 	//OBJECT 1
 	//make a cube object, use defaults EXCEPT for width, depth and mass
-	var ground = new objectFactory.CubeObject({y:0,width:50,depth:50,mass:0}); 
+	var ground = new objectFactory.CubeObject({y:0,width:500,depth:500,mass:0}); 
 	//apply our graphic
 	ground.addGraphics({textures:groundTextures});
 	//add to the world
 	physicsWorld.add(ground);
-	
+	/*
 	//OBJECT 2
 	//make another box, use defaults EXCEPT for y location and mass 
 	var player = new objectFactory.CubeObject({x:2,y:20,mass:50});
@@ -203,15 +209,17 @@ function init(){
 	player.addGraphics({colors:{wrap:0xffff00}});//YELLOW
 	//add to world
 	physicsWorld.add(player);	
-	
+	*/
 	//OBJECT 3
-	//make a sphere, use defaults EXCEPT for Ry,rotation y,x position and apply a linear velocity on X axis; 
-	var ball = new objectFactory.SphereObject({Ry:1.5,y:10,x:3,LVx:10});
+	//make a sphere, use defaults EXCEPT for mass, Ry,rotation y,x position and apply a rotation on the X axis
+	//using Angular Velocity (AV) not LV, else the object will SLIDE not ROLL even though it's a sphere
+	var ball = new objectFactory.SphereObject({mass:100,Ry:1.5,y:100,x:3,AVx:10});
 	//wrap it with texture
 	ball.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
 	//add to the world
 	physicsWorld.add(ball);	
-	
+	console.log(ball.id);
+	/*
 	//OBJECT 4
 	//another box, use defaults EXCEPT for width,depth, height
 	var box = new objectFactory.CubeObject({width:2,depth:2,height:2,y:20});
@@ -227,7 +235,7 @@ var box2 = new objectFactory.CubeObject({y:50,z:3});
 	box2.addGraphics({textures:{back:TEXTURE_FILES_INDEX.playerFace}});
 	//add to world
 	physicsWorld.add(box2);	
-	
+	*/
 	
 	/*
 	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
