@@ -128,7 +128,7 @@ function nextWorldFrame(){
 	for(var object in PWM.rigidBodiesMasterObject){
 			var obj = PWM.rigidBodiesMasterObject[object].physics.activate();
 		}
-			
+		//	
 	//first get the position of all active objects with PWM.getWorldUpdateBuffer()
 	//and add this info to the current buffering frame
 	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());
