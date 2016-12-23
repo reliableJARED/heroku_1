@@ -7,7 +7,13 @@ if(typeof Ammo === 'undefined'){
 const IMPACT_IMPULSE_MINIMUM = 1;//minimum collision force required to register
 
 var physicsWorldManager = function () {
-
+	//GAME CLOCK VARS
+	this.startTime;
+	this.oldTime;
+	this.timeToSendUpdate;
+	this.clientPhysicsUpdateFrequency;
+	
+	
 	/*
 	HAVE Collision handling done by a function that is passed in.  the PWM will get all the collisions, then
 	use the passed in function(s) to determine what to do with them.
@@ -33,14 +39,14 @@ var physicsWorldManager = function () {
 	const broadphase = new Ammo.btDbvtBroadphase();//BROAD
 	
 	//NOTE: Don't need btSoftBodyRigidBodyCollisionConfiguration() config if no soft bodies!
-	//const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
-	const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
+	const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
+	//const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
 	
 	const solver = new Ammo.btSequentialImpulseConstraintSolver();//SOLVER
 	
 	//IMPORTANT: Don't need this softBodySolver if no soft bodies!
 	//remove from btSoftRigidDynamicsWorld() args if not using
-	// new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
+	//const softBodySolver = new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
 	const softBodySolver = new Ammo.btDefaultSoftBodySolver();//SOLVER
 
 	
@@ -58,7 +64,7 @@ var physicsWorldManager = function () {
 
 
 physicsWorldManager.prototype.add = function(obj){
-	
+	console.log("adding:",obj)
 	//Zero Indexed so get the length BEFORE pushing the new obj
 	var UserIndex = this.rigidBodiesMasterArray.length;
 	this.rigidBodiesMasterArray.push(obj);
@@ -73,14 +79,12 @@ physicsWorldManager.prototype.add = function(obj){
 	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
 	else{ID = obj.id;}
 
-	//start the object as active
-	obj.physics.setActivationState(1);
-	
 	//add to our master object organizer
 	this.rigidBodiesMasterObject[ID] = obj;
 	
 	//add to the actual physics simulations
-	this.world.addRigidBody( this.rigidBodiesMasterArray[UserIndex].physics );
+	//this.world.addRigidBody( this.rigidBodiesMasterArray[UserIndex].physics );
+	this.world.addRigidBody( obj.physics );
 }
 
 
@@ -344,120 +348,143 @@ physicsWorldManager.prototype.getServerBinaryDataStructure_physics = function ()
 						AVz:13
 			}
 }
+	
 
-physicsWorldManager.prototype.unpackServerBinaryData = function(binaryData){
+physicsWorldManager.prototype.ServerShapePropCount = function(){
 	
+	//TODO: Server should set this, maybe something like this?:
+	/*
+	physicsWorldManager.prototype.ServerShapePropCount = function(setting){
+		var props = {cube:4,sphere1}
+		if(arguments.length<1){
+			return props
+		}else{
+			props = setting
+		}
+	}
+	*/
 	
-	// binaryData is mixed structure binary data for all objects
-	//first 8 bytes are int16 headers
+	return {
+			cube:4,
+			sphere:2
+		}
+};	
+
+physicsWorldManager.prototype.ServerShapeIDCodes = function(){
+	
+	//TODO: Server should set this, too
+
+	return {
+			cube:0,
+			sphere:1
+		}
+};	
+
+physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryData){
+	
+	const UnpackedDataObject = new Object();
+	
+	//What makes this complicated is it's not uniform binary data.  Cubes for example use more bytes than sphere.
+	//Each object has a uniform set of Float32 bytes and an Int8 Shape code at it's start.  
+	//As data is unpacked we will be able to determine what shape is being unpacked, therefore how many bytes it occupies
+	//first 8 bytes of the ENTIRE buffer are a set of int16 headers
 	   var headerCount = 4;
-		var header = new Uint16Array(binaryData,0,headerCount);
+	   var header = new Uint16Array(binaryData,0,headerCount);
 		
 			var totalObjs = header[0];
 			var leadingF32data = header[1];
 			var header3 = header[2];
 			var header4 = header[3];
-					
-			//What makes it complicated is it's not uniform.  Cubes for example have more data than sphere
-			//as data is unpacked we will be able to determine what shape is next to be unpacked
-			//the data will ALWAYS have 14 float32 and 1 int8 before the non-uniform shape specific data
 			
+			// f32 are always leading, *4 to get bytes
+			var leadingF32bytes = (leadingF32data * 4);
 			
-			
-			var initF32Data = (leadingF32data * 4);// f32 are always leading
 			var physicsDataStructure = this.getServerBinaryDataStructure_physics();
-			
-			//skip first 8 because they are headers
-			var headerOffset = headerCount * 2;//want bytes not number of int16 headers
-			
-			
+
 			//recycle object blueprint
 			var newObjBlueprint = Object();
 			
-			var BytesOfPreviousObj = 0;//this will change EVERY pass of the for loop below
-			var offset = headerOffset;
-			for(var i = headerOffset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
+			//used to move along ENTIRE buffer
+			var offset = headerCount * 2;//calculate bytes of headers for offset
+			
+			//used to log byte count of a single unpacked object
+			var BytesOfPreviousObj = 0;
+			
+			//used to know how many GEOMETRY properties a shape has
+			var ServerShapePropCount = this.ServerShapePropCount();
+			
+			//number to shape code object
+			var ServerShapeIDCodes = this.ServerShapeIDCodes();
+			
+			for(var i = offset,fullBuffer=binaryData.byteLength; i<fullBuffer;i+=BytesOfPreviousObj){
 				
 				//Reset
 				newObjBlueprint = {};
 				
 				/*https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/ArrayBuffer/slice
 				need to slice the buffer before converting into typedArray.
-				this is because new typedArray() expects start to be an increment
-				of the base.  ie floats start on multipue of 4. because the total buffer is a mix we cant just
-				iterate through
+				 new typedArray() expects start to be an increment of the base bytes.  ie floats base byte is 4. 
 				*/
-				BytesOfPreviousObj = 0;//reset
-				offset = i;
-			
-				var bufferF32 = binaryData.slice(offset,offset+initF32Data)
-				var firstF32 = new Float32Array(bufferF32);
+				BytesOfPreviousObj = 0;//reset byte counter
+				offset = i;//slide our location in buffer 
 				
-				//Assign unpacked physics properties to blueprint
-				newObjBlueprint.id = firstF32[physicsDataStructure.id]
-				newObjBlueprint.x =firstF32[physicsDataStructure.x]
-			   newObjBlueprint.y =firstF32[physicsDataStructure.y]
-				newObjBlueprint.z =firstF32[physicsDataStructure.z] 
-				newObjBlueprint.Rx =firstF32[physicsDataStructure.Rx] 
-				newObjBlueprint.Ry =firstF32[physicsDataStructure.Ry] 
-				newObjBlueprint.Rz =firstF32[physicsDataStructure.Rz] 
-				newObjBlueprint.Rw =firstF32[physicsDataStructure.Rw] 
-		      newObjBlueprint.LVx =firstF32[physicsDataStructure.LVx] 
-				newObjBlueprint.LVy =firstF32[physicsDataStructure.LVy] 
-				newObjBlueprint.LVz =firstF32[physicsDataStructure.LVz] 
-				newObjBlueprint.AVx =firstF32[physicsDataStructure.AVx] 
-				newObjBlueprint.AVy =firstF32[physicsDataStructure.AVy] 
-				newObjBlueprint.AVz =firstF32[physicsDataStructure.AVz] 
+			    //Unpack PHYSICS
+				//var buffer = binaryData.slice(offset,offset+leadingF32bytes)
+				var physicsArray = new Float32Array(binaryData.slice(offset,offset+leadingF32bytes));
 				
 				
-				BytesOfPreviousObj += bufferF32.byteLength;
+				//slide our location in buffer 
+				offset += leadingF32bytes
+				//increment byte counter
+				BytesOfPreviousObj += leadingF32bytes;
 				
-				//slide buffer
-				offset += initF32Data
-				
-				var shapeBuffer = binaryData.slice(offset,offset+1)
-				var shape = new Int8Array(shapeBuffer);
-				
-				newObjBlueprint.shape[0] 
+				//Unpack SHAPE CODE
+				//HARDCODE WARNING!! 1 byte for shape code.
+			    //buffer = binaryData.slice(offset,offset+1)
+				var shapeCode = new Int8Array(binaryData.slice(offset,offset+1));//the shape code can be found: shapeCode[0] 
 				
 				
-				BytesOfPreviousObj += shapeBuffer.byteLength;
-				
-				//slide buffer
+				//slide our location in buffer 
 				offset += 1;
+				//increment byte counter
+				BytesOfPreviousObj += 1;
 				
-				//Unpack geometry
-				var geometryF32props;
-				var geoProps;
-				switch(shape[0]){
+				//Unpack GEOMETRY
+				var geometryF32bytes = 4;//this will be used as a multiplyer to get byte count
+				
+				//determine how many bytes the geometry data occupies
+				switch(shapeCode[0]){
 					
-					case ServerShapeIDCodes().cube: geometryF32props = ServerShapePropCount().cube;//width,height,depth
-																geoProps = ['width','height','depth'];
+					case ServerShapeIDCodes.cube: geometryF32bytes *= ServerShapePropCount.cube;										
 					break;
-					case ServerShapeIDCodes().sphere: geometryF32props = ServerShapePropCount().sphere;//radius
-																geoProps = ['radius'];
+					case ServerShapeIDCodes.sphere: geometryF32bytes *= ServerShapePropCount.sphere;										
 					break;
-					default: console.log('todo');
-				}
-				//multiply by 4 to get bytes
-				geometryF32props *= 4
-				
-				var geometryBuffer = binaryData.slice(offset,offset+geometryF32props)
-				var geof32 = new Float32Array(geometryBuffer);
-				
-				for (var p=0,geoProps.length;p<geoProps;p++) {
-						newObjBlueprint[geoProps[p]] = geof32[p]	
-				};
-				
-				BytesOfPreviousObj += geometryF32props;
-				
-				switch(newObjBlueprint.shape) {
-					case ServerShapeIDCodes().cube: this.rigidBodiesMasterObject[newObjBlueprint.id] = new CubeObject(newObjBlueprint);		
+					default: console.log('shape code error in unpackServerBinaryData_physics()');
 				}
 				
+				//make geometry data array now that byte size is known
+			//	buffer = binaryData.slice(offset,offset+geometryF32bytes)
+				var geometryArray = new Float32Array(binaryData.slice(offset,offset+geometryF32bytes));
+
+					
+				//don't need to slide 'offset' because it will be reassined to value of 'i' on next for loop pass
+				//we DO increment byte counter: BytesOfPreviousObj, which will be added to 'i' for next loop
+				BytesOfPreviousObj += geometryF32bytes;
+				
+				//Assign the ID from the unpacked physics data
+				var objID = physicsArray[physicsDataStructure.id];
+				
+				
+				//MAKE THE OBJECT!!
+				UnpackedDataObject[objID] = {shape:shapeCode[0],
+											physics:physicsArray,
+											geometry:geometryArray}	
 			}
 			
+	return UnpackedDataObject;
 }
+
+
 
 /*********
 getCollisionForces() EXPERIMENTAL METHOD UNDER DEVELOPMENT 
@@ -542,14 +569,51 @@ physicsWorldManager.prototype.getCollisionForces = function(timeStep){
 	
 };
 
+physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
+		
+		var frameDataArray = new Array();
+		
+		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
+		for(var object in this.rigidBodiesMasterObject){
+			
+			console.log(object," X,Y,Z ",this.rigidBodiesMasterObject[object].x(),this.rigidBodiesMasterObject[object].y(),this.rigidBodiesMasterObject[object].z())
+			
+			//check activation state
+			if(this.rigidBodiesMasterObject[object].physics.isActive()){
+		
+				//get physics data as float 32 array. NOTE: index 0 is the objects ID
+				var physicsDataBuffer = this.rigidBodiesMasterObject[object].BinaryExport_physics();
+
+				frameDataArray.push(physicsDataBuffer)
+			}
+		}
+		
+		return frameDataArray;
+	
+}
+
+physicsWorldManager.prototype.GameClock = function (serverTime) {
+	//create a 'lag' attribute which is delta of serverTime and Date.now()?
+	console.log('setClock',serverTime)
+	console.log('current time',Date.now())
+	this.startTime = Date.now();//serverTime || Date.now();
+	this.oldTime = Date.now();//serverTime || Date.now();
+};
+
+
+physicsWorldManager.prototype.GameClock_getDelta = function () {
+	var delta = 0;
+	var newTime = Date.now();
+
+	//convert from mili seconds to seconds 
+	delta = 0.001 * ( newTime - this.oldTime );
+
+	this.oldTime = newTime;
+	
+	return delta;
+};
+
 
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 
 //module.exports = physicsWorldManager; //constructor
-
-// Export an instance when imported
-module.exports =  (function(){
-	//this assumes you would only ever have ONE world....
-	//convert to regular function not an IIEF if more than one world is expected
-	return new physicsWorldManager();//instance
-})();

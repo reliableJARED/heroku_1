@@ -1,247 +1,534 @@
 
-var physicsWorldManager = function (Ammo) {
 
-	this.Ammo = Ammo;//Physics Engine
-	this.vector3Aux1 = new this.Ammo.btVector3();
-	this.transformAux1 = new this.Ammo.btTransform();
-	this.quaternionAux1 = new this.Ammo.btQuaternion();
-	this.rigidBodiesIndex = new Object();//holds info about world objects.  Sent to newly connected clients so that they can build the world.  Similar to ridgidBodies but includes height, width, depth, color, object type.
-	this.RigidBodyConstructor  = require(__dirname +'/rigidBodyConstructor.js');
-
-	this.dispatcher; //Collision Manager
-	this.physicsWorld;//WORLD
-	this.init();
+if(typeof Ammo === 'undefined'){
 	
-	//Fill arrays with defaults	
-	this.cubeShapeCode = 0;
+	console.log('**********ERROR*******************There is no instance of \'node-ammo\'.  Please import first with require(node-ammo) before using PhysicsObjectFactory********************************');
+}
+
+const IMPACT_IMPULSE_MINIMUM = 1;//minimum collision force required to register
+
+var physicsWorldManager = function () {
+	//GAME CLOCK VARS
+	this.startTime;
+	this.oldTime;
+	this.timeToSendUpdate;
+	this.clientPhysicsUpdateFrequency;
+	
+	/*
+	HAVE Collision handling done by a callback?  the PWM will get all the collisions, then
+	use the passed in function(s) to determine what to do with them?
+	this.collisionHandler = callback;
+	*/
+
+	//keep these on instance NOT prototype like they are with rigidBodies from the 'PhysicsObjectFactory()'
+	this.vector3 = new Ammo.btVector3();
+	this.transform = new Ammo.btTransform();
+	this.quaternion = new Ammo.btQuaternion();
+	
+	
+	//ORGANIZERS: 
+	//The rigidBodiesMasterObject and rigidBodiesMasterArray hold reference to all objects in the world.
+	//Use rigidBodiesMasterObject to Find Objects by their ptr ID
+	this.rigidBodiesMasterObject = new Object();
+	//Use rigidBodiesMasterArray to Find Objects by their UserIndex
+	this.rigidBodiesMasterArray = new Array(); 
+	
+	/*Private Variables*/
+	const gravityConstant = -9.6;
+	
+	const broadphase = new Ammo.btDbvtBroadphase();//BROAD
+	
+	//NOTE: Don't need btSoftBodyRigidBodyCollisionConfiguration() config if no soft bodies!
+	const collisionConfiguration = new Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
+	//const collisionConfiguration = new Ammo.btDefaultCollisionConfiguration() ;//NARROW
+	
+	const solver = new Ammo.btSequentialImpulseConstraintSolver();//SOLVER
+	
+	//IMPORTANT: Don't need this softBodySolver if no soft bodies!
+	//remove from btSoftRigidDynamicsWorld() args if not using
+	//const softBodySolver =  new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration)
+	const softBodySolver = new Ammo.btDefaultSoftBodySolver();//SOLVER
+
+	
+	/*Public Variables*/
+	//dispatcher is used to determine what objects are in collision
+	this.dispatcher = new Ammo.btCollisionDispatcher( collisionConfiguration );//DISPATCHER
+	
+	//THE VERY IMPORTANT ALL POWERFUL: PHYSICS WORLD
+	this.world = new Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration, softBodySolver);
+	
+	//note: setGravity accepts a vector, you could set gravitationl force in x or z too if you wanted.	
+	this.vector3.setValue( 0, gravityConstant, 0 )	
+	this.world.setGravity( this.vector3 );
 }	
 
 
-physicsWorldManager.prototype.DefaultBlueprint_cube = function(replacments){
+physicsWorldManager.prototype.add = function(obj){
 	
-	var defaults = {
-		w:2,
-		h:2,
-		d:2,
-		mass:1,
-		x:0,
-		y:1,
-		z:0,
-		Rx:0,
-		Ry:0,
-		Rz:0,
-		Rw:1,
-		shape:this.cubeShapeCode
-	}
-
-	//if there are replacement values replace/add them
-	if(arguments.length > 0){
-		var defaults  = Object.assign(defaults,replacments);
-	}
+	//Zero Indexed so get the length BEFORE pushing the new obj
+	var UserIndex = this.rigidBodiesMasterArray.length;
+	this.rigidBodiesMasterArray.push(obj);
 	
-	return defaults;
-}
-
-
-physicsWorldManager.prototype.createPhysicsForCube = function (blueprint){
-
-	const CollisionMargin = 0.04;//just trust me you want this, research if you want to learn more
-		
-	/*set the position of our physics object using our reusable vector object*/
-   //The 0.5 is because bullet uses half extents for boxShape: http://bulletphysics.org/Bullet/BulletFull/btBoxShape_8cpp_source.html
-	//the full extents of the box will be twice the half extents, e. g. from -x to +x on the local x-axis.	
-	this.vector3Aux1.setValue( blueprint.w*0.5, blueprint.h*0.5, blueprint.d*0.5 )
-	
-	/*set the orientation of our physics object using our reusable quaternion object*/
-	this.quaternionAux1.setValue(blueprint.Rx,blueprint.Ry,blueprint.Rz,blueprint.Rw);
-		
-	var physicsShape = new this.Ammo.btBoxShape(this.vector3Aux1);
-	
-	//set the collision margin
-	physicsShape.setMargin(CollisionMargin);
-	
-	/* use a transform to apply the loc/orient of our new physics object in world space using our reusable transform object*/
-	//btTransform() supports rigid transforms with only translation and rotation and no scaling/shear.
-	this.transformAux1.setIdentity();
-	
-	this.vector3Aux1.setValue(blueprint.x,blueprint.y,blueprint.z);
-	
-	this.transformAux1.setOrigin( this.vector3Aux1 );
-    
-	//setRotation() is for Orientation
-	this.transformAux1.setRotation( this.quaternionAux1 );
-	
-	//set the motion state and inertiab of our object
-	var motionState = new this.Ammo.btDefaultMotionState( this.transformAux );
-	
-	var localInertia = this.vector3Aux1.setValue(0,0,0);
-
-	physicsShape.calculateLocalInertia(blueprint.mass, localInertia );
-	
-	//create our final physics rigid body info
-	var rbInfo = new this.Ammo.btRigidBodyConstructionInfo( blueprint.mass, motionState, physicsShape, localInertia );
-	
-	//build our ridgidBody
-	var Cube = new this.Ammo.btRigidBody( rbInfo );
-
-	blueprint.physics = Cube;
-	blueprint.id = Cube.ptr;
-	
-	//return our object which is now ready to be added to the world
-	return blueprint;
-}
-
-physicsWorldManager.prototype.AddToRigidBodiesIndex = function(obj){
-	
-	//indicates if this object can break. If it can breakApartForce is the force required to break it in Newtons
-	//if it's 0 it means object cant break
-	if(typeof obj.breakApartForce === 'undefined'){obj.breakApartForce = 0};
+	//IMPORTANT!!!
+	//you can set or get UserIndex.  ONLY this menthod should ever set it
+	//it is a very import attribute that ties collisions back to objects, EFFECIENTLY
+	obj.physics.setUserIndex(UserIndex);
 	
 	//master object organizer
 	var ID; 
 	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
 	else{ID = obj.id;}
 
-	this.rigidBodiesIndex[ID] = new this.RigidBodyConstructor(obj,(new this.Ammo.btTransform()),new this.Ammo.btVector3());
+	//start the object as active
+	obj.physics.setActivationState(1);
+	
+	//add to our master object organizer
+	this.rigidBodiesMasterObject[ID] = obj;
 	
 	//add to the actual physics simulations
-	this.physicsWorld.addRigidBody( obj.physics );
-	
-	return obj;
+	this.world.addRigidBody( this.rigidBodiesMasterArray[UserIndex].physics );
 }
 
 
-physicsWorldManager.prototype.createCube = function (blueprint) {
+physicsWorldManager.prototype.reassignIndexLocationsAfterIndex = function(IndexPosition){
 	
+	//update ALL the indexlocations for elements AFTER this one
+	//....If large numbers of objects are being removed this method sux
+	for(var i = IndexPosition, total = this.ridgidBodiesArray.length; i <total;i++){
+		
+		this.rigidBodiesMasterArray[i].physics.setUserIndex(i);
+	};
 	
-	/*WARNING! 
-		if createPhysicsForCube() is called without all args, the builder will use some defaults
-		setting it up like this could cause errors
-	    However, it's nice to have defaults and the flexibility to change one or all, i.e. situations where cube building is happening.
-	*/
+}
+physicsWorldManager.prototype.removeObj = function(obj){
+	
+	var ID; 
+	if(typeof obj.id !== 'string'){ID = obj.id.toString()}
+	else{ID = obj.id;}
 
+	this.world.removeRigidBody( this.rigidBodiesMasterObject[ID].physics);
+	
+	//remove from our master object organizer
+	delete this.rigidBodiesMasterObject[ID];
+	
+	//index location in our master array
+	var IndexPosition = obj.physics.getUserIndex();
+	
+	//remove it from our master array
+	this.rigidBodiesMasterArray.splice(IndexPosition,1);
+	
+	//update ALL the indexlocations for elements AFTER this one
+	this.reassignIndexLocationsAfterIndex()
+}
+
+physicsWorldManager.prototype.removeObjByID = function(objID){
+	
+	var ID; 
+	if(typeof objID !== 'string'){ID = objID.toString()}
+	else{ID = objID;}
+
+	//remove from simulation
+	this.world.removeRigidBody( this.rigidBodiesMasterObject[ID].physics);
+	
+	//get objects index location in our master array
+	var IndexPosition = this.rigidBodiesMasterObject[ID].physics.getUserIndex();
+	
+	//remove from our master object organizer
+	delete this.rigidBodiesMasterObject[ID];
+	
+	//remove it from our master array
+	this.rigidBodiesMasterArray.splice(IndexPosition,1);
+	
+	//update ALL the indexlocations for elements AFTER this one
+	this.reassignIndexLocationsAfterIndex(IndexPosition)
+}
+
+physicsWorldManager.prototype.removeObjByIndex = function(IndexPosition){
+	
+	var object = this.ridgidBodiesArray[IndexPosition];
+	
+	//remove from simulation
+	this.world.removeRigidBody( object.physics);
+	
+	//remove from our master object organizer
+	var ID = object.id;
+	if(typeof ID !== 'string'){ID = ID.toString()};
+	delete this.rigidBodiesMasterObject[ID];
+	
+	//remove it from our master array
+	this.rigidBodiesMasterArray.splice(IndexPosition,1);
+	
+	//update ALL the indexlocations for elements AFTER this one
+	this.reassignIndexLocationsAfterIndex(IndexPosition)
+};
+
+physicsWorldManager.prototype.removeObjByIndexBatch = function(IndexPositionsArray){
+	
+	//FIRST:
+	//sort array deccending
+	IndexPositionsArray.sort(function(a, b){return b - a});
+
+	//SECOND:
+	//remove the objects from master locations
+	for(var i=0,count=IndexPositionsArray.length; i<count;i++){
+		
+		var theObject = this.rigidBodiesMasterArray[IndexPositionsArray[i]];
+		
+		var ID = theObject.physics.id.toString();
+		if(typeof ID !== 'string'){ID = ID.toString()};
+		delete this.rigidBodiesMasterObject[ID];
+		
+		this.world.removeRigidBody( theObject.physics);
 			
-	//replace any required build props not supplied by blueprint with defaults 
-	var buildProps = this.DefaultBlueprint_cube(blueprint);
-		
-	
-	var block = this.AddToRigidBodiesIndex(this.createPhysicsForCube(buildProps));
+		this.rigidBodiesMasterArray.splice(IndexPositionsArray[i],1);
+	}
 
-	return block;
-}
+	//THIRD:
+	//get lowest index value that was removed with .pop() (remember we sorted so value lowest is at end)
+	//then update ALL the index locations for elements AFTER this lowest index removed
+	this.reassignIndexLocationsAfterIndex(IndexPositionsArray.pop());
+};
 
-physicsWorldManager.prototype.AddToPhysicsWorld = function(cubeObjBlueprint){
-	
-		//build the object
-		var cube = this.createPhysicsForCube(cubeObjBlueprint);
 
-		//add to our index used to update clients about objects that have moved
-		//IMPORTANT: AddToRigidBodiesIndex expects that cube.physics is an Ammo object. 
-		this.AddToRigidBodiesIndex(cube);
-		
-		return cube;
-}
-
-physicsWorldManager.prototype.launchCube = function (data){
-		//first 4 bytes will be headers
-		//last 48 bytes will be data
+physicsWorldManager.prototype.step = function(deltaTime){
+	this.world.stepSimulation( deltaTime,10);
+};
 
 /*
-TODO:
-this should use the setXYZArray functions
+GENERAL collision detection notes:
+
+1) there are a lot of options, see: http://www.bulletphysics.org/mediawiki-1.5.8/index.php?title=Collision_Callbacks_and_Triggers
+
+the best options will obviously be subject to the specific goal.  In the case of smashing blocks we don't care what hit them, just that they were struck with enough force to break.
+
+In the case of colliding with a 'power up' we only care that it was struck and by which player.
+
+for this reason the getCollisionPairsArray() menthod was created.  It returns an array with the form [force,obj1,obj2,force,obj1,obj2,etc.]
+
+you can now tell what two objects collided and with how much force.
+
+IMPORTANT Note on collision objects:------->
+this.dispatcher.getManifoldByIndexInternal(i).getBody0().getUserPointer() returns an object: VoidPtr{ptr:number}
+or
+this.dispatcher.getManifoldByIndexInternal(i).getBody0().getUserIndex() returns the ptr value of the
+VoidPtr object
+
+This can be used as a flag.  to indicate specific actions.  The ptr can be accessed by the physics property
+of the rigid body.  Its one of the few if only direct links between a collision object and it's coresponding rigid body when using Ammo (obv in bullet you get actual pointers because it's c++)
+there are coresponding set methods setUserPointer(number) setUserIndex(number).  they do what you'd expect.
+--------/>
 */
-		var headers   = new Uint8Array(4);
-		headers[0] = this.fireBullet;
-		headers[1] = 0//not assigned right now
-		headers[2] = 0//not assigned right now
-		headers[3] = 0//not assigned right now
-		
-		
-		this.setDimensionsArray(.5,.5,.5);
-		this.setPositionArray(data.readFloatLE(4),data.readFloatLE(8),data.readFloatLE(12));
-		this.setOrientationArray(0,0,0,1);
-		this.setLinearVelocityArray(data.readFloatLE(16),data.readFloatLE(20),data.readFloatLE(24));		
-		
-		var binaryData   = new Float32Array(12);
-		binaryData[0] = 0.5;//width
-		binaryData[1] = 0.5;//height
-		binaryData[2] = 0.5;//depth
-		binaryData[3] = 10;//mass
-		binaryData[4] = Math.random() * 0xffffff //RANDOM color
-		binaryData[5] = data.readFloatLE(4);//x
-		binaryData[6] = data.readFloatLE(8);//y
-		binaryData[7] = data.readFloatLE(12);//z
-		binaryData[8] = data.readFloatLE(16);//Linear Velocity x
-		binaryData[9] = data.readFloatLE(20);//Linear Velocity y
-		binaryData[10] = data.readFloatLE(24);//Linear Velocity z
-		
-		//array positions: w,h,d,mass,x,y,z,Rx,Ry,Rz,Rw
-		/*
-		TODO!!
-		binaryData should be a standard format to send to AddToPhysicsWOrld so dont need two arrays
-		*/
-		var cubeObjBlueprint = [binaryData[0],binaryData[1],binaryData[2],binaryData[3],binaryData[5],binaryData[6],binaryData[7],0,0,0,1]
-		
-		//build the object
-		/*TODO: Dont use AddToPhysicsWorld, deprecated function */
-		var cube = this.AddToPhysicsWorld(cubeObjBlueprint);
-		
-		
-		binaryData[11] = cube.physics.ptr;//the NUMBER portion of ptr ID
-		
-		//create a vector to apply shot force to our bullet
-		this.vector3Aux1.setValue(data.readFloatLE(16),data.readFloatLE(20),data.readFloatLE(24));
-		
-		//apply the movement force of the shot
-		cube.physics.applyCentralImpulse(this.vector3Aux1);
-
-		//keep the cube always active		
-		cube.physics.setActivationState(4);
-
-
-		//prepare binary data for shipping
-		var dataBuffer = Buffer.from(binaryData.buffer)
-		var headersBuffer = Buffer.from(headers.buffer);
-		//console.log(dataBuffer.byteLength)
-		//console.log(headers.byteLength);
-		
-		var binaryShot = Buffer.concat([headersBuffer,dataBuffer],(dataBuffer.byteLength+headers.byteLength));
-		//console.log(ship.byteLength)
-		
-		//remove shot from world in 5000 mili seconds	
-		this.delayedDestruction(cube.id,5000)
-		
-		//used to add shot to worlds of players
-		return binaryShot;
-		
-}
-
-physicsWorldManager.prototype.init = function (data){
-	/*Private Variables*/
-	const gravityConstant = -9.6;
-	const broadphase = new this.Ammo.btDbvtBroadphase();//BROAD
-	const collisionConfiguration = new this.Ammo.btSoftBodyRigidBodyCollisionConfiguration() ;//NARROW
-	const solver = new this.Ammo.btSequentialImpulseConstraintSolver();//SOLVER
-	const softBodySolver = new this.Ammo.btDefaultSoftBodySolver();//SOLVER
+physicsWorldManager.prototype.getCollisionPairsArray = function(){
 	
+	//number of collisions
+	var collisionPairs = this.dispatcher.getNumManifolds();
+
+	//for each pair we need 3 index positions [force,obj1,obj2]
+	//using typedArray in the event this needs to be sent to clients as binary
+	//var collisionPairsArray = new Int32Array(collisionPairs*3);
+	var collisionPairsArray = {};
 	
-	/*Public Variables*/
-	//dispatcher is used to determine what objects are in collision
-	this.dispatcher = new this.Ammo.btCollisionDispatcher( collisionConfiguration );//DISPATCHER
+	var IndexPosition = 0 ;
 	
-	//our World
-	this.physicsWorld = new this.Ammo.btSoftRigidDynamicsWorld( this.dispatcher, broadphase, solver, collisionConfiguration, softBodySolver);
+	while(collisionPairs--){
+		
+		//truncate decimal, don't need that high of precision
+		var impactImpulse = this.dispatcher.getManifoldByIndexInternal(collisionPairs).getContactPoint().getAppliedImpulse() | 0;
+		
+		if( impactImpulse > IMPACT_IMPULSE_MINIMUM){
 				
-	//note setGravity accepts (x,y,z), you could set gravitationl force in x or z too if you wanted.	
-	this.vector3Aux1.setValue( 0, gravityConstant, 0 )	
-	this.physicsWorld.setGravity( this.vector3Aux1 );
+				var Obj1_collisionObject = this.dispatcher.getManifoldByIndexInternal(collisionPairs).getBody0();
+				var Obj2_collisionObject = this.dispatcher.getManifoldByIndexInternal(collisionPairs).getBody1();
+
+				//isActive() will help eliminate reporting objects resting on eachother.
+				//they are technically in collision but we don't care.... or do we?!
+				//also objects that are Kinematic (aka static) like the GROUND will return false on .isActive()
+				if(Obj2_collisionObject.isActive() && Obj1_collisionObject.isActive()){
+					
+					console.log("pwm1",Obj1_collisionObject.getUserIndex())
+					console.log("pwm2",Obj2_collisionObject.getUserIndex())
+					
+					console.log(Obj1_collisionObject.ptr)
+					
+					collisionPairsArray.push(impactImpulse,Obj1_collisionObject.getUserIndex(),Obj2_collisionObject.getUserIndex())
+					//collisionPairsArray[IndexPosition] = impactImpulse;
+					//collisionPairsArray[IndexPosition+1] = Obj1_collisionObject.ptr;
+					//collisionPairsArray[IndexPosition+2] = Obj2_collisionObject.ptr;
+					//IndexPosition += 3;	
+				};
+				
+			};
+	}
+	
+	return collisionPairsArray;
+}
+physicsWorldManager.prototype.getCollisionImpulses = function(){
+
+	//http://www.bulletphysics.org/Bullet/phpBB3/viewtopic.php?p=10269&f=9&t=2568
+	
+		var CollisionObjs_IDandImpact = {}; 
+		var ThereWereCollisions = false;
+		
+		var collisionPairs = this.dispatcher.getNumManifolds();
+
+		for(var i=0;i<collisionPairs;i++){
+		//for each collision pair, check if the impact impulse of the two objects exceeds our minimum threshold 
+		//this will eliminate small impacts from being evaluated, light resting on the ground, gravity acting on object etc.
+		
+			//truncate with bit OR 0 because don't need decimal, not looking for that high precision
+
+			var impactImpulse = this.dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
+			//var impactImpulse = this.dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse();
+			
+			//NOTE: impactImpulse != impact force
+			//to get force see the link to the bullet forum above.  It would require many extra calcs and would
+			//not improve game play, but would slow things down.  for that reason impulse not force will be used.
+			//since the goal is basically to check if the object was hit 'hard', not check exactly how hard from all sides
+
+			if( impactImpulse > IMPACT_IMPULSE_MINIMUM){
+				
+				var Obj1_collisionObject = this.dispatcher.getManifoldByIndexInternal(i).getBody0()
+				var Obj2_collisionObject = this.dispatcher.getManifoldByIndexInternal(i).getBody1();
+				
+				//OBJECT 1
+				//first check if it's active.  Resting on the ground produces a collision, but isActive() = false
+				if(Obj1_collisionObject.isActive()){
+					
+					//flag that we will be returning something
+					ThereWereCollisions = true;
+					
+					//Objects ptr id, MUST be a string to be used as lookup
+					//a collision object ptr will match our rigidBodies ptr
+					var Obj1_lookupID = Obj1_collisionObject.ptr.toString();
+					
+					//A single object can be in more than one collision, we want to record the LARGEST
+					if(typeof CollisionObjs_IDandImpact[Obj1_lookupID] === 'undefined'){
+						CollisionObjs_IDandImpact[Obj1_lookupID] = impactImpulse;
+					}else{
+						if(impactImpulse > CollisionObjs_IDandImpact[Obj1_lookupID] ){
+							CollisionObjs_IDandImpact[Obj1_lookupID] = impactImpulse}
+					}
+				}
+				////OBJECT 2
+				if(Obj2_collisionObject.isActive()){
+					ThereWereCollisions = true;
+					var Obj2_lookupID = Obj2_collisionObject.ptr.toString();
+					if(typeof CollisionObjs_IDandImpact[Obj2_lookupID] === 'undefined'){
+						CollisionObjs_IDandImpact[Obj2_lookupID] = impactImpulse;
+					}else{
+						if(impactImpulse > CollisionObjs_IDandImpact[Obj2_lookupID] ){
+							CollisionObjs_IDandImpact[Obj2_lookupID] = impactImpulse}
+					}
+				}
+		
+			};
+		};
+	
+	//if(Object.keys(CollisionObjs_IDandImpact).length > 0){
+	if(ThereWereCollisions){
+		return CollisionObjs_IDandImpact
+	}else{
+		return false;
+	}
+};
+
+
+/*********
+getCollisionForces() EXPERIMENTAL METHOD UNDER DEVELOPMENT 
+***********/
+physicsWorldManager.prototype.getCollisionForces = function(timeStep){
+
+	//http://www.bulletphysics.org/Bullet/phpBB3/viewtopic.php?p=10269&f=9&t=2568
+	
+	/*
+	void myTickCallback( btDynamicsWorld *world, btScalar timeStep) {
+   if (world)
+      world->performDiscreteCollisionDetection();
+   int i;
+   ///one way to draw all the contact points is iterating over contact manifolds / points:
+   int numManifolds = dynamicsWorld->getDispatcher()->getNumManifolds();
+   for (i=0;i<numManifolds;i++)
+   {
+      btPersistentManifold* contactManifold = world->getDispatcher()->getManifoldByIndexInternal(i);
+      btCollisionObject* obA = static_cast<btCollisionObject*>(contactManifold->getBody0());
+      btCollisionObject* obB = static_cast<btCollisionObject*>(contactManifold->getBody1());
+
+      int numContacts = contactManifold->getNumContacts();
+      for (int j=0;j<numContacts;j++)
+      {
+         btManifoldPoint& contactPoint = contactManifold->getContactPoint(j);
+         btVector3 normal = contactPoint.m_normalWorldOnB;
+         btScalar angleX = normal.angle(btVector3(1,0,0));
+         btScalar angleY = normal.angle(btVector3(0,1,0));
+         btScalar angleZ = normal.angle(btVector3(0,0,1));
+         btScalar impulseX = contactPoint.m_appliedImpulse*cos(angleX);
+         btScalar impulseY = contactPoint.m_appliedImpulse*cos(angleY);
+         btScalar impulseZ = contactPoint.m_appliedImpulse*cos(angleZ);
+         btScalar forceX = impulseX/(timeStep);
+         btScalar forceY = impulseY/(timeStep);
+         btScalar forceZ = impulseZ/(timeStep);
+         //printf("Force: %8.6f %8.6f %8.6f %8.6f \n",(float)timeStep,forceX,forceY,forceZ);
+      }
+   }
+}
+	*/
+	var collisionCount = this.dispatcher.getNumManifolds();
+	console.log("total collisions:",collisionCount)
+	
+	while(collisionCount--){
+		//collisionPair is a btPersistentManifold object
+		//http://bulletphysics.org/Bullet/BulletFull/btPersistentManifold_8h_source.html#l00043
+		var collisionPair = this.dispatcher.getManifoldByIndexInternal(i);
+		
+		var obj1 = collisionPair.getBody0();
+		var obj2 = collisionPair.getBody1();
+		
+		var contactsCount = collisionPair.getNumContacts();
+		console.log("collision",i+1," contact count:",contactsCount)
+		
+		for(var j=0; j<contactsCount;j++){
+			var contactPoint = collisionPair.getContactPoint(j);
+			
+			//contactPoint is a btManifoldPoint object
+			//http://bulletphysics.org/Bullet/BulletFull/btManifoldPoint_8h_source.html#l00136
+			
+			//FYI the 'distance' returned from  contactPoint.getDistance() is related to the CollisionMargin 
+			//set for the object. >0 no touch <0 penetrating(ie touch) =0 exactly touch. 
+			//http://bulletphysics.org/Bullet/phpBB3/viewtopic.php?t=5831
+			var pointVector = contactPoint.getPositionWorldOnB();
+			
+			var angleX = pointVector.x();
+			var angleY = pointVector.y();
+			var angleZ = pointVector.z();
+			
+			var impulse = contactPoint.getAppliedImpulse()
+			if(impulse > 1){
+				var impulseX = impulse*Math.cos(angleX);
+				var impulseY = impulse*Math.sin(angleY);
+				var impulseZ = impulse*Math.cos(angleZ);
+
+				console.log("Ximp:",impulseX,"Yimp:",impulseY,"Zimp:",impulseZ)
+				console.log("Xang:",angleX,"Yang:",angleY,"Zang:",angleZ)
+			}	
+			
+		}
+	}
+	
+};
+
+physicsWorldManager.prototype.BinaryExporter = function(HeaderBufferObject){
+	
+	//used determine what binary export function to call on an object
+	var binaryExportMethod;
+	
+	//the incomming header buffer to be added to
+	var binaryData;
+	
+	//HeaderBufferObject has keys graphics or physics
+	if(HeaderBufferObject.hasOwnProperty('physics')){
+
+		binaryExportMethod = 'BinaryExport_ALL';
+		binaryData = HeaderBufferObject.physics;
+
+	}else if(HeaderBufferObject.hasOwnProperty('graphics')){
+		
+		binaryExportMethod = 'BinaryExport_graphics';
+		binaryData = HeaderBufferObject.graphics;
+	}else{
+		
+		console.log('unrecognized binary export type passed to BinaryExporter(). Use "physics" or "graphics" ');
+	}
+	
+	//build buffers
+	for(var i in this.rigidBodiesMasterObject){
+		//PHYSICS
+		var objBuffer = this.rigidBodiesMasterObject[i][binaryExportMethod]();
+		var objBuffer_len = objBuffer.length;
+		var currentByteLength = binaryData.length + objBuffer_len;
+		
+		// PUSH new binary to end of current binary
+		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength );
+
+	}
+	
+	return binaryData;
 }
 
+
+physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
+		//TIME STAMP HEADER
+		var header = new Float32Array(1);
+		header[0] = Date.now();
+		var binaryData = Buffer.from(header.buffer);
+		
+		//******************
+		//HARDCODE WARNING!!
+		//******************
+		
+		//to determine the bytes each object uses see file:
+		// PhysicsObjectFactory.js -> base class: objectPhysicsManipulationSuite() , this.f32arrayPhysics, for a Float32 count
+		const bytesPerObj = 56;
+	
+		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
+		for(var object in this.rigidBodiesMasterObject){
+			//cache the object in question
+			var theObject = this.rigidBodiesMasterObject[object];
+			
+			//check activation state
+			if(theObject.physics.isActive()){
+				
+				//get physics data as float 32 array BUFFER. NOTE: index 0 is the objects ID
+				var physicsDataBuffer = theObject.BinaryExport_physics();
+				var currentByteLength = binaryData.length + bytesPerObj;
+		
+				// PUSH new binary to end of current binary
+				binaryData = Buffer.concat([binaryData, physicsDataBuffer], currentByteLength );
+			}
+		}
+		
+		return binaryData;
+	
+}
+
+
+physicsWorldManager.prototype.GameClock = function (clientPhysicsUpdateFrequency) {
+	this.startTime = Date.now();
+	this.oldTime = Date.now();
+	this.timeToSendUpdate = false;
+	this.clientPhysicsUpdateFrequency =clientPhysicsUpdateFrequency;
+	
+};
+
+
+physicsWorldManager.prototype.GameClock_getDelta = function () {
+	var delta = 0;
+	var newTime = Date.now();
+	//convert from mili seconds to seconds 
+	delta = 0.001 * ( newTime - this.oldTime );
+	this.oldTime = newTime;
+	this.timeToSendUpdate += delta;
+	return delta;
+};
+
+physicsWorldManager.prototype.GameClock_start = function () {
+	this.startTime = Date.now();
+	this.oldTime = Date.now();
+};
+
+physicsWorldManager.prototype.GameClock_UpdateTime = function () {
+	//Change frequence of updates here
+	var update = Boolean(this.timeToSendUpdate > this.clientPhysicsUpdateFrequency);	
+	if(update)this.timeToSendUpdate = 0;
+
+	return update;
+}
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 
 //module.exports = physicsWorldManager; //constructor
 
-// Export a convenience function that creates an instance
-module.exports = function(Ammo) {
-  return new physicsWorldManager(Ammo);//Instance
-}
+// Export an instance when imported
+module.exports =  (function(){
+	//this assumes you would only ever have ONE world....
+	//convert to regular function not an IIEF if more than one world is expected
+	return new physicsWorldManager();//instance
+})();

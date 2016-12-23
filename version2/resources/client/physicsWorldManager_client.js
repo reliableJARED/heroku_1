@@ -576,7 +576,7 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
 		for(var object in this.rigidBodiesMasterObject){
 			
-			console.log(object," X,Y,Z ",this.rigidBodiesMasterObject[object].x(),this.rigidBodiesMasterObject[object].y(),this.rigidBodiesMasterObject[object].z())
+		//	console.log(object," X,Y,Z ",this.rigidBodiesMasterObject[object].x(),this.rigidBodiesMasterObject[object].y(),this.rigidBodiesMasterObject[object].z())
 			
 			//check activation state
 			if(this.rigidBodiesMasterObject[object].physics.isActive()){
@@ -593,7 +593,7 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 }
 
 physicsWorldManager.prototype.GameClock = function (serverTime) {
-	//create a 'lag' attribute?
+	//create a 'lag' attribute which is delta of serverTime and Date.now()?
 	console.log('setClock',serverTime)
 	console.log('current time',Date.now())
 	this.startTime = Date.now();//serverTime || Date.now();

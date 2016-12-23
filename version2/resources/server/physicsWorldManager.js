@@ -220,24 +220,25 @@ there are coresponding set methods setUserPointer(number) setUserIndex(number). 
 */
 physicsWorldManager.prototype.getCollisionPairsArray = function(){
 	
+	//number of collisions
 	var collisionPairs = this.dispatcher.getNumManifolds();
 
 	//for each pair we need 3 index positions [force,obj1,obj2]
 	//using typedArray in the event this needs to be sent to clients as binary
 	//var collisionPairsArray = new Int32Array(collisionPairs*3);
-	var collisionPairsArray = new Array();
+	var collisionPairsArray = {};
 	
 	var IndexPosition = 0 ;
 	
-	for(var i=0;i<collisionPairs;i++){
+	while(collisionPairs--){
 		
 		//truncate decimal, don't need that high of precision
-		var impactImpulse = this.dispatcher.getManifoldByIndexInternal(i).getContactPoint().getAppliedImpulse() | 0;
+		var impactImpulse = this.dispatcher.getManifoldByIndexInternal(collisionPairs).getContactPoint().getAppliedImpulse() | 0;
 		
 		if( impactImpulse > IMPACT_IMPULSE_MINIMUM){
 				
-				var Obj1_collisionObject = this.dispatcher.getManifoldByIndexInternal(i).getBody0();
-				var Obj2_collisionObject = this.dispatcher.getManifoldByIndexInternal(i).getBody1();
+				var Obj1_collisionObject = this.dispatcher.getManifoldByIndexInternal(collisionPairs).getBody0();
+				var Obj2_collisionObject = this.dispatcher.getManifoldByIndexInternal(collisionPairs).getBody1();
 
 				//isActive() will help eliminate reporting objects resting on eachother.
 				//they are technically in collision but we don't care.... or do we?!
@@ -265,7 +266,7 @@ physicsWorldManager.prototype.getCollisionImpulses = function(){
 
 	//http://www.bulletphysics.org/Bullet/phpBB3/viewtopic.php?p=10269&f=9&t=2568
 	
-		var CollisionObjs_IDandImpact = new Object(); 
+		var CollisionObjs_IDandImpact = {}; 
 		var ThereWereCollisions = false;
 		
 		var collisionPairs = this.dispatcher.getNumManifolds();
@@ -374,10 +375,10 @@ physicsWorldManager.prototype.getCollisionForces = function(timeStep){
 	var collisionCount = this.dispatcher.getNumManifolds();
 	console.log("total collisions:",collisionCount)
 	
-	for(var i=0; i<collisionCount;i++){
+	while(collisionCount--){
 		//collisionPair is a btPersistentManifold object
 		//http://bulletphysics.org/Bullet/BulletFull/btPersistentManifold_8h_source.html#l00043
-		var collisionPair = this.dispatcher.getManifoldByIndexInternal(i);
+		var collisionPair = this.dispatcher.getManifoldByIndexInternal(collisionCount);
 		
 		var obj1 = collisionPair.getBody0();
 		var obj2 = collisionPair.getBody1();
@@ -470,12 +471,14 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 	
 		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
 		for(var object in this.rigidBodiesMasterObject){
+			//cache the object in question
+			var theObject = this.rigidBodiesMasterObject[object];
 			
 			//check activation state
-			if(this.rigidBodiesMasterObject[object].physics.isActive()){
+			if(theObject.physics.isActive()){
 				
 				//get physics data as float 32 array BUFFER. NOTE: index 0 is the objects ID
-				var physicsDataBuffer = this.rigidBodiesMasterObject[object].BinaryExport_physics();
+				var physicsDataBuffer = theObject.BinaryExport_physics();
 				var currentByteLength = binaryData.length + bytesPerObj;
 		
 				// PUSH new binary to end of current binary

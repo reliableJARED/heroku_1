@@ -6,8 +6,6 @@ require('ammo-node');//physics
 var objectFactory = require(__dirname +'/resources/server/PhysicsObjectFactory.js');//returns object constructors
 var physicsWorld =  require(__dirname +'/resources/server/physicsWorldManager.js');//returns an instance of world manager
 
-var graphicsWorldManager = require(__dirname +'/resources/server/graphicsWorldManager.js');//returns an instance of 
-
 //Express initializes app to be a function handler that you can supply to an HTTP server
 var http = require('http').Server(app);
 
@@ -27,7 +25,9 @@ app.use(serveStatic(__dirname+'/'));
 app.use(serveStatic(__dirname + '/resources/'));
 app.use(serveStatic(__dirname + '/resources/images/'));
 app.use(serveStatic(__dirname + '/resources/images/textures'));
+app.use(serveStatic(__dirname + '/resources/client/'));
 app.use(serveStatic(__dirname + '/static/three.js/build/'));
+app.use(serveStatic(__dirname + '/static/three.js/controls/'));
 app.use(serveStatic(__dirname + '/static/ammo.js/'));
 app.use(serveStatic(__dirname + '/static/HID/'));
 app.use(serveStatic(__dirname + '/static/socket.io/'));
@@ -46,9 +46,8 @@ http.listen(port, function(){
 
 //GLOBAL variables
 const updateFrequency = 1;//Seconds
+physicsWorld.GameClock(updateFrequency);
 const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
-var clock = require(__dirname +'/resources/server/gameClock.js');//returns constructor for a clock
-clock = new clock(updateFrequency)
 
 //EXAMPLE
 /*nodeJS inheritence construct example */
@@ -103,22 +102,37 @@ const       fireBullet = 128;
 	
 
 function SendUpdateToClients(){
-	/*put stuff here*/
-}
-function TickPhysics() {
-	
-	   var deltaTime = clock.getDelta();
-	   
-	   var sendUpdate = clock.UpdateTime();//bool that is true every second
+	var buffer = physicsWorld.getWorldUpdateBuffer();
 
+	io.emit('U', buffer);
+	//console.log('update sent')
+	 //:::TESTING:::
+	for(var object in physicsWorld.rigidBodiesMasterObject){
+		
+	//	console.log(object," X,Y,Z:", ~~physicsWorld.rigidBodiesMasterObject[object].x(),~~physicsWorld.rigidBodiesMasterObject[object].y(),~~physicsWorld.rigidBodiesMasterObject[object].z()," Rx,Ry,Rz:", physicsWorld.rigidBodiesMasterObject[object].Rx(),physicsWorld.rigidBodiesMasterObject[object].Ry(), physicsWorld.rigidBodiesMasterObject[object].Rz());
+	}
+	//:::::::::::::
+	
+}
+
+function TickPhysics() {
+		
+	 //:::TESTING:::
+	//for(var object in physicsWorld.rigidBodiesMasterObject){
+		
+	//	console.log(object," X ", physicsWorld.rigidBodiesMasterObject[object].x());
+	//}
+	//:::::::::::::
+	 
 	  // physicsWorld.step( deltaTime );
-	   physicsWorld.world.stepSimulation( deltaTime,10);
+	   physicsWorld.world.stepSimulation( physicsWorld.GameClock_getDelta(),10);
 
 	   //loop our physics at about X fps
 		setTimeout( TickPhysics, SIMULATION_STEP_FREQUENCY);//milisecond callback timer
 		
-		if (sendUpdate){
-		process.nextTick(function (){SendUpdateToClients()} );
+		//return bool that is true every 'updateFrequency' seconds
+		if (physicsWorld.GameClock_UpdateTime()){
+			process.nextTick(function (){SendUpdateToClients()} );
 		}
     };
 	
@@ -129,43 +143,49 @@ function BuildWorldStateForNewConnection(socket_id){
 	var msgByteCount = 0;
 	var totalObjs = physicsWorld.rigidBodiesMasterArray.length;
 	
+	//PHYSICS
 	var header = new Int16Array(4);
 	header[0] = totalObjs;
-	//built in space for future info in header
 	header[1] = 14;//number of f32 props that lead every object
-	header[2] = 0;
-	header[3] = 0;
-
+	//built in space for future info in header
+	header[2] = 0;//UNUSED
+	header[3] = 0;//UNUSED
 	var binaryData = Buffer.from(header.buffer);
-
-	for(var i = 0; i < totalObjs; i++){
-		
-		var objBuffer = physicsWorld.rigidBodiesMasterArray[i].BinaryExport_ALL();
-		
-		var objBuffer_len = objBuffer.length;
-
-		var currentByteLength = binaryData.length + objBuffer_len;
-		//basically PUSH new binary to end of current binary
-		binaryData = Buffer.concat([binaryData, objBuffer], currentByteLength )
-
-	}
 	
-	console.log('binSize',binaryData.length)
+	var physicsBinary = physicsWorld.BinaryExporter({physics:binaryData});
+	
+	
+	//GRAPHICS
+	var gheader = new Int16Array(4);
+	gheader[0] = totalObjs;
+	//built in space for future info in header
+	gheader[1] = 0;//UNUSED
+	gheader[2] = 0;//UNUSED
+	gheader[3] = 0;//UNUSED
+	var binaryGraphics = Buffer.from(gheader.buffer);
+	var graphicsBinary = physicsWorld.BinaryExporter({graphics:binaryGraphics})
+	
 	//create a time stamp
 	var time = Date.now();
 	
-	/*IMPORTANT: See SO link above.  Can't send rigidBodiesIndex directly, had to copy to new array.  */	
-	io.emit('setup',{
+	console.log("send WORLD data to:",socket_id);
+	console.log("physics bytes sent:",physicsBinary.length);
+	console.log("graphics bytes sent:",graphicsBinary.length);
+	
+	//Only send to the new connection, NOT every connection
+	io.to(socket_id).emit('setup',{
 		time:time,
-		data: binaryData,
+		data: physicsBinary,
+		graphics:graphicsBinary,
 		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
 		TEXTURE_FILES:TEXTURE_FILES});
 			
-   io.to(socket_id).emit('playerID', socket_id);
 }
 
 function init(){
-	var testGraphic = this.cubeDataKeys ={
+	
+	//making a texture map for a cube
+	var groundTextures = {
 		front:TEXTURE_FILES_INDEX.ground,
 		back:TEXTURE_FILES_INDEX.ground,
 		top:TEXTURE_FILES_INDEX.ground,
@@ -174,19 +194,48 @@ function init(){
 		right:TEXTURE_FILES_INDEX.ground
 	};
 	
-	var ground = new objectFactory.CubeObject({width:50,depth:50,mass:0}); 
-	graphicsWorldManager.CubeGraphic({obj:ground,texture:testGraphic,color:{}})
+	//OBJECT 1
+	//make a cube object, use defaults EXCEPT for width, depth and mass
+	var ground = new objectFactory.CubeObject({y:0,width:500,depth:500,mass:0}); 
+	//apply our graphic
+	ground.addGraphics({textures:groundTextures});
+	//add to the world
 	physicsWorld.add(ground);
-	
-	var player = new objectFactory.CubeObject({y:20,mass:50});
-	graphicsWorldManager.CubeGraphic({obj:player,texture:testGraphic,color:{}})
+	/*
+	//OBJECT 2
+	//make another box, use defaults EXCEPT for y location and mass 
+	var player = new objectFactory.CubeObject({x:2,y:20,mass:50});
+	//don't add a texture, but set its color to yellow
+	player.addGraphics({colors:{wrap:0xffff00}});//YELLOW
+	//add to world
 	physicsWorld.add(player);	
-	
-	var ball = new objectFactory.SphereObject();
-	console.log(ball.id)
+	*/
+	//OBJECT 3
+	//make a sphere, use defaults EXCEPT for mass, Ry,rotation y,x position and apply a rotation on the X axis
+	//using Angular Velocity (AV) not LV, else the object will SLIDE not ROLL even though it's a sphere
+	var ball = new objectFactory.SphereObject({mass:100,Ry:1.5,y:100,x:3,AVx:10});
+	//wrap it with texture
+	ball.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
+	//add to the world
 	physicsWorld.add(ball);	
-	
-	console.log("ml",physicsWorld.rigidBodiesMasterArray.length)
+	console.log(ball.id);
+	/*
+	//OBJECT 4
+	//another box, use defaults EXCEPT for width,depth, height
+	var box = new objectFactory.CubeObject({width:2,depth:2,height:2,y:20});
+	//instead of doing a texture for each face like OBJECT 1, just use wrap
+	box.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
+	//add to world
+	physicsWorld.add(box);
+
+	//OBJECT 5
+	//another box, use all defaults except y
+var box2 = new objectFactory.CubeObject({y:50,z:3});
+	//instead of doing a texture for each face, only texture the back
+	box2.addGraphics({textures:{back:TEXTURE_FILES_INDEX.playerFace}});
+	//add to world
+	physicsWorld.add(box2);	
+	*/
 	
 	/*
 	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
@@ -195,7 +244,13 @@ function init(){
 		physicsWorld.add(new objectFactory.CubeObject({y:10+i,mass:50}) );
 	}
 	*/
+	//Start our world clock
+	physicsWorld.GameClock_start();
+	
+	//start physics simulation
 	TickPhysics();
+	
+
 }
 
 
@@ -227,8 +282,8 @@ io.on('connection', function(socket){
 	//io.to(socket.id).emit('playerID', socket.id);
 	
 
-	//get current state of everything, build specs and send out		
-	BuildWorldStateForNewConnection();
+	//get current state of everything, build specs and send out	to the NEW connection	
+	BuildWorldStateForNewConnection(socket.id);
 
 	
 	socket.on('getMyObj',function () {	

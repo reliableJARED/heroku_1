@@ -246,11 +246,11 @@ RigidBodyBase.prototype.createPhysics = function (){
 			
 			switch (this.shape){
 				case shapeCodes.cube:
-					this.vector3.setValue( this.width*0.5, this.height*0.5, this.depth*0.5 );
+					this.vector3.setValue( this.geometry.width*0.5, this.geometry.height*0.5, this.geometry.depth*0.5 );
 					physicsShape = new Ammo.btBoxShape(this.vector3);
 					break;
 				case shapeCodes.sphere:
-					physicsShape = new Ammo.btSphereShape(this.radius);
+					physicsShape = new Ammo.btSphereShape(this.geometry.radius);
 					break;
 
 				//TODO: ADD MORE SHAPES>>>
@@ -276,10 +276,10 @@ RigidBodyBase.prototype.createPhysics = function (){
 			//reset
 			var localInertia = new Ammo.btVector3( 0, 0, 0 );
 
-			physicsShape.calculateLocalInertia( this.mass, localInertia );
+			physicsShape.calculateLocalInertia( this.geometry.mass, localInertia );
 
-			var rbInfo = new Ammo.btRigidBodyConstructionInfo( this.mass, motionState, physicsShape, localInertia );
-
+			var rbInfo = new Ammo.btRigidBodyConstructionInfo( this.geometry.mass, motionState, physicsShape, localInertia );
+			
 			//Assign FINAL OBJECT
 			this.physics = new Ammo.btRigidBody( rbInfo );			
 			
@@ -415,7 +415,7 @@ var CubeConstructorBase = function(blueprint){
 		this.geometry.width = blueprint.geometry[indexLoc.width];
 		this.geometry.height = blueprint.geometry[indexLoc.height];
 		this.geometry.depth = blueprint.geometry[indexLoc.depth];
-		this.mass = blueprint.geometry[indexLoc.mass];
+		this.geometry.mass = blueprint.geometry[indexLoc.mass];
 
 }
 //CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
@@ -434,7 +434,7 @@ var SphereConstructorBase = function(blueprint){
 		this.geometry = {};
 		
 		this.geometry.radius = blueprint.geometry[indexLoc.radius];
-		this.mass = blueprint.geometry[indexLoc.mass];
+		this.geometry.mass = blueprint.geometry[indexLoc.mass];
 
 }
 SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
@@ -443,6 +443,7 @@ SphereConstructorBase.prototype.constructor = SphereConstructorBase;
 /********************************************/
 
 var CubeObject = function(blueprint){
+	console.log('buildBlueprint',blueprint)
 	CubeConstructorBase.call(this,blueprint);
 	this.createPhysics();
 	//if(this.mass>0)this.physics.forceActivationState(1);
@@ -452,9 +453,10 @@ CubeObject.prototype.constructor = CubeObject;
 
 
 var SphereObject = function(blueprint){
+	console.log('buildBlueprint',blueprint)
 	SphereConstructorBase.call(this,blueprint);
 	this.createPhysics();
-	if(this.mass>0)this.physics.activate(true);
+	
 }
 SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;

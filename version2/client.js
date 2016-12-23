@@ -98,9 +98,15 @@ var socket = io();
 
 		
 		socket.on('U',function(msg){
-		//	console.log(msg.byteLength);
+			console.log(msg.byteLength);
+			//update is a giant float32.  very first element
+			//is a time stamp.  then remaining unpacks in standard way
+			//Take the data and re-assign physics
+			//then take the delta of the time stamp and current time
+			//and step the simulation.  THis will be a larger than normal
+			//step but it should server as a way to back up 
 			var array = new Float32Array(msg);
-		//	console.log(array)
+			console.log(array)
 		});
 		
 function render() {
@@ -126,10 +132,10 @@ function nextWorldFrame(){
 	
 	//*******TESTING !@!
 	for(var object in PWM.rigidBodiesMasterObject){
-			var obj = PWM.rigidBodiesMasterObject[object].physics.activate();
+		
 		}
-		//
-//		
+		//***********************
+	
 	//first get the position of all active objects with PWM.getWorldUpdateBuffer()
 	//and add this info to the current buffering frame
 	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());

@@ -275,7 +275,7 @@ RigidBodyBase.prototype.createPhysics = function (){
 			physicsShape.calculateLocalInertia( this.mass, localInertia );
 
 			var rbInfo = new Ammo.btRigidBodyConstructionInfo( this.mass, motionState, physicsShape, localInertia );
-
+			
 			//Assign FINAL OBJECT
 			this.physics = new Ammo.btRigidBody( rbInfo );
 			//UNIQUIE 7 digit number ID
