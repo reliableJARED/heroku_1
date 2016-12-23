@@ -380,6 +380,24 @@ physicsWorldManager.prototype.ServerShapeIDCodes = function(){
 		}
 };	
 
+physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
+	
+			var allData = binaryData.byteLength;
+			var structObj = this.getServerBinaryDataStructure_physics();
+			var bytesPerObj = (Object.keys(structObj)).length * 4;
+			for (var obj = 8;obj<allData;obj +=bytesPerObj) {
+				
+				var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
+				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
+			}
+			
+			//reset our game clock BACK IN TIME to the timestamp value from server
+			//first 8 bytes of binaryData are the time stamp
+		   this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
+}
+
+//TODO: break this function up, unpack is only called once so it doesn't need to 
+//be self contained like this.  some parts are needed other places like float32 prop unpacking
 physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryData){
 	
 	const UnpackedDataObject = new Object();

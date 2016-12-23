@@ -109,7 +109,7 @@ function SendUpdateToClients(){
 	 //:::TESTING:::
 	for(var object in physicsWorld.rigidBodiesMasterObject){
 		
-	//	console.log(object," X,Y,Z:", ~~physicsWorld.rigidBodiesMasterObject[object].x(),~~physicsWorld.rigidBodiesMasterObject[object].y(),~~physicsWorld.rigidBodiesMasterObject[object].z()," Rx,Ry,Rz:", physicsWorld.rigidBodiesMasterObject[object].Rx(),physicsWorld.rigidBodiesMasterObject[object].Ry(), physicsWorld.rigidBodiesMasterObject[object].Rz());
+		console.log(object," X,Y,Z:", ~~physicsWorld.rigidBodiesMasterObject[object].x(),~~physicsWorld.rigidBodiesMasterObject[object].y(),~~physicsWorld.rigidBodiesMasterObject[object].z()," Rx,Ry,Rz:", physicsWorld.rigidBodiesMasterObject[object].Rx(),physicsWorld.rigidBodiesMasterObject[object].Ry(), physicsWorld.rigidBodiesMasterObject[object].Rz());
 	}
 	//:::::::::::::
 	

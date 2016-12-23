@@ -72,6 +72,8 @@ var objectPhysicsManipulationSuite = function () {
 
 objectPhysicsManipulationSuite.prototype = {
 	
+		//consider making physics_indexLocations an external CONST to avoid constant lookups
+		//this obj is accessed very often
 		physics_indexLocations:function() {
 			return {
 						id:0,
@@ -120,7 +122,7 @@ objectPhysicsManipulationSuite.prototype = {
 			array[indexLoc.Ry] = rot.y();
 			array[indexLoc.Rz] = rot.z();
 			array[indexLoc.Rw] = rot.w();
-		    array[indexLoc.LVx] = LV.x();
+		   array[indexLoc.LVx] = LV.x();
 			array[indexLoc.LVy] = LV.y();
 			array[indexLoc.LVz] = LV.z();
 			array[indexLoc.AVx] = AV.x();
@@ -130,7 +132,40 @@ objectPhysicsManipulationSuite.prototype = {
 			return array;
 			
 		},
+		BinaryImport_physics:function(array) {
+			//reverse of the Export function, imports a float array of props to apply to an object
+			var indexLoc = this.physics_indexLocations();
+			var objPhys = this.physics;
+			var trans = this.transform;
+			var vect = this.vector3;
+			var quat = this.quaternion;
+
+			//Consider doing an ID vs. ID check? or slow things down and not worth results?
+		  // if(this.id	!== array[indexLoc.id])/*do something*/
+
+			//Apply world position/rotation
+			vect.setValue(array[indexLoc.x],array[indexLoc.y],array[indexLoc.z]);
+			quat.setValue(array[indexLoc.Rx],array[indexLoc.Ry],array[indexLoc.Rz],array[indexLoc.Rw]);
+			trans.setOrigin(vect);			
+			trans.getRotation(quat);
+			//objPhys.setWorldTransform(trans);
+			
+			//CONSIDER:
+			/*Is this more correct? 
+			For changing world position use a recycle motionstate, set motionstate to new
+			mostionstate.setWorldTransform(transform)
+			then pass in to physics with objPhys.setMotionState(motionstate);
+			*/
+			
+			//Apply linear velocity
+		   vect.setValue(array[indexLoc.LVx],array[indexLoc.LVy],array[indexLoc.LVz]);
+			//objPhys.setLinearVelocity(vect);
+			
+			//Apply angular velocity
+			vect.setValue(array[indexLoc.AVx],array[indexLoc.AVy],array[indexLoc.AVz]);
+			//objPhys.setAngularVelocity(vect);
 		
+		},
 		getOrigin:function(){
 				this.physics.getMotionState().getWorldTransform(this.transform);
 				var pos = this.transform.getOrigin();

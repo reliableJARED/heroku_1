@@ -457,7 +457,7 @@ physicsWorldManager.prototype.BinaryExporter = function(HeaderBufferObject){
 
 physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		//TIME STAMP HEADER
-		var header = new Float32Array(1);
+		var header = new Float64Array(1);
 		header[0] = Date.now();
 		var binaryData = Buffer.from(header.buffer);
 		

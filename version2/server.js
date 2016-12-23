@@ -201,7 +201,7 @@ function init(){
 	ground.addGraphics({textures:groundTextures});
 	//add to the world
 	physicsWorld.add(ground);
-	/*
+	
 	//OBJECT 2
 	//make another box, use defaults EXCEPT for y location and mass 
 	var player = new objectFactory.CubeObject({x:2,y:20,mass:50});
@@ -209,7 +209,7 @@ function init(){
 	player.addGraphics({colors:{wrap:0xffff00}});//YELLOW
 	//add to world
 	physicsWorld.add(player);	
-	*/
+	
 	//OBJECT 3
 	//make a sphere, use defaults EXCEPT for mass, Ry,rotation y,x position and apply a rotation on the X axis
 	//using Angular Velocity (AV) not LV, else the object will SLIDE not ROLL even though it's a sphere
@@ -219,7 +219,7 @@ function init(){
 	//add to the world
 	physicsWorld.add(ball);	
 	console.log(ball.id);
-	/*
+	
 	//OBJECT 4
 	//another box, use defaults EXCEPT for width,depth, height
 	var box = new objectFactory.CubeObject({width:2,depth:2,height:2,y:20});
@@ -230,12 +230,12 @@ function init(){
 
 	//OBJECT 5
 	//another box, use all defaults except y
-var box2 = new objectFactory.CubeObject({y:50,z:3});
+	var box2 = new objectFactory.CubeObject({y:50,z:3});
 	//instead of doing a texture for each face, only texture the back
 	box2.addGraphics({textures:{back:TEXTURE_FILES_INDEX.playerFace}});
 	//add to world
 	physicsWorld.add(box2);	
-	*/
+	
 	
 	/*
 	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
