@@ -269,8 +269,8 @@ RigidBodyBase.prototype.createPhysics = function (){
 			var motionState = new Ammo.btDefaultMotionState( this.transform );
 	
 			//reset
-		//	this.vector3.setValue(0,0,0);
-			var localInertia = new Ammo.btVector3( 0, 0, 0 );
+			this.vector3.setValue(0,0,0);
+			var localInertia = this.vector3;
 
 			physicsShape.calculateLocalInertia( this.mass, localInertia );
 
@@ -433,6 +433,7 @@ RigidBodyBase.prototype.BinaryExport_ALL = function () {
 	//**********
 	//DOES NOT EXPORT ANY GRAPICS INFO !!!
 	//use: BinaryExport_graphics()
+	//... Which means this method is not named right....
 	//**********
 	
 	//physics portion - ALL float32
@@ -660,6 +661,7 @@ var SphereObject = function(blueprint){
 }
 SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;
+
 
 
 //IMPORTANT! tells node.js what you'd like to export from this file. 

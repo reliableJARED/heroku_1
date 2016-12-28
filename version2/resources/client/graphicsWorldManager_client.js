@@ -25,7 +25,8 @@ var graphicsWorldManager = function (config) {
 		cameraPerspectiveZ: -15,
 		defaultColor: 0x0000ff,
 		//consider adding a link back to the PWM
-		physicsWorldManager: false
+		physicsWorldManager: false,
+		totalFramesInBuffer: 10
 	}
 	
 	//replace defaults with anything sent in config
@@ -72,7 +73,7 @@ var graphicsWorldManager = function (config) {
 	this.graphicsMasterObject = new Object();
 	
 	//total count of frames the buffer holds
-	this.totalFramesInBuffer = 10;
+	this.totalFramesInBuffer = config.totalFramesInBuffer;
 	this.renderingFrame = 0;
 	this.bufferingFrame = 0;
 	
@@ -453,7 +454,7 @@ graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 		//get object whos keys are names of THREE material types and whos value is an index location
 		var materialSelector = this.graphicsMaterialCodes();
 		
-		//create the array of strings that represent THREE materials
+		//create the array of strings that represent THREEjs materials
 		var matTypes = Object.keys(materialSelector);
 		
 		//pick the material type based on the value in blueprint.material which is a single number index location 
@@ -536,6 +537,14 @@ graphicsWorldManager.prototype.createGraphics = function(blueprint) {
 		//return to the requester
 		return MESH;
 		
+}
+
+graphicsWorldManager.prototype.removeGraphic = function (ID) {
+	
+	//nullify and delete key
+	this.graphicsMasterObject[ID] = null;
+	delete this.graphicsMasterObject[ID];
+	
 }
 
 graphicsWorldManager.prototype.physics_indexLocations = {

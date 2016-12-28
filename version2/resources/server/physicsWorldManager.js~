@@ -29,9 +29,11 @@ var physicsWorldManager = function () {
 	//ORGANIZERS: 
 	//The rigidBodiesMasterObject and rigidBodiesMasterArray hold reference to all objects in the world.
 	//Use rigidBodiesMasterObject to Find Objects by their ptr ID
-	this.rigidBodiesMasterObject = new Object();
+	this.rigidBodiesMasterObject = {};
 	//Use rigidBodiesMasterArray to Find Objects by their UserIndex
-	this.rigidBodiesMasterArray = new Array(); 
+	this.rigidBodiesMasterArray = []; 
+	//use playersMasterObject to find players, it's a subset of rigidBodiesMasterObject
+	this.playersMasterObject = {};
 	
 	/*Private Variables*/
 	const gravityConstant = -9.6;
@@ -62,6 +64,25 @@ var physicsWorldManager = function () {
 	this.world.setGravity( this.vector3 );
 }	
 
+physicsWorldManager.prototype.addPlayer = function (socketID,obj) {
+
+	this.playersMasterObject[socketID] = obj;
+	this.add(obj);
+}
+physicsWorldManager.prototype.removePlayer = function (socketID) {
+	
+	var ID = this.playersMasterObject[socketID].id;
+	
+	//nullify and delete key
+	this.rigidBodiesMasterObject[ID] = null;
+	delete this.rigidBodiesMasterObject[ID];
+	//nullify and delete key
+	this.playersMasterObject[socketID].id = null;	
+	delete this.playersMasterObject[socketID].id;
+	//nullify and delete key
+	this.playersMasterObject[socketID] = null;
+	delete this.playersMasterObject[socketID];
+}
 
 physicsWorldManager.prototype.add = function(obj){
 	
@@ -426,11 +447,15 @@ physicsWorldManager.prototype.BinaryExporter = function(HeaderBufferObject){
 	
 	//HeaderBufferObject has keys graphics or physics
 	if(HeaderBufferObject.hasOwnProperty('physics')){
-
+		//DOES NOT EXPORT ANY GRAPICS INFO !!!
 		binaryExportMethod = 'BinaryExport_ALL';
 		binaryData = HeaderBufferObject.physics;
 
 	}else if(HeaderBufferObject.hasOwnProperty('graphics')){
+		
+		binaryExportMethod = 'BinaryExport_graphics';
+		binaryData = HeaderBufferObject.graphics;
+	}else if(HeaderBufferObject.hasOwnProperty('players')){
 		
 		binaryExportMethod = 'BinaryExport_graphics';
 		binaryData = HeaderBufferObject.graphics;
@@ -459,7 +484,6 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		//TIME STAMP HEADER
 		var header = new Float64Array(1);
 		header[0] = Date.now();
-
 		var binaryData = Buffer.from(header.buffer);
 		
 		//******************

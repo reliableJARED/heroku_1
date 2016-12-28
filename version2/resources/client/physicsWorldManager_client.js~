@@ -87,6 +87,13 @@ physicsWorldManager.prototype.add = function(obj){
 	this.world.addRigidBody( obj.physics );
 }
 
+physicsWorldManager.prototype.removePlayer = function (ID) {
+	
+	//nullify and delete key
+	this.rigidBodiesMasterObject[ID] = null;
+	delete this.rigidBodiesMasterObject[ID];
+	
+}
 
 physicsWorldManager.prototype.reassignIndexLocationsAfterIndex = function(IndexPosition){
 	
@@ -385,6 +392,8 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			var allData = binaryData.byteLength;
 			var structObj = this.getServerBinaryDataStructure_physics();
 			var bytesPerObj = (Object.keys(structObj)).length * 4;
+			
+			//first 8 bytes of binaryData are the time stamp, skip
 			for (var obj = 8;obj<allData;obj +=bytesPerObj) {
 				
 				var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
@@ -393,8 +402,6 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			
 			//reset our game clock BACK IN TIME to the timestamp value from server
 			//first 8 bytes of binaryData are the time stamp
-			console.log('local',this.oldTime);
-			console.log('server',new Float64Array(binaryData.slice(0,8))[0])
 		   this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
 }
 
@@ -624,12 +631,10 @@ physicsWorldManager.prototype.GameClock = function (serverTime) {
 physicsWorldManager.prototype.GameClock_getDelta = function () {
 	var delta = 0;
 	var newTime = Date.now();
-
 	//convert from mili seconds to seconds 
 	delta = 0.001 * ( newTime - this.oldTime );
 
 	this.oldTime = newTime;
-	
 	return delta;
 };
 

@@ -100,6 +100,43 @@ const 		changeLinearVelocity = 32;
 const 		changeAngularVelocity = 64;		
 const       fireBullet = 128;
 	
+var PlayerObject = function(blueprint){
+	
+	//players are instances of cubes
+	objectFactory.CubeObject.call(this,blueprint);
+	
+	this.createPhysics();
+	//DEFAULT call addGraphics to assign 'no assignment'.  call again on the actual obj to assign real graphics.
+	this.addGraphics();
+	
+	var defaults = {health:100,bullets:10};	  
+		
+	//over write defaults if any build params sent
+	blueprint = Object.assign(defaults,blueprint);
+	
+	this.attributes = {
+		health: blueprint.health,
+		bullets: blueprint.bullets		
+		};
+	this.attribute_indexLocations = {
+		health: 0,
+		bullets: 1		
+		};
+}
+PlayerObject.prototype =  Object.create(objectFactory.CubeObject.prototype); 
+PlayerObject.prototype.constructor = PlayerObject;
+PlayerObject.prototype.BinaryExport_PlayerAttributes = function () {
+	
+		var indexLoc = this.attribute_indexLocations;
+		var attributes =  this.attributes;
+		
+		var int8attributes = new Int8Array(2);//ORDER: health,bullets	
+		int8attributes[indexLoc.health] = attributes.health;
+		int8attributes[indexLoc.bullets] = attributes.bullets;
+		
+		return Buffer.from(int8attributes.buffer);
+	
+}
 
 function SendUpdateToClients(){
 	var buffer = physicsWorld.getWorldUpdateBuffer();
@@ -107,10 +144,10 @@ function SendUpdateToClients(){
 	io.emit('U', buffer);
 	//console.log('update sent')
 	 //:::TESTING:::
-	for(var object in physicsWorld.rigidBodiesMasterObject){
+	//for(var object in physicsWorld.rigidBodiesMasterObject){
 		
-		console.log(object," X,Y,Z:", ~~physicsWorld.rigidBodiesMasterObject[object].x(),~~physicsWorld.rigidBodiesMasterObject[object].y(),~~physicsWorld.rigidBodiesMasterObject[object].z()," Rx,Ry,Rz:", physicsWorld.rigidBodiesMasterObject[object].Rx(),physicsWorld.rigidBodiesMasterObject[object].Ry(), physicsWorld.rigidBodiesMasterObject[object].Rz());
-	}
+		//console.log(object," X,Y,Z:", ~~physicsWorld.rigidBodiesMasterObject[object].x(),~~physicsWorld.rigidBodiesMasterObject[object].y(),~~physicsWorld.rigidBodiesMasterObject[object].z()," Rx,Ry,Rz:", physicsWorld.rigidBodiesMasterObject[object].Rx(),physicsWorld.rigidBodiesMasterObject[object].Ry(), physicsWorld.rigidBodiesMasterObject[object].Rz());
+	//}
 	//:::::::::::::
 	
 }
@@ -139,9 +176,8 @@ function TickPhysics() {
 
 function BuildWorldStateForNewConnection(socket_id){
 	
-	
 	var msgByteCount = 0;
-	var totalObjs = physicsWorld.rigidBodiesMasterArray.length;
+	var totalObjs = Object.keys(physicsWorld.rigidBodiesMasterObject).length;
 	
 	//PHYSICS
 	var header = new Int16Array(4);
@@ -165,6 +201,17 @@ function BuildWorldStateForNewConnection(socket_id){
 	var binaryGraphics = Buffer.from(gheader.buffer);
 	var graphicsBinary = physicsWorld.BinaryExporter({graphics:binaryGraphics})
 	
+	//PLAYERS
+	var totalPlayers = Object.keys(physicsWorld.playersMasterObject).length;
+	var pheader = new Int16Array(4);
+	pheader[0] = totalPlayers;
+	//built in space for future info in header
+	pheader[1] = 0;//UNUSED
+	pheader[2] = 0;//UNUSED
+	pheader[3] = 0;//UNUSED
+	var binaryPlayers = Buffer.from(pheader.buffer);
+	var playersBinary = physicsWorld.BinaryExporter({players:binaryPlayers})
+	
 	//create a time stamp
 	var time = Date.now();
 	
@@ -180,7 +227,31 @@ function BuildWorldStateForNewConnection(socket_id){
 		TEXTURE_FILES_INDEX:TEXTURE_FILES_INDEX,
 		TEXTURE_FILES:TEXTURE_FILES});
 			
+};
+
+
+function NewPlayer(socketID){
+
+	// add a new object for the player 
+	//use defaults EXCEPT for width,depth, height
+	var player = new PlayerObject({width:2,depth:2,height:2,y:10});
+	//instead of doing a texture for each face like OBJECT 1, just use wrap
+	player.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
+	//add to world
+	physicsWorld.addPlayer(socketID,player);
+	
+	console.log(player);
+	
+	io.emit('newPlayerObj',{socketID:buffer});
+
+
+	//send current state of everything, build specs and send out	to the NEW connection	
+	BuildWorldStateForNewConnection(socketID);	
+	
+	//the unique ID for the object associate with this player
+	return player.id;	
 }
+
 
 function init(){
 	
@@ -194,23 +265,24 @@ function init(){
 		right:TEXTURE_FILES_INDEX.ground
 	};
 	
-	//OBJECT 1
+	//OBJECT 
 	//make a cube object, use defaults EXCEPT for width, depth and mass
 	var ground = new objectFactory.CubeObject({y:0,width:500,depth:500,mass:0}); 
 	//apply our graphic
 	ground.addGraphics({textures:groundTextures});
 	//add to the world
 	physicsWorld.add(ground);
-	/*
-	//OBJECT 2
+	
+	//OBJECT
 	//make another box, use defaults EXCEPT for y location and mass 
-	var player = new objectFactory.CubeObject({x:2,y:20,mass:50});
+	var box = new objectFactory.CubeObject({x:2,y:20,mass:50});
 	//don't add a texture, but set its color to yellow
-	player.addGraphics({colors:{wrap:0xffff00}});//YELLOW
+	box.addGraphics({colors:{wrap:0xffff00}});//YELLOW
 	//add to world
-	physicsWorld.add(player);	
-	*/
-	//OBJECT 3
+	physicsWorld.add(box);
+	
+	
+	//OBJECT 
 	//make a sphere, use defaults EXCEPT for mass, Ry,rotation y,x position and apply a rotation on the X axis
 	//using Angular Velocity (AV) not LV, else the object will SLIDE not ROLL even though it's a sphere
 	var ball = new objectFactory.SphereObject({mass:100,Ry:1.5,y:100,x:3,AVx:10});
@@ -219,23 +291,16 @@ function init(){
 	//add to the world
 	physicsWorld.add(ball);	
 	console.log(ball.id);
-	/*
-	//OBJECT 4
-	//another box, use defaults EXCEPT for width,depth, height
-	var box = new objectFactory.CubeObject({width:2,depth:2,height:2,y:20});
-	//instead of doing a texture for each face like OBJECT 1, just use wrap
-	box.addGraphics({textures:{wrap:TEXTURE_FILES_INDEX.playerFace}});
-	//add to world
-	physicsWorld.add(box);
-
-	//OBJECT 5
+	
+	
+	//OBJECT 
 	//another box, use all defaults except y
-var box2 = new objectFactory.CubeObject({y:50,z:3});
+	var box2 = new objectFactory.CubeObject({y:50,z:3});
 	//instead of doing a texture for each face, only texture the back
 	box2.addGraphics({textures:{back:TEXTURE_FILES_INDEX.playerFace}});
 	//add to world
 	physicsWorld.add(box2);	
-	*/
+	
 	
 	/*
 	physicsWorld.add(new objectFactory.CubeObject({y:10,mass:50}) );
@@ -267,7 +332,11 @@ io.on('connection', function(socket){
 	
 	
 	socket.on('disconnect', function(){
-		console.log('goodbye')
+		
+		var ID = physicsWorld.playersMasterObject[socket.id].id;
+		physicsWorld.removePlayer(socket.id);
+		console.log('goodbye',socket.id,ID)
+		io.emit('removePlayer',ID);
 	});
 	
 	//log
@@ -279,12 +348,8 @@ io.on('connection', function(socket){
 	
 	//send the new connection their uniqueID, which happens to be their socketID
 	//use this to send INITIAL SETUP TOO
-	//io.to(socket.id).emit('playerID', socket.id);
+	io.to(socket.id).emit('yourSocketID',NewPlayer(socket.id));
 	
-
-	//get current state of everything, build specs and send out	to the NEW connection	
-	BuildWorldStateForNewConnection(socket.id);
-
 	
 	socket.on('getMyObj',function () {	
 	//	socket.emit('yourObj',PlayerIndex[this.id].id)

@@ -1,9 +1,9 @@
 //GLOBAL General variables
-
-
 var PWM = new physicsWorldManager();
 var GWM = new graphicsWorldManager();
 GWM.displayInHTMLElementId('container');
+
+var PLAYER_ID = false;
 
 //IMPORTANT!! 
 //The rigidBody class must have a link to the GWM 
@@ -75,7 +75,7 @@ var socket = io();
 			}
 			
 			//all our objects
-			console.log(PWM.rigidBodiesMasterObject)		
+			//console.log(PWM.rigidBodiesMasterObject)		
 			
 			//sync with server time, this might not be needed....
 			PWM.GameClock(msg.time);
@@ -94,11 +94,25 @@ var socket = io();
 			
 		});
 
-
+		socket.on('newPlayer',function(msg){
+			console.log("ID:",msg);
+			if (!PLAYER_ID) {
+				PLAYER_ID = msg;				
+			}else {
+				//add a new player to the world			
+			}
+		});
+		socket.on('removePlayer',function(msg){
+			//DON't actually remove, just deactivate.  This could be an issue and
+			//should consider using 'delete' method or setup a player obj recycle system
 		
+			PWM.removePlayer(msg);
+			GWM.removeGraphic(msg);
+			console.log("deactivate ID:",msg)
+		});
 		socket.on('U',function(msg){
 			//TESTING
-			console.log(msg.byteLength);
+			console.log('update size:',msg.byteLength);
 			
 			//update is a giant float32 buffer.  very first element
 			//is a time stamp.  then remaining unpacks in standard way

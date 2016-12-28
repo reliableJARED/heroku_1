@@ -309,7 +309,8 @@ RigidBodyBase.prototype.createPhysics = function (){
 			var motionState = new Ammo.btDefaultMotionState( this.transform );
 			
 			//reset
-			var localInertia = new Ammo.btVector3( 0, 0, 0 );
+			this.vector3.setValue(0,0,0);
+			var localInertia = this.vector3;
 
 			physicsShape.calculateLocalInertia( this.geometry.mass, localInertia );
 
@@ -478,7 +479,7 @@ SphereConstructorBase.prototype.constructor = SphereConstructorBase;
 /********************************************/
 
 var CubeObject = function(blueprint){
-	console.log('buildBlueprint',blueprint)
+	//console.log('buildBlueprint',blueprint)
 	CubeConstructorBase.call(this,blueprint);
 	this.createPhysics();
 	//if(this.mass>0)this.physics.forceActivationState(1);
@@ -488,7 +489,7 @@ CubeObject.prototype.constructor = CubeObject;
 
 
 var SphereObject = function(blueprint){
-	console.log('buildBlueprint',blueprint)
+	//console.log('buildBlueprint',blueprint)
 	SphereConstructorBase.call(this,blueprint);
 	this.createPhysics();
 	
@@ -496,5 +497,42 @@ var SphereObject = function(blueprint){
 SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;
 
-
+var PlayerObject = function(blueprint){
+	
+	CubeConstructorBase.call(this,blueprint);
+	this.createPhysics();
+	//DEFAULT call addGraphics to assign 'no assignment'.  call again on the actual obj to assign real graphics.
+	this.addGraphics();
+	
+	var defaults = {
+		health:100,
+		bullets:10
+	};	  
+		
+	//over write defaults if any build params sent
+	blueprint = Object.assign(defaults,blueprint);
+	
+	this.attributes = {
+		health: blueprint.health,
+		bullets: blueprint.bullets		
+		};
+	this.attribute_indexLocations = {
+		health: 0,
+		bullets: 1		
+		};
+}
+PlayerObject.prototype =  Object.create(CubeConstructorBase.prototype); 
+PlayerObject.prototype.constructor = PlayerObject;
+PlayerObject.prototype.BinaryExport_attributes = function () {
+	
+		var indexLoc = this.attribute_indexLocations;
+		var attributes =  this.attributes;
+		
+		var int8attributes = new Int8Array(2);//ORDER: health,bullets	
+		int8attributes[indexLoc.health] = attributes.health;
+		int8attributes[indexLoc.bullets] = attributes.bullets;
+		
+		return Buffer.from(int8attributes.buffer);
+	
+}
 
