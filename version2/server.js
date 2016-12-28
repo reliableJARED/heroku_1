@@ -169,6 +169,16 @@ function TickPhysics() {
 		
 		//return bool that is true every 'updateFrequency' seconds
 		if (physicsWorld.GameClock_UpdateTime()){
+			//ADD NEW WORLD OBJECT
+			var box = new objectFactory.CubeObject({x:2,y:20,mass:50});
+			var randomColor = Math.random() * 0xffffff;
+			box.addGraphics({colors:{wrap:randomColor}});
+			//add to world
+			physicsWorld.add(box);
+			
+			//broadcast new addtion
+			addObjectToClientWorlds(box);
+			
 			process.nextTick(function (){SendUpdateToClients()} );
 		}
     };
@@ -179,28 +189,19 @@ function BuildWorldStateForNewConnection(socket_id){
 	var msgByteCount = 0;
 	var totalObjs = Object.keys(physicsWorld.rigidBodiesMasterObject).length;
 	
-	//PHYSICS
-	var header = new Int16Array(4);
-	header[0] = totalObjs;
-	header[1] = 14;//number of f32 props that lead every object
-	//built in space for future info in header
-	header[2] = 0;//UNUSED
-	header[3] = 0;//UNUSED
-	var binaryData = Buffer.from(header.buffer);
-	
-	var physicsBinary = physicsWorld.BinaryExporter({physics:binaryData});
+	//Data Header buffer: PHYSICS
+	var physicsHeader =  physicsWorld.generatePhysicsBinaryDataHeader(totalObjs);
+	//generate data
+	var physicsBinary = physicsWorld.BinaryExporter({physics:physicsHeader});
 	
 	
-	//GRAPHICS
-	var gheader = new Int16Array(4);
-	gheader[0] = totalObjs;
-	//built in space for future info in header
-	gheader[1] = 0;//UNUSED
-	gheader[2] = 0;//UNUSED
-	gheader[3] = 0;//UNUSED
-	var binaryGraphics = Buffer.from(gheader.buffer);
-	var graphicsBinary = physicsWorld.BinaryExporter({graphics:binaryGraphics})
+	//Data Header buffer: GRAPHICS
+	var graphicsHeader = physicsWorld.generateGraphicsBinaryDataHeader(totalObjs);
+	//generate data
+	var graphicsBinary = physicsWorld.BinaryExporter({graphics:graphicsHeader})
 	
+	
+	/*
 	//PLAYERS
 	var totalPlayers = Object.keys(physicsWorld.playersMasterObject).length;
 	var pheader = new Int16Array(4);
@@ -211,6 +212,8 @@ function BuildWorldStateForNewConnection(socket_id){
 	pheader[3] = 0;//UNUSED
 	var binaryPlayers = Buffer.from(pheader.buffer);
 	var playersBinary = physicsWorld.BinaryExporter({players:binaryPlayers})
+	
+	*/
 	
 	//create a time stamp
 	var time = Date.now();
@@ -229,6 +232,32 @@ function BuildWorldStateForNewConnection(socket_id){
 			
 };
 
+function addObjectToClientWorlds(obj){
+	
+	//Data Header buffer: PHYSICS
+	var physicsHeader =  physicsWorld.generatePhysicsBinaryDataHeader(1);
+	//Data Header buffer: GRAPHICS
+	var graphicsHeader = physicsWorld.generateGraphicsBinaryDataHeader(1);
+	
+		//PHYSICS
+		var objPhyBuffer = obj.BinaryExport_ALL();
+		var TotalByteLength = physicsHeader.length + objPhyBuffer.length;
+		//create final Physics Buffer
+		physicsBinary = Buffer.concat([physicsHeader, objPhyBuffer], TotalByteLength );
+		
+		//GRAPHICS
+		var objGraBuffer = obj.BinaryExport_graphics();
+		TotalByteLength = graphicsHeader.length + objGraBuffer.length;
+		//create final Physics Buffer
+		graphicsBinary = Buffer.concat([graphicsHeader, objGraBuffer], TotalByteLength );
+
+		
+	//tell players to add this
+	io.emit('add',{	
+		data:physicsBinary,
+		graphics:graphicsBinary});
+};
+
 
 function NewPlayer(socketID){
 
@@ -243,10 +272,6 @@ function NewPlayer(socketID){
 	console.log(player);
 	
 	io.emit('newPlayerObj',{socketID:buffer});
-
-
-	//send current state of everything, build specs and send out	to the NEW connection	
-	BuildWorldStateForNewConnection(socketID);	
 	
 	//the unique ID for the object associate with this player
 	return player.id;	
@@ -333,10 +358,10 @@ io.on('connection', function(socket){
 	
 	socket.on('disconnect', function(){
 		
-		var ID = physicsWorld.playersMasterObject[socket.id].id;
-		physicsWorld.removePlayer(socket.id);
-		console.log('goodbye',socket.id,ID)
-		io.emit('removePlayer',ID);
+		//var ID = physicsWorld.playersMasterObject[socket.id].id;
+		//physicsWorld.removePlayer(socket.id);
+		console.log('goodbye',socket.id)
+		//io.emit('removePlayer',ID);
 	});
 	
 	//log
@@ -348,8 +373,10 @@ io.on('connection', function(socket){
 	
 	//send the new connection their uniqueID, which happens to be their socketID
 	//use this to send INITIAL SETUP TOO
-	io.to(socket.id).emit('yourSocketID',NewPlayer(socket.id));
+	//io.to(socket.id).emit('yourSocketID',NewPlayer(socket.id));
 	
+	//send current state of everything, build specs and send out	to the NEW connection	
+	BuildWorldStateForNewConnection(socket.id);	
 	
 	socket.on('getMyObj',function () {	
 	//	socket.emit('yourObj',PlayerIndex[this.id].id)

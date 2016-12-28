@@ -64,9 +64,33 @@ var physicsWorldManager = function () {
 	this.world.setGravity( this.vector3 );
 }	
 
-physicsWorldManager.prototype.addPlayer = function (socketID,obj) {
+physicsWorldManager.prototype.generatePhysicsBinaryDataHeader = function(totalObjs){
+		
+	//PHYSICS
+	var header = new Int16Array(4);
+	header[0] = totalObjs;
+	header[1] = 14;//number of f32 props that lead every object
+	//built in space for future info in header
+	header[2] = 0;//UNUSED
+	header[3] = 0;//UNUSED
+	return Buffer.from(header.buffer);
+}
 
+physicsWorldManager.prototype.generateGraphicsBinaryDataHeader = function(totalObjs){
+	//GRAPHICS
+	var gheader = new Int16Array(4);
+	gheader[0] = totalObjs;
+	//built in space for future info in header
+	gheader[1] = 0;//UNUSED
+	gheader[2] = 0;//UNUSED
+	gheader[3] = 0;//UNUSED
+	return Buffer.from(gheader.buffer);
+};
+
+physicsWorldManager.prototype.addPlayer = function (socketID,obj) {
+	//associate a player socketID with their object.
 	this.playersMasterObject[socketID] = obj;
+	//proceed to normal object world addition
 	this.add(obj);
 }
 physicsWorldManager.prototype.removePlayer = function (socketID) {
@@ -76,9 +100,11 @@ physicsWorldManager.prototype.removePlayer = function (socketID) {
 	//nullify and delete key
 	this.rigidBodiesMasterObject[ID] = null;
 	delete this.rigidBodiesMasterObject[ID];
+	
 	//nullify and delete key
 	this.playersMasterObject[socketID].id = null;	
 	delete this.playersMasterObject[socketID].id;
+	
 	//nullify and delete key
 	this.playersMasterObject[socketID] = null;
 	delete this.playersMasterObject[socketID];

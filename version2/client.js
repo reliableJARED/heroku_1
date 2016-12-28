@@ -22,6 +22,7 @@ var ORBIT_Control = new THREE.OrbitControls( GWM.camera );
 
 function MakePhysicsObject(instructions){
 	
+	console.log('make',instructions)
 	var ShapeIDCodes = RigidBodyBase.prototype.ShapeIDCodes.call();
 	
 	switch (instructions.shape){
@@ -110,6 +111,22 @@ var socket = io();
 			GWM.removeGraphic(msg);
 			console.log("deactivate ID:",msg)
 		});
+		socket.on('add',function(msg){
+			console.log('ADD',msg)
+			var unpackedPhy = PWM.unpackServerBinaryData_physics(msg.data);
+			console.log('phy',unpackedPhy)
+			var unpackedGra = GWM.unpackServerBinaryData_graphics(msg.graphics);
+			console.log('gra',unpackedGra);
+			
+			//UGLY
+			var objID = Object.keys(unpackedPhy);
+			
+			var newObject = MakePhysicsObject(unpackedPhy[objID[0]]);
+			console.log('new obj',newObject);
+			newObject.addGraphics(unpackedGra[objID[0]]);
+			PWM.add(newObject);
+		});
+		
 		socket.on('U',function(msg){
 			//TESTING
 			console.log('update size:',msg.byteLength);
@@ -137,8 +154,7 @@ var socket = io();
 		
 function render() {
 	   
-	   //draw all the updates
-	   GWM.drawFromBuffer();
+	   
 		
 		//TESTING!!! *****************
 		//remove for live game
@@ -153,7 +169,9 @@ function render() {
 };
 
 function nextWorldFrame(){
-
+	//draw all the updates
+	GWM.drawFromBuffer();
+	
 	PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
 	
 	//*******TESTING !@!

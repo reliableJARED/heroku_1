@@ -402,8 +402,8 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			
 			//reset our game clock BACK IN TIME to the timestamp value from server
 			//first 8 bytes of binaryData are the time stamp
-		   this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
-}
+		   //this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
+};
 
 //TODO: break this function up, unpack is only called once so it doesn't need to 
 //be self contained like this.  some parts are needed other places like float32 prop unpacking

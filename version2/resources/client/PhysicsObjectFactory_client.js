@@ -148,7 +148,7 @@ objectPhysicsManipulationSuite.prototype = {
 			quat.setValue(array[indexLoc.Rx],array[indexLoc.Ry],array[indexLoc.Rz],array[indexLoc.Rw]);
 			trans.setOrigin(vect);			
 			trans.getRotation(quat);
-			//objPhys.setWorldTransform(trans);
+			objPhys.setWorldTransform(trans);
 			
 			//CONSIDER:
 			/*Is this more correct? 
@@ -159,11 +159,11 @@ objectPhysicsManipulationSuite.prototype = {
 			
 			//Apply linear velocity
 		   vect.setValue(array[indexLoc.LVx],array[indexLoc.LVy],array[indexLoc.LVz]);
-			//objPhys.setLinearVelocity(vect);
+			objPhys.setLinearVelocity(vect);
 			
 			//Apply angular velocity
 			vect.setValue(array[indexLoc.AVx],array[indexLoc.AVy],array[indexLoc.AVz]);
-			//objPhys.setAngularVelocity(vect);
+			objPhys.setAngularVelocity(vect);
 		
 		},
 		getOrigin:function(){

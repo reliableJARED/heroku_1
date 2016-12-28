@@ -588,18 +588,18 @@ RigidBodyBase.prototype.addGraphics = function(inputObj){
 	
 	
 }
-	
 
-//CUBE
-var CubeConstructorBase = function(obj){
-		
-		//inherit
-		RigidBodyBase.call(this,obj);
+
+/********************************************/
+//CUBE Class
+var CubeObject = function(blueprint){
+	    //inherit
+		RigidBodyBase.call(this,blueprint);
 		
 		var defaults = {depth:1,height:1,width:1};	  
 		
 		//over write defaults if any build params sent
-		var blueprint = Object.assign(defaults,obj);
+		var blueprint = Object.assign(defaults,blueprint);
 		
 		this.width = blueprint.width;
 		this.height = blueprint.height;
@@ -613,20 +613,22 @@ var CubeConstructorBase = function(obj){
 		this.f32arrayGeometry[indexLoc.width] = this.width;
 		this.f32arrayGeometry[indexLoc.height] = this.height;
 		this.f32arrayGeometry[indexLoc.depth] = this.depth;
+		
+	this.createPhysics();
+	//DEFAULT call addGraphics to assign 'no assignment'.  call again on the actual obj to assign real graphics.
+	this.addGraphics();
 }
-//CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
-CubeConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
-CubeConstructorBase.prototype.constructor = CubeConstructorBase;
-		
-		
-//SPHERE
-var SphereConstructorBase = function(obj){
-		//inherit
-		RigidBodyBase.call(this,obj);
+CubeObject.prototype =  Object.create(RigidBodyBase.prototype); 
+CubeObject.prototype.constructor = CubeObject;
+
+//SPHERE Class
+var SphereObject = function(blueprint){
+	   //inherit
+		RigidBodyBase.call(this,blueprint);
 		
 		var defaults = {radius:1};	
 		
-		var blueprint = Object.assign(defaults,obj);
+		var blueprint = Object.assign(defaults,blueprint);
 		
 		this.radius = blueprint.radius;
 		
@@ -636,30 +638,13 @@ var SphereConstructorBase = function(obj){
 		this.f32arrayGeometry = new Float32Array(2);//ORDER: mass,radius
 		this.f32arrayGeometry[indexLoc.mass] = this.mass;
 		this.f32arrayGeometry[indexLoc.radius] = this.radius;
-}
-SphereConstructorBase.prototype =  Object.create(RigidBodyBase.prototype); 
-SphereConstructorBase.prototype.constructor = SphereConstructorBase;
-
-/********************************************/
-
-var CubeObject = function(blueprint){
-	CubeConstructorBase.call(this,blueprint);
-	this.createPhysics();
-	//DEFAULT call addGraphics to assign 'no assignment'.  call again on the actual obj to assign real graphics.
-	this.addGraphics();
-}
-CubeObject.prototype =  Object.create(CubeConstructorBase.prototype); 
-CubeObject.prototype.constructor = CubeObject;
-
-
-var SphereObject = function(blueprint){
-	SphereConstructorBase.call(this,blueprint);
-	this.createPhysics();
+	
+		this.createPhysics();
 	
 	//DEFAULT call addGraphics to assign 'no assignment'.  call again on the actual obj to assign real graphics.
 	this.addGraphics();
 }
-SphereObject.prototype =  Object.create(SphereConstructorBase.prototype); 
+SphereObject.prototype =  Object.create(RigidBodyBase.prototype); 
 SphereObject.prototype.constructor = SphereObject;
 
 
