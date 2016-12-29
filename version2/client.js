@@ -21,8 +21,7 @@ var ORBIT_Control = new THREE.OrbitControls( GWM.camera );
 //***********************
 
 function MakePhysicsObject(instructions){
-	
-	console.log('make',instructions)
+
 	var ShapeIDCodes = RigidBodyBase.prototype.ShapeIDCodes.call();
 	
 	switch (instructions.shape){
@@ -31,7 +30,7 @@ function MakePhysicsObject(instructions){
 		break;
 		case ShapeIDCodes.sphere: return new SphereObject(instructions);
 		break;
-		default: console.log("MakePhysicsObject argument error")
+		default: console.log("MakePhysicsObject() argument error")
 		
 	}
 }
@@ -153,9 +152,7 @@ var socket = io();
 		});
 		
 function render() {
-	   
-	   
-		
+
 		//TESTING!!! *****************
 		//remove for live game
 		ORBIT_Control.update();//view control
@@ -172,6 +169,10 @@ function nextWorldFrame(){
 	//draw all the updates
 	GWM.drawFromBuffer();
 	
+	//then get the position of all active objects with PWM.getWorldUpdateBuffer()
+	//and add this info to the current buffering frame
+	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());
+	
 	PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
 	
 	//*******TESTING !@!
@@ -180,9 +181,7 @@ function nextWorldFrame(){
 		}
 		//***********************
 	
-	//first get the position of all active objects with PWM.getWorldUpdateBuffer()
-	//and add this info to the current buffering frame
-	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());
+	
 	
 	//draw the updates
 	render();
