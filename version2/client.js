@@ -133,21 +133,9 @@ var socket = io();
 			//update is a giant float32 buffer.  very first element
 			//is a time stamp.  then remaining unpacks in standard way
 			//Take the data and re-assign physics
-			//then take the delta of the time stamp and current time
-			//and step the simulation.  THis will be a larger than normal
-			//step but it should server as a way to back up 
 			PWM.applyServerUpdates(msg);
-			/* MOVED THIS INSIDE OF PWM
-			var binaryData = msg;
-			var allData = binaryData.byteLength;
-			var structObj = PWM.getServerBinaryDataStructure_physics();
-			var bytesPerObj = (Object.keys(structObj)).length;
-			for (var obj = 4;obj<allData;obj +=bytesPerObj) {
-				
-				var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
-
-				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
-			}*/
+			
+			//also need to update the graphics buffer
 			
 		});
 		

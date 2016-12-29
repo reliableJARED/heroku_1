@@ -26,7 +26,8 @@ var graphicsWorldManager = function (config) {
 		defaultColor: 0x0000ff,
 		//consider adding a link back to the PWM
 		physicsWorldManager: false,
-		totalFramesInBuffer: 10
+		totalFramesInBuffer: 10,
+		framesUpdatedFromServer: 3
 	}
 	
 	//replace defaults with anything sent in config
@@ -77,6 +78,9 @@ var graphicsWorldManager = function (config) {
 	this.renderingFrame = 0;
 	this.bufferingFrame = 0;
 	
+	//used to update already drawn buffer frames based on server update
+	this.framesUpdatedFromServer = config.framesUpdatedFromServer;
+	
 	//2D array used to hold previous positions of objects in a buffer
 	this.renderingBuffer = new Array(this.totalFramesInBuffer);
 	
@@ -123,7 +127,44 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
 }
 
+graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
+	//first get what frame is currently buffered
+	var currentBufferFrameNumber = this.bufferingFrame;
+	
+	//then determine how many frames need to be updated
+	var UpdateFrameCount = this.framesUpdatedFromServer;
+	var TotalFrameCount = this.totalFramesInBuffer;
+	
+	//since the graphics updater is looping through the buffer array, need to calculate which frames need update
+	var determineFrames = currentBufferFrameNumber - UpdateFrameCount;
+	
+	var BUFFER = this.renderingBuffer; 
+	
+	var FramesToUpdate = [];
+	
+	if(determineFrames > 0){
+		
+		for(var f = determineFrames; determineFrames<UpdateFrameCount; determineFrames++){
+			
+			BUFFER[f]
+		}
+	}
+	//frames are not in numerical order because need to loop to the end of the buffer array, ie. frames 9,0,1
+	else{
+		
+	}
+	
+	//go back and change a few frames of data based on the input
+	
+}
 
+graphicsWorldManager.prototype.reviseBufferFrame = function(updateArray){
+	//updateArray is what you want to revised the frame to be
+	//percent is how much to change current to update.  It's a crude 'interpolation' method. 
+	//if 
+	var serverIndexLoc = this.physics_indexLocations;
+	
+}
 
 graphicsWorldManager.prototype.drawFromBuffer = function () {
 

@@ -394,10 +394,12 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			var bytesPerObj = (Object.keys(structObj)).length * 4;
 			
 			//first 8 bytes of binaryData are the time stamp, skip
+			//server updates are ALWAYS from the past.  This means the prepared grapics buffer also needs adjustments
 			for (var obj = 8;obj<allData;obj +=bytesPerObj) {
 				
-				var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
-				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
+				//var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
+				//PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
+				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(new Float32Array(binaryData.slice(obj,obj+bytesPerObj)));
 			}
 			
 			//reset our game clock BACK IN TIME to the timestamp value from server
