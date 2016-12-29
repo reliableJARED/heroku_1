@@ -96,7 +96,7 @@ var graphicsWorldManager = function (config) {
 
 graphicsWorldManager.prototype.Buffering = function(ArrayOfObjectData){
 		
-		//CONSIDER!!! does this need to be closure? worth the extra memory?
+		//CONSIDER!!! does this need to be closure? worth the extra memorey?
 		var stillBuffering = true;
 		
 		if(this.bufferingFrame === this.totalFramesInBuffer || this.bufferingFrame >= this.totalFramesInBuffer){
@@ -119,9 +119,10 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 	//rendering is done from the buffer NOT directly from the world state
 	//objects send their own updates to the graphics buffer
 	//they send the update as a float32 array whos first index is ID
-	//the remaining 13 array index positions hold position and orientation info
-	//ArrayOfObjectData is ALL data from the physics simulation for objects that are active, and therefore require their 
-	//grahic to be drawn again in the new location.
+	//the remaining 13 array index positions hold position, orientation and velocity info
+	//ArrayOfObjectData is ALL data from the physics simulation for objects that are ACTIVE in the form of a 2D array. [[obj1Array],[Obj2Array],...] 
+	//If an object is in an ACTIVE state, it 'likly' requires an rendering update. 
+	//so we update it's grahic to be drawn again in the new location.  NOTE: ACTIVE objects might not be in motion, but they will go to DEACTIVE state soon so just redraw to keep simple.
 	
 	//console.log("load buffer with:", ArrayOfObjectData)
 	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
@@ -146,7 +147,7 @@ graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
 		
 		for(var f = determineFrames; determineFrames<UpdateFrameCount; determineFrames++){
 			
-			BUFFER[f]
+			this.reviseSingleBufferFrame(BUFFER[f],(determineFrames/UpdateFrameCount))
 		}
 	}
 	//frames are not in numerical order because need to loop to the end of the buffer array, ie. frames 9,0,1
@@ -158,13 +159,67 @@ graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
 	
 }
 
-graphicsWorldManager.prototype.reviseBufferFrame = function(updateArray){
-	//updateArray is what you want to revised the frame to be
-	//percent is how much to change current to update.  It's a crude 'interpolation' method. 
-	//if 
-	var serverIndexLoc = this.physics_indexLocations;
+graphicsWorldManager.prototype.reviseSingleBufferFrame = function(updateArray,frameIndex,percent){
+	//updateArray is a 2D array.  It is what you want the revised frame to be
+	//frameIndex is the frame in the primary buffer
+	//percent is how far along in total update process you are.  It's used to create a crude 'interpolation' method. 
+	//if you need to update 5 frames for example. percent would be .2 for frame 1.
+	//if percent = 1 it's a direct replacement of buffer with updateArray
 	
-}
+	//key of where props are in the update Array
+	var serverIndexLoc = this.physics_indexLocations;
+	//count of props for a single object
+	var PropsPerObj = Object.keys(serverIndexLoc).length;
+	
+	var bufferFrame = this.renderingBuffer[frameIndex];
+	
+	//loop through the array of updates
+	for(var obj = 0,totalObjs = updateArray.length; obj<totalObjs;obj++){		
+		
+			var array = updateArray[obj];
+			//Issue for interpolation
+			
+			//if the current LVx is LESS than update LVx, obj is Excellerating, else decellerating
+			array[serverIndexLoc.LVx];
+			array[serverIndexLoc.x];
+			
+			array[serverIndexLoc.LVy];
+			array[serverIndexLoc.y];
+			
+			array[serverIndexLoc.LVz];
+			array[serverIndexLoc.z];
+			
+			array[serverIndexLoc.AVx];
+			array[serverIndexLoc.Rx];
+			
+			array[serverIndexLoc.AVy];
+			array[serverIndexLoc.Ry];
+			
+			array[serverIndexLoc.AVz];
+			array[serverIndexLoc.Rz];
+			
+			
+			array[serverIndexLoc.Rw];
+		    
+			
+			
+			
+			
+			
+		var objUpdateData = updateArray[obj];
+
+		//get the graphic for the objects data
+		var objToUpdate = this.graphicsMasterObject[objUpdateData[serverIndexLoc.id]];
+		//console.log("update ",objToUpdate," with ",objUpdateData)
+		//update the graphic		
+		objToUpdate.position.set(objUpdateData[serverIndexLoc.x], objUpdateData[serverIndexLoc.y], objUpdateData[serverIndexLoc.z] );
+		objToUpdate.quaternion.set(objUpdateData[serverIndexLoc.Rx], objUpdateData[serverIndexLoc.Ry], objUpdateData[serverIndexLoc.Rz], objUpdateData[serverIndexLoc.Rw] );
+		
+	
+	}
+	
+	
+};
 
 graphicsWorldManager.prototype.drawFromBuffer = function () {
 
@@ -598,5 +653,11 @@ graphicsWorldManager.prototype.physics_indexLocations = {
 						Rx:4,
 						Ry:5,
 						Rz:6,
-						Rw:7
+						Rw:7,
+						LVx:8,
+						LVy:9,
+						LVz:10,
+						AVx:11,
+						AVy:12,
+						AVz:13
 	}
