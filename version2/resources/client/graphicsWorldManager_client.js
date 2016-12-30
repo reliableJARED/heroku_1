@@ -172,14 +172,17 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(updateArray,fr
 	var PropsPerObj = Object.keys(serverIndexLoc).length;
 	
 	var bufferFrame = this.renderingBuffer[frameIndex];
+	//this.renderingBuffer is 2D arry with format: [ [ Frame1 [obj],[obj],[obj] ], [ Frame2 [obj],[obj],[obj] ], [Frame3 [obj],etc...] ]
 	
 	//loop through the array of updates
 	for(var obj = 0,totalObjs = updateArray.length; obj<totalObjs;obj++){		
 		
 			var array = updateArray[obj];
 			//Issue for interpolation
-			
 			//if the current LVx is LESS than update LVx, obj is Excellerating, else decellerating
+			//same for velocity in y and z
+			
+			//need to confirm that array[serverIndexLoc.id] === bufferFrame[obj][serverIndexLoc.id]
 			array[serverIndexLoc.LVx];
 			array[serverIndexLoc.x];
 			
@@ -201,10 +204,6 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(updateArray,fr
 			
 			array[serverIndexLoc.Rw];
 		    
-			
-			
-			
-			
 			
 		var objUpdateData = updateArray[obj];
 
