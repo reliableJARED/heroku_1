@@ -132,10 +132,11 @@ var socket = io();
 			
 			//update is a giant float32 buffer.  very first element
 			//is a time stamp.  then remaining unpacks in standard way
-			//Take the data and re-assign physics
-			PWM.applyServerUpdates(msg);
+			//FIRST: Take the update data and overwrite the local physics with it
+			//SECOND: need to update the graphics buffer
+			GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
 			
-			//also need to update the graphics buffer
+			
 			
 		});
 		

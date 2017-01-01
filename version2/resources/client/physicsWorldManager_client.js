@@ -336,9 +336,9 @@ physicsWorldManager.prototype.getCollisionImpulses = function(){
 	}
 };
 
-physicsWorldManager.prototype.getServerBinaryDataStructure_physics = function () {
+physicsWorldManager.prototype.getServerBinaryDataStructure_physics = {
 	
-	return {
+
 						id:0,
 						x:1,
 						y:2,
@@ -353,7 +353,7 @@ physicsWorldManager.prototype.getServerBinaryDataStructure_physics = function ()
 						AVx:11,
 						AVy:12,
 						AVz:13
-			}
+			
 }
 	
 
@@ -390,21 +390,31 @@ physicsWorldManager.prototype.ServerShapeIDCodes = function(){
 physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 	
 			var allData = binaryData.byteLength;
-			var structObj = this.getServerBinaryDataStructure_physics();
+			var structObj = this.getServerBinaryDataStructure_physics;
 			var bytesPerObj = (Object.keys(structObj)).length * 4;
+			
+			//object used for graphics updater
+			var preparedData = {};			
 			
 			//first 8 bytes of binaryData are the time stamp, skip
 			//server updates are ALWAYS from the past.  This means the prepared grapics buffer also needs adjustments
 			for (var obj = 8;obj<allData;obj +=bytesPerObj) {
 				
-				//var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
-				//PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
-				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(new Float32Array(binaryData.slice(obj,obj+bytesPerObj)));
+				//slice the buffer section for this object
+				var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
+				
+				//save the update to be sent to graphics updater
+				preparedData[objectData[structObj.id]] = objectData;
+				
+				//apply the update to the object
+				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
 			}
 			
 			//reset our game clock BACK IN TIME to the timestamp value from server
 			//first 8 bytes of binaryData are the time stamp
-		   //this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
+		   this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
+		   
+		   return preparedData;
 };
 
 //TODO: break this function up, unpack is only called once so it doesn't need to 
@@ -428,7 +438,7 @@ physicsWorldManager.prototype.unpackServerBinaryData_physics = function(binaryDa
 			// f32 are always leading, *4 to get bytes
 			var leadingF32bytes = (leadingF32data * 4);
 			
-			var physicsDataStructure = this.getServerBinaryDataStructure_physics();
+			var physicsDataStructure = this.getServerBinaryDataStructure_physics;
 
 			//recycle object blueprint
 			var newObjBlueprint = Object();

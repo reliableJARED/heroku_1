@@ -129,6 +129,8 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 }
 
 graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
+	//ArrayOfObjectData is a object whos keys are the IDs for the objects to be updated
+	
 	//first get what frame is currently buffered
 	var currentBufferFrameNumber = this.bufferingFrame;
 	
@@ -136,18 +138,16 @@ graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
 	var UpdateFrameCount = this.framesUpdatedFromServer;
 	var TotalFrameCount = this.totalFramesInBuffer;
 	
-	//since the graphics updater is looping through the buffer array, need to calculate which frames need update
+	//since the graphics world manager is constantly looping through and drawing from the buffer array, need to calculate which frames need update
 	var determineFrames = currentBufferFrameNumber - UpdateFrameCount;
 	
 	var BUFFER = this.renderingBuffer; 
-	
-	var FramesToUpdate = [];
 	
 	if(determineFrames > 0){
 		
 		for(var f = determineFrames; determineFrames<UpdateFrameCount; determineFrames++){
 			
-			this.reviseSingleBufferFrame(BUFFER[f],(determineFrames/UpdateFrameCount))
+			this.reviseSingleBufferFrame(ArrayOfObjectData, f,(determineFrames/UpdateFrameCount))
 		}
 	}
 	//frames are not in numerical order because need to loop to the end of the buffer array, ie. frames 9,0,1
@@ -159,28 +159,42 @@ graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
 	
 }
 
-graphicsWorldManager.prototype.reviseSingleBufferFrame = function(updateArray,frameIndex,percent){
-	//updateArray is a 2D array.  It is what you want the revised frame to be
+graphicsWorldManager.prototype.reviseSingleBufferFrame = function(updateObject,frameIndex,percent){
+	//updateObject is an object whos keys are the IDs for the objects to be updated.  The value of each key is an array of data with index locations based this.physics_indexLocations.This is what you want to revise the graphics frame data with
 	//frameIndex is the frame in the primary buffer
 	//percent is how far along in total update process you are.  It's used to create a crude 'interpolation' method. 
 	//if you need to update 5 frames for example. percent would be .2 for frame 1.
-	//if percent = 1 it's a direct replacement of buffer with updateArray
+	//if percent = 1 it's a direct replacement of buffer with updateObject
 	
 	//key of where props are in the update Array
 	var serverIndexLoc = this.physics_indexLocations;
+	
 	//count of props for a single object
 	var PropsPerObj = Object.keys(serverIndexLoc).length;
 	
+	//bufferFrame is a 2D array with form [ [objData], [objData],[objData]...]
 	var bufferFrame = this.renderingBuffer[frameIndex];
-	//this.renderingBuffer is 2D arry with format: [ [ Frame1 [obj],[obj],[obj] ], [ Frame2 [obj],[obj],[obj] ], [Frame3 [obj],etc...] ]
 	
-	//loop through the array of updates
-	for(var obj = 0,totalObjs = updateArray.length; obj<totalObjs;obj++){		
+	//loop through the frame and apply updates to objects
+	for(var obj = 0,totalObjs = bufferFrame.length; obj<totalObjs;obj++){		
 		
-			var array = updateArray[obj];
+			//current frame data
+			var currentData = bufferFrame[obj];
+			
+		   //updateObject is an object whos keys are the IDs for the objects to be updated
+			var updateData = updateObject[currentData[serverIndexLoc.id]];
+		
 			//Issue for interpolation
 			//if the current LVx is LESS than update LVx, obj is Excellerating, else decellerating
 			//same for velocity in y and z
+			//MOST of the time objects are decelerating so assume deceleration, which means 
+			//currentData should be LESS than updateData since, updateData is EARLIER in time than currentData due to network latency
+			
+			if (updateData[serverIndexLoc.LVx] >= currentData[serverIndexLoc.LVx]) {
+				
+				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x];
+				
+			}
 			
 			//need to confirm that array[serverIndexLoc.id] === bufferFrame[obj][serverIndexLoc.id]
 			array[serverIndexLoc.LVx];
