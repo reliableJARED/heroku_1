@@ -122,7 +122,7 @@ objectPhysicsManipulationSuite.prototype = {
 			array[indexLoc.Ry] = rot.y();
 			array[indexLoc.Rz] = rot.z();
 			array[indexLoc.Rw] = rot.w();
-		   array[indexLoc.LVx] = LV.x();
+		    array[indexLoc.LVx] = LV.x();
 			array[indexLoc.LVy] = LV.y();
 			array[indexLoc.LVz] = LV.z();
 			array[indexLoc.AVx] = AV.x();
@@ -149,7 +149,8 @@ objectPhysicsManipulationSuite.prototype = {
 			trans.setOrigin(vect);			
 			trans.getRotation(quat);
 			//objPhys.setWorldTransform(trans);
-			
+			objPhys.getMotionState().setWorldTransform(trans);
+			//objPhys.setMotionState(ms)
 			//CONSIDER:
 			/*Is this more correct? 
 			For changing world position use a recycle motionstate, set motionstate to new
@@ -159,11 +160,11 @@ objectPhysicsManipulationSuite.prototype = {
 			
 			//Apply linear velocity
 		   vect.setValue(array[indexLoc.LVx],array[indexLoc.LVy],array[indexLoc.LVz]);
-			//objPhys.setLinearVelocity(vect);
+			objPhys.setLinearVelocity(vect);
 			
 			//Apply angular velocity
 			vect.setValue(array[indexLoc.AVx],array[indexLoc.AVy],array[indexLoc.AVz]);
-			//objPhys.setAngularVelocity(vect);
+			objPhys.setAngularVelocity(vect);
 		
 		},
 		getOrigin:function(){
@@ -268,10 +269,13 @@ var RigidBodyBase = function(blueprint){
 RigidBodyBase.prototype =  Object.create(objectPhysicsManipulationSuite.prototype); 
 RigidBodyBase.prototype.constructor = RigidBodyBase;
 
-
+//RECYCLE UTILS
 RigidBodyBase.prototype.transform = new Ammo.btTransform();
 RigidBodyBase.prototype.vector3 = new Ammo.btVector3();
 RigidBodyBase.prototype.quaternion = new Ammo.btQuaternion();
+RigidBodyBase.prototype.motionState = new Ammo.btDefaultMotionState( this.transform );
+
+
 RigidBodyBase.prototype.createPhysics = function (){
 		
 			var physicsShape;

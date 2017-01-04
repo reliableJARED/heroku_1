@@ -412,7 +412,7 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			
 			//reset our game clock BACK IN TIME to the timestamp value from server
 			//first 8 bytes of binaryData are the time stamp
-		   this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
+		 //  this.oldTime = new Float64Array(binaryData.slice(0,8))[0];
 		   
 		   return preparedData;
 };

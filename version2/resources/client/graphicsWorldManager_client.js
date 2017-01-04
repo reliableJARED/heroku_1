@@ -26,8 +26,8 @@ var graphicsWorldManager = function (config) {
 		defaultColor: 0x0000ff,
 		//consider adding a link back to the PWM
 		physicsWorldManager: false,
-		totalFramesInBuffer: 10,
-		framesUpdatedFromServer: 5
+		totalFramesInBuffer: 15,
+		framesUpdatedFromServer: 15
 	}
 	
 	//replace defaults with anything sent in config
@@ -193,13 +193,10 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 	
 	//used for crude interpolation.
 	// half each time
-	console.log('this.currentServerUpdateProgress',this.currentServerUpdateProgress)
 	var half = (this.framesUpdatedFromServer - this.currentServerUpdateProgress)/2 | 0; // truncate decimal
-	console.log('half',half)
-	
+
 	var percent = half/this.framesUpdatedFromServer;
 	
-	console.log(percent)
 	//var percent = this.currentServerUpdateProgress / this.framesUpdatedFromServer;
 	
 	//loop through the frame and apply updates to objects
@@ -227,7 +224,7 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 				//update and current should have the same sign				
 				var delta = updateData[serverIndexLoc.x] - currentData[serverIndexLoc.x];
 				var adjustment = delta * percent;
-				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x] - adjustment;
+				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x] + adjustment;
 	
 			}else{
 				//same as above but reverse
@@ -243,7 +240,7 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 				//	console.log('currentData[serverIndexLoc.y]',currentData[serverIndexLoc.x])				
 				}
 				
-				currentData[serverIndexLoc.y] = updateData[serverIndexLoc.y] -  ((updateData[serverIndexLoc.y] - currentData[serverIndexLoc.y]) * percent);	
+				currentData[serverIndexLoc.y] = updateData[serverIndexLoc.y] +  ((updateData[serverIndexLoc.y] - currentData[serverIndexLoc.y]) * percent);	
 				
 				//TESTING
 				if (obj === 1) {		
@@ -267,12 +264,12 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 	
 	}
 	
-	if (this.currentServerUpdateProgress >= this.framesUpdatedFromServer){
+	if (this.currentServerUpdateProgress >= this.framesUpdatedFromServer/2 ){
 		//ALL updates have been applied
 		this.currentServerUpdateProgress = false;
 	}else {
 		//increment progress
-		this.currentServerUpdateProgress+= half;
+		this.currentServerUpdateProgress += half;
 	}
 };
 

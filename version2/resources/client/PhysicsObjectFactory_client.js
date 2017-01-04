@@ -148,7 +148,8 @@ objectPhysicsManipulationSuite.prototype = {
 			quat.setValue(array[indexLoc.Rx],array[indexLoc.Ry],array[indexLoc.Rz],array[indexLoc.Rw]);
 			trans.setOrigin(vect);			
 			trans.getRotation(quat);
-			objPhys.setWorldTransform(trans);
+			//objPhys.setWorldTransform(trans);
+			objPhys.getMotionState().setWorldTransform(trans);
 			
 			//CONSIDER:
 			/*Is this more correct? 
@@ -268,10 +269,13 @@ var RigidBodyBase = function(blueprint){
 RigidBodyBase.prototype =  Object.create(objectPhysicsManipulationSuite.prototype); 
 RigidBodyBase.prototype.constructor = RigidBodyBase;
 
-
+//RECYCLE UTILS
 RigidBodyBase.prototype.transform = new Ammo.btTransform();
 RigidBodyBase.prototype.vector3 = new Ammo.btVector3();
 RigidBodyBase.prototype.quaternion = new Ammo.btQuaternion();
+RigidBodyBase.prototype.motionState = new Ammo.btDefaultMotionState( this.transform );
+
+
 RigidBodyBase.prototype.createPhysics = function (){
 		
 			var physicsShape;
