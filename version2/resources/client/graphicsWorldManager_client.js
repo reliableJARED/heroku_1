@@ -27,7 +27,7 @@ var graphicsWorldManager = function (config) {
 		//consider adding a link back to the PWM
 		physicsWorldManager: false,
 		totalFramesInBuffer: 10,
-		framesUpdatedFromServer: 3
+		framesUpdatedFromServer: 5
 	}
 	
 	//replace defaults with anything sent in config
@@ -78,8 +78,15 @@ var graphicsWorldManager = function (config) {
 	this.renderingFrame = 0;
 	this.bufferingFrame = 0;
 	
+	//SERVER SYNC
 	//used to update already drawn buffer frames based on server update
 	this.framesUpdatedFromServer = config.framesUpdatedFromServer;
+	//the latest update from the server
+	this.currentServerUpdateData = {};
+	//server updates are similar to a 'constant' in that it is a single set of numbers but must be applied to many frames.
+	//the application of the corrections depends on how close in game time the update is to the current rendering data
+	//for that need a counter: currentServerUpdateProgress
+	this.currentServerUpdateProgress = false;
 	
 	//2D array used to hold previous positions of objects in a buffer
 	this.renderingBuffer = new Array(this.totalFramesInBuffer);
@@ -130,10 +137,16 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 
 graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
 	//ArrayOfObjectData is a object whos keys are the IDs for the objects to be updated
+	this.currentServerUpdateData = ArrayOfObjectData;
+	
+	//set the counter to 1
+	this.currentServerUpdateProgress = 1;
 	
 	//first get what frame is currently buffered
 	var currentBufferFrameNumber = this.bufferingFrame;
 	
+	
+	/*
 	//then determine how many frames need to be updated
 	var UpdateFrameCount = this.framesUpdatedFromServer;
 	var TotalFrameCount = this.totalFramesInBuffer;
@@ -156,15 +169,18 @@ graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
 	}
 	
 	//go back and change a few frames of data based on the input
-	
+	*/
 }
 
-graphicsWorldManager.prototype.reviseSingleBufferFrame = function(updateObject,frameIndex,percent){
-	//updateObject is an object whos keys are the IDs for the objects to be updated.  The value of each key is an array of data with index locations based this.physics_indexLocations.This is what you want to revise the graphics frame data with
-	//frameIndex is the frame in the primary buffer
-	//percent is how far along in total update process you are.  It's used to create a crude 'interpolation' method. 
-	//if you need to update 5 frames for example. percent would be .2 for frame 1.
-	//if percent = 1 it's a direct replacement of buffer with updateObject
+graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
+	
+	//****LOOKUP AND STORE A FEW THINGS.	
+	
+	//frameIndex is the frame location in the primary buffer
+	var frameIndex = this.renderingFrame;
+	
+	//this.currentServerUpdateData is an object whos keys are the IDs for the objects to be updated.  The value of each key is an array of data with index locations based this.physics_indexLocations.This is what you want to revise the graphics frame data with	
+	var currentServerUpdateData = this.currentServerUpdateData;
 	
 	//key of where props are in the update Array
 	var serverIndexLoc = this.physics_indexLocations;
@@ -175,66 +191,97 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(updateObject,f
 	//bufferFrame is a 2D array with form [ [objData], [objData],[objData]...]
 	var bufferFrame = this.renderingBuffer[frameIndex];
 	
+	//used for crude interpolation.
+	// half each time
+	console.log('this.currentServerUpdateProgress',this.currentServerUpdateProgress)
+	var half = (this.framesUpdatedFromServer - this.currentServerUpdateProgress)/2 | 0; // truncate decimal
+	console.log('half',half)
+	
+	var percent = half/this.framesUpdatedFromServer;
+	
+	console.log(percent)
+	//var percent = this.currentServerUpdateProgress / this.framesUpdatedFromServer;
+	
 	//loop through the frame and apply updates to objects
 	for(var obj = 0,totalObjs = bufferFrame.length; obj<totalObjs;obj++){		
 		
-			//current frame data
+			//current obj datafor frame
 			var currentData = bufferFrame[obj];
 			
 		   //updateObject is an object whos keys are the IDs for the objects to be updated
-			var updateData = updateObject[currentData[serverIndexLoc.id]];
+			var updateData = currentServerUpdateData[currentData[serverIndexLoc.id]];		
+		
+			//TODO: should add a check that updateData != undefined		
+			if (typeof updateData === 'undefined') {continue}
 		
 			//Issue for interpolation
-			//if the current LVx is LESS than update LVx, obj is Excellerating, else decellerating
+			//if the current LVx is LESS than update LVx, obj is Accelerating, else decelerating
 			//same for velocity in y and z
 			//MOST of the time objects are decelerating so assume deceleration, which means 
 			//currentData should be LESS than updateData since, updateData is EARLIER in time than currentData due to network latency
 			
-			if (updateData[serverIndexLoc.LVx] >= currentData[serverIndexLoc.LVx]) {
+			//the 'percent' arg passed into reviseSingleBufferFrame indicates how many frames have been or will be updated
+			//percent also determines how the adjustments 
+			if (updateData[serverIndexLoc.LVx] <= currentData[serverIndexLoc.LVx]) {
 				
-				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x];
-				
+				//update and current should have the same sign				
+				var delta = updateData[serverIndexLoc.x] - currentData[serverIndexLoc.x];
+				var adjustment = delta * percent;
+				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x] - adjustment;
+	
+			}else{
+				//same as above but reverse
+				var adjustment = (currentData[serverIndexLoc.x] - updateData[serverIndexLoc.x]) * percent;
+				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x] + adjustment;			
 			}
 			
-			//need to confirm that array[serverIndexLoc.id] === bufferFrame[obj][serverIndexLoc.id]
-			array[serverIndexLoc.LVx];
-			array[serverIndexLoc.x];
-			
-			array[serverIndexLoc.LVy];
-			array[serverIndexLoc.y];
-			
-			array[serverIndexLoc.LVz];
-			array[serverIndexLoc.z];
-			
-			array[serverIndexLoc.AVx];
-			array[serverIndexLoc.Rx];
-			
-			array[serverIndexLoc.AVy];
-			array[serverIndexLoc.Ry];
-			
-			array[serverIndexLoc.AVz];
-			array[serverIndexLoc.Rz];
-			
-			
-			array[serverIndexLoc.Rw];
-		    
-			
-		var objUpdateData = updateArray[obj];
-
-		//get the graphic for the objects data
-		var objToUpdate = this.graphicsMasterObject[objUpdateData[serverIndexLoc.id]];
-		//console.log("update ",objToUpdate," with ",objUpdateData)
-		//update the graphic		
-		objToUpdate.position.set(objUpdateData[serverIndexLoc.x], objUpdateData[serverIndexLoc.y], objUpdateData[serverIndexLoc.z] );
-		objToUpdate.quaternion.set(objUpdateData[serverIndexLoc.Rx], objUpdateData[serverIndexLoc.Ry], objUpdateData[serverIndexLoc.Rz], objUpdateData[serverIndexLoc.Rw] );
+							//same as above ; REPEAT CODE WARNING.
+			if (updateData[serverIndexLoc.LVy] <= currentData[serverIndexLoc.LVy]) {
+				
+					//TESTING
+				if (obj === 1) {		
+				//	console.log('currentData[serverIndexLoc.y]',currentData[serverIndexLoc.x])				
+				}
+				
+				currentData[serverIndexLoc.y] = updateData[serverIndexLoc.y] -  ((updateData[serverIndexLoc.y] - currentData[serverIndexLoc.y]) * percent);	
+				
+				//TESTING
+				if (obj === 1) {		
+			//		console.log('revised[serverIndexLoc.y]',currentData[serverIndexLoc.x])				
+				}
+						
 		
+			}else{
+				currentData[serverIndexLoc.y] = updateData[serverIndexLoc.y] + ((currentData[serverIndexLoc.y] - updateData[serverIndexLoc.y]) * percent);			
+			}
+			
+			if (updateData[serverIndexLoc.LVz] <= currentData[serverIndexLoc.LVz]) {
+				currentData[serverIndexLoc.z] = updateData[serverIndexLoc.z] +  ((updateData[serverIndexLoc.z] - currentData[serverIndexLoc.z]) * percent);	
+			}else{
+				currentData[serverIndexLoc.z] = updateData[serverIndexLoc.z] + ((currentData[serverIndexLoc.z] - updateData[serverIndexLoc.z]) * percent);			
+			}
+			
+			//****** NEED THE SAME FOR ROTATION? Or skip to save on speed
+			
+			//confirm that array[serverIndexLoc.id] === bufferFrame[obj][serverIndexLoc.id] ?
 	
 	}
 	
-	
+	if (this.currentServerUpdateProgress >= this.framesUpdatedFromServer){
+		//ALL updates have been applied
+		this.currentServerUpdateProgress = false;
+	}else {
+		//increment progress
+		this.currentServerUpdateProgress+= half;
+	}
 };
 
 graphicsWorldManager.prototype.drawFromBuffer = function () {
+
+	//if server corrections exist, apply them BEFORE drawing
+	if (this.currentServerUpdateProgress) {
+		this.reviseSingleBufferFrame();
+	}
 
 	//console.log("buffer frame:",this.bufferingFrame)
 	//console.log("render frame:",this.renderingFrame)
