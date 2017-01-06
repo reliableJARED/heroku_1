@@ -37,8 +37,9 @@ app.get('/', function(request, response){
 	response.sendFile(__dirname+'/game.html');
 });
 
-
-http.listen(port, ip,function(){
+//listen for connections
+//http.listen(port, ip,function(){  //on an IP
+	http.listen(port,function(){ // Local Host
 	console.log('listening on port: '+port);
 	console.log('serving files from root: '+__dirname);
 	});	

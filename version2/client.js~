@@ -1,3 +1,17 @@
+
+//INSTRUCTIONS POP UP
+var startup = document.createElement("div");
+startup.setAttribute('id',"info");
+startup.setAttribute('class',"info");
+startup.setAttribute('height',window.outerHeight);
+startup.setAttribute('width',window.outerWidth);
+startup.setAttribute('style','text-align:center;vertical-align:middle; display:block;opacity:0.5; color:#ffffff; background: #000; width:100%; height:100%; z-index:10;top:0; left:0; position:fixed');
+startup.innerHTML = "press buttons to play";
+startup.onkeydown = function () {
+	this.style.display='none'
+}
+document.body.insertBefore(startup, document.getElementById("container"));
+
 //GLOBAL General variables
 var PWM = new physicsWorldManager();
 var GWM = new graphicsWorldManager();
@@ -135,9 +149,7 @@ var socket = io();
 			//FIRST: Take the update data and overwrite the local physics with it
 			//SECOND: need to update the graphics buffer
 			GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
-			
-			
-			
+
 		});
 		
 function render() {
