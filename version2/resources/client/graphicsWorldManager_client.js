@@ -26,8 +26,8 @@ var graphicsWorldManager = function (config) {
 		defaultColor: 0x0000ff,
 		//consider adding a link back to the PWM
 		physicsWorldManager: false,
-		totalFramesInBuffer: 15,
-		framesUpdatedFromServer: 15
+		totalFramesInBuffer: 10,
+		framesUpdatedFromServer: 5
 	}
 	
 	//replace defaults with anything sent in config
@@ -194,10 +194,12 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 	//used for crude interpolation.
 	// half each time
 	var half = (this.framesUpdatedFromServer - this.currentServerUpdateProgress)/2 | 0; // truncate decimal
-
 	var percent = half/this.framesUpdatedFromServer;
 	
+	
 	//var percent = this.currentServerUpdateProgress / this.framesUpdatedFromServer;
+	
+	
 	
 	//loop through the frame and apply updates to objects
 	for(var obj = 0,totalObjs = bufferFrame.length; obj<totalObjs;obj++){		

@@ -15,7 +15,7 @@ var io = require('socket.io')(http);
 var port = process.env.PORT || 5000; 
 
 //var ip = '192.168.1.100'
-//var ip = '192.168.1.102'
+var ip = '192.168.1.103'
 //var ip = '10.10.10.100'
 
 
@@ -38,16 +38,17 @@ app.get('/', function(request, response){
 });
 
 
-http.listen(port, function(){
+http.listen(port, ip,function(){
 	console.log('listening on port: '+port);
 	console.log('serving files from root: '+__dirname);
 	});	
 
 
 //GLOBAL variables
-const updateFrequency = 1;//Seconds
+const updateFrequency = .3;//Seconds
 physicsWorld.GameClock(updateFrequency);
 const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
+
 
 //EXAMPLE
 /*nodeJS inheritence construct example */
@@ -139,7 +140,15 @@ PlayerObject.prototype.BinaryExport_PlayerAttributes = function () {
 }
 
 function SendUpdateToClients(){
+
 	var buffer = physicsWorld.getWorldUpdateBuffer();
+
+	//TESTING!!!
+	//only update 'argument' random objects
+	var buffer = physicsWorld.getWorldUpdateBuffer_randomObjs(10)
+	var buffer = physicsWorld.getWorldUpdateBuffer_randomObjs(Object.keys(physicsWorld.rigidBodiesMasterObject).length/4);
+
+	console.log("update bytes sent:",buffer.length);
 
 	io.emit('U', buffer);
 	//console.log('update sent')
@@ -169,7 +178,18 @@ function TickPhysics() {
 		
 		//return bool that is true every 'updateFrequency' seconds
 		if (physicsWorld.GameClock_UpdateTime()){
-			//ADD NEW WORLD OBJECT
+			//next loop send the serverupdate
+			process.nextTick(function (){SendUpdateToClients()} );
+		}
+    };
+	
+	
+
+//TESTING LOOP
+setInterval(loopNewBoxAddition,500);
+	
+function loopNewBoxAddition() {
+        //ADD NEW WORLD OBJECT
 			var box = new objectFactory.CubeObject({x:2,y:20,mass:50});
 			var randomColor = Math.random() * 0xffffff;
 			box.addGraphics({colors:{wrap:randomColor}});
@@ -177,12 +197,9 @@ function TickPhysics() {
 			physicsWorld.add(box);
 			
 			//broadcast new addtion
-			addObjectToClientWorlds(box);
-			
-			process.nextTick(function (){SendUpdateToClients()} );
-		}
-    };
-	
+			addObjectToClientWorlds(box);	
+}
+
 
 function BuildWorldStateForNewConnection(socket_id){
 	

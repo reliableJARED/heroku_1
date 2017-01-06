@@ -135,9 +135,7 @@ var socket = io();
 			//FIRST: Take the update data and overwrite the local physics with it
 			//SECOND: need to update the graphics buffer
 			GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
-			
-			
-			
+
 		});
 		
 function render() {

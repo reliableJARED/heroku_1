@@ -148,11 +148,16 @@ objectPhysicsManipulationSuite.prototype = {
 			quat.setValue(array[indexLoc.Rx],array[indexLoc.Ry],array[indexLoc.Rz],array[indexLoc.Rw]);
 			trans.setOrigin(vect);			
 			trans.getRotation(quat);
-			//objPhys.setWorldTransform(trans);
-			objPhys.getMotionState().setWorldTransform(trans);
+			//objPhys.setWorldTransform(trans); DOESNT CHANGE MOTION STATE
+			//objPhys.getMotionState().setWorldTransform(trans);  DOESNT CHANGE MOTION STATE
+			
+			//Change motionState
+			var ms = objPhys.getMotionState()
+			ms.setWorldTransform(trans);
+			objPhys.setMotionState(ms)
 			
 			//CONSIDER:
-			/*Is this more correct? 
+			/*Is this more correct/efficient ? 
 			For changing world position use a recycle motionstate, set motionstate to new
 			mostionstate.setWorldTransform(transform)
 			then pass in to physics with objPhys.setMotionState(motionstate);

@@ -64,9 +64,33 @@ var physicsWorldManager = function () {
 	this.world.setGravity( this.vector3 );
 }	
 
-physicsWorldManager.prototype.addPlayer = function (socketID,obj) {
+physicsWorldManager.prototype.generatePhysicsBinaryDataHeader = function(totalObjs){
+		
+	//PHYSICS
+	var header = new Int16Array(4);
+	header[0] = totalObjs;
+	header[1] = 14;//number of f32 props that lead every object
+	//built in space for future info in header
+	header[2] = 0;//UNUSED
+	header[3] = 0;//UNUSED
+	return Buffer.from(header.buffer);
+}
 
+physicsWorldManager.prototype.generateGraphicsBinaryDataHeader = function(totalObjs){
+	//GRAPHICS
+	var gheader = new Int16Array(4);
+	gheader[0] = totalObjs;
+	//built in space for future info in header
+	gheader[1] = 0;//UNUSED
+	gheader[2] = 0;//UNUSED
+	gheader[3] = 0;//UNUSED
+	return Buffer.from(gheader.buffer);
+};
+
+physicsWorldManager.prototype.addPlayer = function (socketID,obj) {
+	//associate a player socketID with their object.
 	this.playersMasterObject[socketID] = obj;
+	//proceed to normal object world addition
 	this.add(obj);
 }
 physicsWorldManager.prototype.removePlayer = function (socketID) {
@@ -76,9 +100,11 @@ physicsWorldManager.prototype.removePlayer = function (socketID) {
 	//nullify and delete key
 	this.rigidBodiesMasterObject[ID] = null;
 	delete this.rigidBodiesMasterObject[ID];
+	
 	//nullify and delete key
 	this.playersMasterObject[socketID].id = null;	
 	delete this.playersMasterObject[socketID].id;
+	
 	//nullify and delete key
 	this.playersMasterObject[socketID] = null;
 	delete this.playersMasterObject[socketID];
@@ -457,8 +483,8 @@ physicsWorldManager.prototype.BinaryExporter = function(HeaderBufferObject){
 		binaryData = HeaderBufferObject.graphics;
 	}else if(HeaderBufferObject.hasOwnProperty('players')){
 		
-		binaryExportMethod = 'BinaryExport_graphics';
-		binaryData = HeaderBufferObject.graphics;
+		binaryExportMethod = 'BinaryExport_PlayerAttributes';
+		binaryData = HeaderBufferObject.players;
 	}else{
 		
 		console.log('unrecognized binary export type passed to BinaryExporter(). Use "physics" or "graphics" ');
@@ -484,6 +510,7 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		//TIME STAMP HEADER
 		var header = new Float64Array(1);
 		header[0] = Date.now();
+		//console.log('pwm: update TS',header[0])
 		var binaryData = Buffer.from(header.buffer);
 		
 		//******************
@@ -514,6 +541,76 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		return binaryData;
 	
 }
+
+physicsWorldManager.prototype.getWorldUpdateBuffer_randomObjs = function(count) {
+	
+		//count is the number of random objects you want an update for
+		
+		//TIME STAMP HEADER
+		var header = new Float64Array(1);
+		header[0] = Date.now();
+		
+		var binaryData = Buffer.from(header.buffer);
+		
+		//******************
+		//HARDCODE WARNING!!
+		//******************
+		
+		//to determine the bytes each object uses see file:
+		// PhysicsObjectFactory.js -> base class: objectPhysicsManipulationSuite() , this.f32arrayPhysics, for a Float32 count
+		const bytesPerObj = 56;
+	
+		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
+		var allObjIDs = Object.keys(this.rigidBodiesMasterObject);
+		var shuffledObjs = this.FisherYates_shuffle(allObjIDs);
+		var objCounter = shuffledObjs.length;
+	   var addedObjs = 0;
+
+		while(objCounter--){
+			
+			//cache the object 
+			var theObject = this.rigidBodiesMasterObject[shuffledObjs[objCounter]];
+			
+			//check activation state
+			if(theObject.physics.isActive()){
+				
+				//get physics data as float 32 array BUFFER. NOTE: index 0 is the objects ID
+				var physicsDataBuffer = theObject.BinaryExport_physics();
+				var currentByteLength = binaryData.length + bytesPerObj;
+		
+				// PUSH new binary to end of current binary
+				binaryData = Buffer.concat([binaryData, physicsDataBuffer], currentByteLength );
+				
+				//another object was added to the return buffer				
+				addedObjs++
+			}
+			if (addedObjs >= count) { return binaryData };
+		}
+		
+		//in the event we didn't find enough to satisfy count request, return what you have
+		return binaryData
+	
+}
+
+physicsWorldManager.prototype.FisherYates_shuffle = function (array) {
+  var currentIndex = array.length, temporaryValue, randomIndex;
+
+  // While there remain elements to shuffle...
+  while (0 !== currentIndex) {
+
+    // Pick a remaining element...
+    randomIndex = Math.random() * currentIndex | 0;//truncate decimal
+    currentIndex -= 1;
+
+    // And swap it with the current element.
+    temporaryValue = array[currentIndex];
+    array[currentIndex] = array[randomIndex];
+    array[randomIndex] = temporaryValue;
+  }
+
+  return array;
+}
+
 
 
 physicsWorldManager.prototype.GameClock = function (clientPhysicsUpdateFrequency) {

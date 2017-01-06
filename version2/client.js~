@@ -108,27 +108,27 @@ var socket = io();
 		
 			PWM.removePlayer(msg);
 			GWM.removeGraphic(msg);
-			console.log("deactivate ID:",msg)
+		//	console.log("deactivate ID:",msg)
 		});
 		socket.on('add',function(msg){
-			console.log('ADD',msg)
+		//	console.log('ADD',msg)
 			var unpackedPhy = PWM.unpackServerBinaryData_physics(msg.data);
-			console.log('phy',unpackedPhy)
+		//	console.log('phy',unpackedPhy)
 			var unpackedGra = GWM.unpackServerBinaryData_graphics(msg.graphics);
-			console.log('gra',unpackedGra);
+		//	console.log('gra',unpackedGra);
 			
 			//UGLY
 			var objID = Object.keys(unpackedPhy);
 			
 			var newObject = MakePhysicsObject(unpackedPhy[objID[0]]);
-			console.log('new obj',newObject);
+		//	console.log('new obj',newObject);
 			newObject.addGraphics(unpackedGra[objID[0]]);
 			PWM.add(newObject);
 		});
 		
 		socket.on('U',function(msg){
 			//TESTING
-			console.log('update size:',msg.byteLength);
+		//	console.log('update size:',msg.byteLength);
 			
 			//update is a giant float32 buffer.  very first element
 			//is a time stamp.  then remaining unpacks in standard way
