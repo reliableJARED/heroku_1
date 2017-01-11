@@ -46,7 +46,7 @@ app.get('/', function(request, response){
 
 
 //GLOBAL variables
-const updateFrequency = .3;//Seconds
+const updateFrequency = .5;//Seconds
 physicsWorld.GameClock(updateFrequency);
 const SIMULATION_STEP_FREQUENCY = 16;//miliseconds
 

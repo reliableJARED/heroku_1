@@ -20,6 +20,9 @@ var physicsWorldManager = function () {
 	this.collisionHandler = callback;
 	*/
 
+	//Networking Sync
+	this.frameCount = 0;
+	
 	//keep these on instance NOT prototype like they are with rigidBodies from the 'PhysicsObjectFactory()'
 	this.vector3 = new Ammo.btVector3();
 	this.transform = new Ammo.btTransform();
@@ -239,6 +242,7 @@ physicsWorldManager.prototype.removeObjByIndexBatch = function(IndexPositionsArr
 
 physicsWorldManager.prototype.step = function(deltaTime){
 	this.world.stepSimulation( deltaTime,10);
+	this.frameCount++;
 };
 
 /*
@@ -599,7 +603,7 @@ physicsWorldManager.prototype.FisherYates_shuffle = function (array) {
   while (0 !== currentIndex) {
 
     // Pick a remaining element...
-    randomIndex = Math.random() * currentIndex | 0;//truncate decimal
+    randomIndex = Math.floor(Math.random() * currentIndex);
     currentIndex -= 1;
 
     // And swap it with the current element.

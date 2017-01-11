@@ -1,4 +1,4 @@
-
+/*
 //INSTRUCTIONS POP UP
 var startup = document.createElement("div");
 startup.setAttribute('id',"info");
@@ -11,6 +11,8 @@ startup.onclick = function () {
 	this.style.display='none'
 }
 document.body.insertBefore(startup, document.getElementById("container"));
+*/
+
 
 //GLOBAL General variables
 var PWM = new physicsWorldManager();

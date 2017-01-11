@@ -43,7 +43,7 @@ var graphicsWorldManager = function (config) {
 	this.cameraPerspectiveZ = config.cameraPerspectiveZ;
 	
     this.camera.position.x = this.cameraPerspectiveX;
-	this.camera.position.y = this.cameraPerspectiveY;
+	 this.camera.position.y = this.cameraPerspectiveY;
     this.camera.position.z = this.cameraPerspectiveZ;
 				
 	//http://threejs.org/docs/#Reference/Scenes/Scene			
@@ -69,6 +69,7 @@ var graphicsWorldManager = function (config) {
 	this.textureFilesIndex;
 	this.fileLoader = new THREE.TextureLoader();
 	this.defaultColor = config.defaultColor;
+	this.lastUpdateTime_serverTime = 0;
 	
 	//Use graphicsMasterObject to Find Objects by their ID from PHYSICS! not their uuid from threejs
 	this.graphicsMasterObject = new Object();
@@ -114,7 +115,7 @@ graphicsWorldManager.prototype.Buffering = function(ArrayOfObjectData){
 		}else{
 			console.log("buffering frame",this.bufferingFrame)
 			this.bufferingFrame_update(ArrayOfObjectData);
-			this.bufferingFrame +=1;
+			this.bufferingFrame += 1;
 			stillBuffering = true;
 			return stillBuffering;
 		}
@@ -144,7 +145,7 @@ graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
 	
 	//first get what frame is currently buffered
 	var currentBufferFrameNumber = this.bufferingFrame;
-	
+
 	
 	/*
 	//then determine how many frames need to be updated
@@ -193,14 +194,14 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 	
 	//used for crude interpolation.
 	// half each time
+	//
 	var half = (this.framesUpdatedFromServer - this.currentServerUpdateProgress)/2 | 0; // truncate decimal
-	var percent = half/this.framesUpdatedFromServer;
+	//var percent = half/this.framesUpdatedFromServer;
 	
 	
-	//var percent = this.currentServerUpdateProgress / this.framesUpdatedFromServer;
-	
-	
-	
+	var percent = this.currentServerUpdateProgress / this.framesUpdatedFromServer;
+
+
 	//loop through the frame and apply updates to objects
 	for(var obj = 0,totalObjs = bufferFrame.length; obj<totalObjs;obj++){		
 		
@@ -226,7 +227,7 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 				//update and current should have the same sign				
 				var delta = updateData[serverIndexLoc.x] - currentData[serverIndexLoc.x];
 				var adjustment = delta * percent;
-				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x] + adjustment;
+				currentData[serverIndexLoc.x] = updateData[serverIndexLoc.x] - adjustment;
 	
 			}else{
 				//same as above but reverse
@@ -239,14 +240,14 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 				
 					//TESTING
 				if (obj === 1) {		
-				//	console.log('currentData[serverIndexLoc.y]',currentData[serverIndexLoc.x])				
+				//	console.log('currentData[serverIndexLoc.y]',currentData[serverIndexLoc.y])				
 				}
 				
-				currentData[serverIndexLoc.y] = updateData[serverIndexLoc.y] +  ((updateData[serverIndexLoc.y] - currentData[serverIndexLoc.y]) * percent);	
+				currentData[serverIndexLoc.y] = updateData[serverIndexLoc.y] - ((updateData[serverIndexLoc.y] - currentData[serverIndexLoc.y]) * percent);	
 				
 				//TESTING
 				if (obj === 1) {		
-			//		console.log('revised[serverIndexLoc.y]',currentData[serverIndexLoc.x])				
+			//		console.log('revised[serverIndexLoc.y]',currentData[serverIndexLoc.y])				
 				}
 						
 		
@@ -255,7 +256,7 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 			}
 			
 			if (updateData[serverIndexLoc.LVz] <= currentData[serverIndexLoc.LVz]) {
-				currentData[serverIndexLoc.z] = updateData[serverIndexLoc.z] +  ((updateData[serverIndexLoc.z] - currentData[serverIndexLoc.z]) * percent);	
+				currentData[serverIndexLoc.z] = updateData[serverIndexLoc.z] -  ((updateData[serverIndexLoc.z] - currentData[serverIndexLoc.z]) * percent);	
 			}else{
 				currentData[serverIndexLoc.z] = updateData[serverIndexLoc.z] + ((currentData[serverIndexLoc.z] - updateData[serverIndexLoc.z]) * percent);			
 			}
@@ -266,12 +267,14 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 	
 	}
 	
-	if (this.currentServerUpdateProgress >= this.framesUpdatedFromServer/2 ){
+	//if (this.currentServerUpdateProgress >= this.framesUpdatedFromServer/2 ){
+		if (this.currentServerUpdateProgress >= this.framesUpdatedFromServer ){
 		//ALL updates have been applied
 		this.currentServerUpdateProgress = false;
 	}else {
 		//increment progress
 		this.currentServerUpdateProgress += half;
+		//this.currentServerUpdateProgress += 1;
 	}
 };
 

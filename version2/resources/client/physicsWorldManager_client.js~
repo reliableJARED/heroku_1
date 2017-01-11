@@ -398,7 +398,7 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			console.log('current - server:',Date.now() - ts )*/
 			
 			this.serverLocalClockCorrection = Date.now() - ts;
-	
+			this.lastUpdateTime_serverTime
 	
 			var allData = binaryData.byteLength;
 			var structObj = this.getServerBinaryDataStructure_physics;
@@ -409,32 +409,23 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			
 			//first 8 bytes of binaryData are the time stamp, skip
 			//server updates are ALWAYS from the past.  This means the prepared grapics buffer also needs adjustments
-			for (var obj = 8;obj<allData;obj +=bytesPerObj) {
+			for (var obj = 8;obj<allData;obj += bytesPerObj) {
 				
 				//slice the buffer section for this object
 				var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
 				
 				//save the update to be sent to graphics updater
 				preparedData[objectData[structObj.id]] = objectData;
-				
-				//TESTING
-				if (obj < 9) {
-				//	console.log('CURRENT:',PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryExport_physics());				
-				}
+
 				//apply the update to the object
 				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
-				
-				//TESTING
-				if (obj < 9) {
-					//console.log('UPDATED:',PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryExport_physics());	
-				//	console.log('*******************************')	
-				}
 			}
 			
 			//reset our game clock BACK IN TIME to the timestamp value from server
 			//first 8 bytes of binaryData are the time stamp
 		   
-		   this.oldTime = ts; //DO THIS?
+		 //  this.oldTime = ts; //DO THIS?
+		   this.lastUpdateTime_serverTime = ts;
 		   
 		   return preparedData;
 };
@@ -654,13 +645,15 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 }
 
 physicsWorldManager.prototype.GameClock = function (serverTime) {
-	//create a 'lag' attribute which is delta of serverTime and Date.now()?
+	
 	console.log('setClock',serverTime)
 	console.log('current time',Date.now())
 	console.log('now - server',Date.now()-serverTime)
-	this.startTime = serverTime; // || Date.now(); 
-	this.oldTime =serverTime;// || Date.now(); 
+	this.startTime = Date.now(); //serverTime; // || Date.now(); 
+	this.oldTime = Date.now(); //serverTime;// || Date.now(); 
+	this.lastUpdateTime_serverTime = serverTime;
 	
+	//basically a 'lag' attribute which is delta of serverTime and Date.now()
 	this.serverLocalClockCorrection = this.startTime - serverTime;
 };
 
@@ -668,14 +661,15 @@ physicsWorldManager.prototype.GameClock = function (serverTime) {
 physicsWorldManager.prototype.GameClock_getDelta = function () {
 	var delta = 0;
 	var newTime = Date.now() - this.serverLocalClockCorrection;
+	
 	//convert from mili seconds to seconds 
 	delta = 0.001 * ( newTime - this.oldTime );
 
 	this.oldTime = newTime;
-	//return delta;
+	return delta;
 	
 	//TESTING
-	return .016
+	//return .016
 };
 
 
