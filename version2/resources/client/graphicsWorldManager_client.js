@@ -104,7 +104,7 @@ var graphicsWorldManager = function (config) {
 
 graphicsWorldManager.prototype.Buffering = function(ArrayOfObjectData){
 		
-		//CONSIDER!!! does this need to be closure? worth the extra memorey?
+		//CONSIDER!!! does this need to be closure? worth the extra memory?
 		var stillBuffering = true;
 		
 		if(this.bufferingFrame === this.totalFramesInBuffer || this.bufferingFrame >= this.totalFramesInBuffer){
@@ -121,8 +121,11 @@ graphicsWorldManager.prototype.Buffering = function(ArrayOfObjectData){
 		}
 }
 
-graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectData) {
+graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectData,frameShift) {
 
+	//frameShift is used if we don't want to update the current bufferingFrame index, but some other frame AHEAD of the buffering frame
+	//purpose is when server updates come in graphics updates need to be revised	
+	
 	//the positions of objects in the physics world are sent to the rendering buffer
 	//rendering is done from the buffer NOT directly from the world state
 	//objects send their own updates to the graphics buffer
@@ -133,7 +136,21 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 	//so we update it's grahic to be drawn again in the new location.  NOTE: ACTIVE objects might not be in motion, but they will go to DEACTIVE state soon so just redraw to keep simple.
 	
 	//console.log("load buffer with:", ArrayOfObjectData)
-	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+	if (typeof frameShift === 'undefined') {
+		this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+	}else {
+		
+		//check we are not drawing beyond the buffer array 
+		if((this.bufferingFrame + frameShift) < this.totalFramesInBuffer){
+			this.bufferingFrame += frameShift;
+			this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+		}
+		//if we will end up drawing beyond buffer array, loop back to start		
+		else {
+			this.bufferingFrame = frameShift - 1;
+			this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+		}
+	}
 }
 
 graphicsWorldManager.prototype.applyServerUpdates = function(ArrayOfObjectData){
@@ -281,9 +298,9 @@ graphicsWorldManager.prototype.reviseSingleBufferFrame = function(){
 graphicsWorldManager.prototype.drawFromBuffer = function () {
 
 	//if server corrections exist, apply them BEFORE drawing
-	if (this.currentServerUpdateProgress) {
-		this.reviseSingleBufferFrame();
-	}
+	//if (this.currentServerUpdateProgress) {
+		//this.reviseSingleBufferFrame();
+	//}
 
 	//console.log("buffer frame:",this.bufferingFrame)
 	//console.log("render frame:",this.renderingFrame)

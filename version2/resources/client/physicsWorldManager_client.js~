@@ -6,13 +6,19 @@ if(typeof Ammo === 'undefined'){
 }
 const IMPACT_IMPULSE_MINIMUM = 1;//minimum collision force required to register
 
-var physicsWorldManager = function () {
+var physicsWorldManager = function (GraphicsWorldManager) {
+
+	this.GWM = GraphicsWorldManager || false;
+	if (!this.GWM) {console.warn('WARNING: Physics World Manager is NOT linked to Graphics World Manager.  Assign your Graphics World Manager to attribute GWM')}
+	
 	//GAME CLOCK VARS
 	this.startTime;
 	this.oldTime;
-	this.timeToSendUpdate;
-	this.clientPhysicsUpdateFrequency;
+	//sync physics for server and client
+	this.serverUpdateTimeDelta = 0;
 	
+	this.frameRate = 60; //TODO: make this based on true frame rate, should have an updater	
+	this.frameCountRewind = 0; //used when applying server updates, how far back in time needs updating
 	
 	/*
 	HAVE Collision handling done by a function that is passed in.  the PWM will get all the collisions, then
@@ -28,10 +34,10 @@ var physicsWorldManager = function () {
 	//ORGANIZERS: The rigidBodiesMasterObject and rigidBodiesMasterArray hold reference to all objects in the world.
 	
 	//Use rigidBodiesMasterObject to Find Objects by their ptr ID
-	this.rigidBodiesMasterObject = new Object();
+	this.rigidBodiesMasterObject = {};
 	
 	//Use rigidBodiesMasterArray to Find Objects by their UserIndex
-	this.rigidBodiesMasterArray = new Array(); 
+	this.rigidBodiesMasterArray = [];
 	
 	/*Private Variables*/
 	const gravityConstant = -9.6;
@@ -197,6 +203,18 @@ physicsWorldManager.prototype.removeObjByIndexBatch = function(IndexPositionsArr
 
 physicsWorldManager.prototype.step = function(deltaTime){
 	this.world.stepSimulation( deltaTime,10);
+	
+	//if we are in a state of buffer updating need to double step physics	
+	if (this.frameCountRewind > 0) {
+		//calculate miliseconds for current frame, if 60fps arg will be 0.016
+		//tick 1 frame forward
+		this.world.stepSimulation( (this.frameRate *0.001) ,10);	
+		this.GWM.bufferingFrame_update(this.getWorldUpdateBuffer());
+		this.frameCountRewind--;
+		//TESTING
+		console.log('apply updates', this.frameCountRewind)
+	}
+	
 };
 
 /*
@@ -389,23 +407,26 @@ physicsWorldManager.prototype.ServerShapeIDCodes = function(){
 
 physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 	
-			//TESTING
+			//timeStamp for the update
 			var ts = new Float64Array(binaryData.slice(0,8))[0];
-			/*console.log('server time stamp:',ts);
-			console.log('end of last update',this.oldTime);
-			console.log('oldTime - server:',this.oldTime - ts )
-			console.log('current time',Date.now())	
-			console.log('current - server:',Date.now() - ts )*/
 			
+			//delta between server updates in seconds!
+			this.serverUpdateTimeDelta = (ts - this.lastUpdateTime_serverTime) * 0.001;
+			
+			//update timestamp to current
+			this.lastUpdateTime_serverTime = ts;
+			
+			//how many frames to go backwards and update?
+			this.frameCountRewind = this.frameRate * this.serverUpdateTimeDelta | 0; //truncate decimal need whole number as will be used for array index
+						
+			//lag update - although this isn't really lag...
 			this.serverLocalClockCorrection = Date.now() - ts;
-			this.lastUpdateTime_serverTime
+			
 	
 			var allData = binaryData.byteLength;
 			var structObj = this.getServerBinaryDataStructure_physics;
 			var bytesPerObj = (Object.keys(structObj)).length * 4;
-			
-			//object used for graphics updater
-			var preparedData = {};			
+		
 			
 			//first 8 bytes of binaryData are the time stamp, skip
 			//server updates are ALWAYS from the past.  This means the prepared grapics buffer also needs adjustments
@@ -413,21 +434,11 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 				
 				//slice the buffer section for this object
 				var objectData = new Float32Array(binaryData.slice(obj,obj+bytesPerObj));
-				
-				//save the update to be sent to graphics updater
-				preparedData[objectData[structObj.id]] = objectData;
 
 				//apply the update to the object
 				PWM.rigidBodiesMasterObject[objectData[structObj.id]].BinaryImport_physics(objectData);
 			}
-			
-			//reset our game clock BACK IN TIME to the timestamp value from server
-			//first 8 bytes of binaryData are the time stamp
-		   
-		 //  this.oldTime = ts; //DO THIS?
-		   this.lastUpdateTime_serverTime = ts;
-		   
-		   return preparedData;
+		
 };
 
 //TODO: break this function up, unpack is only called once so it doesn't need to 

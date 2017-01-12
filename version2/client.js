@@ -17,6 +17,9 @@ document.body.insertBefore(startup, document.getElementById("container"));
 //GLOBAL General variables
 var PWM = new physicsWorldManager();
 var GWM = new graphicsWorldManager();
+
+PWM.GWM = GWM; //LINK physics to graphics
+
 GWM.displayInHTMLElementId('container');
 
 var PLAYER_ID = false;
@@ -150,7 +153,8 @@ var socket = io();
 			//is a time stamp.  then remaining unpacks in standard way
 			//FIRST: Take the update data and overwrite the local physics with it
 			//SECOND: need to update the graphics buffer
-			GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
+			PWM.applyServerUpdates(msg);
+			//GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
 
 		});
 		
@@ -176,7 +180,8 @@ function nextWorldFrame(){
 	//and add this info to the current buffering frame
 	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());
 	
-	PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
+	//PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
+	PWM.step( PWM.GameClock_getDelta());
 	
 	//*******TESTING !@!
 	for(var object in PWM.rigidBodiesMasterObject){

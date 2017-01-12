@@ -1,4 +1,4 @@
-
+/*
 //INSTRUCTIONS POP UP
 var startup = document.createElement("div");
 startup.setAttribute('id',"info");
@@ -11,10 +11,15 @@ startup.onclick = function () {
 	this.style.display='none'
 }
 document.body.insertBefore(startup, document.getElementById("container"));
+*/
+
 
 //GLOBAL General variables
 var PWM = new physicsWorldManager();
 var GWM = new graphicsWorldManager();
+
+PWM.GWM = GWM; //LINK physics to graphics
+
 GWM.displayInHTMLElementId('container');
 
 var PLAYER_ID = false;
@@ -148,7 +153,8 @@ var socket = io();
 			//is a time stamp.  then remaining unpacks in standard way
 			//FIRST: Take the update data and overwrite the local physics with it
 			//SECOND: need to update the graphics buffer
-			GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
+			PWM.applyServerUpdates(msg);
+			//GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
 
 		});
 		
