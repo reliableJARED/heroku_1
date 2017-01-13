@@ -146,15 +146,14 @@ var socket = io();
 		});
 		
 		socket.on('U',function(msg){
-			//TESTING
-		//	console.log('update size:',msg.byteLength);
-			
+		
 			//update is a giant float32 buffer.  very first element
 			//is a time stamp.  then remaining unpacks in standard way
-			//FIRST: Take the update data and overwrite the local physics with it
-			//SECOND: need to update the graphics buffer
+			//Take the update data and overwrite the local physics with it
+			
 			PWM.applyServerUpdates(msg);
-			//GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
+			GWM.bufferingFrame = GWM.renderingFrame
+
 
 		});
 		

@@ -146,15 +146,13 @@ var socket = io();
 		});
 		
 		socket.on('U',function(msg){
-			//TESTING
-		//	console.log('update size:',msg.byteLength);
-			
+		
 			//update is a giant float32 buffer.  very first element
 			//is a time stamp.  then remaining unpacks in standard way
-			//FIRST: Take the update data and overwrite the local physics with it
-			//SECOND: need to update the graphics buffer
+			//Take the update data and overwrite the local physics with it
+			
 			PWM.applyServerUpdates(msg);
-			//GWM.applyServerUpdates(PWM.applyServerUpdates(msg));
+
 
 		});
 		
@@ -180,7 +178,8 @@ function nextWorldFrame(){
 	//and add this info to the current buffering frame
 	GWM.bufferingFrame_update(PWM.getWorldUpdateBuffer());
 	
-	PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
+	//PWM.world.stepSimulation( PWM.GameClock_getDelta(),10);
+	PWM.step( PWM.GameClock_getDelta());
 	
 	//*******TESTING !@!
 	for(var object in PWM.rigidBodiesMasterObject){

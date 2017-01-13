@@ -206,13 +206,15 @@ physicsWorldManager.prototype.step = function(deltaTime){
 	
 	//if we are in a state of buffer updating need to double step physics	
 	if (this.frameCountRewind > 0) {
-		//calculate miliseconds for current frame, if 60fps arg will be 0.016
-		//tick 1 frame forward
-		this.world.stepSimulation( (this.frameRate *0.001) ,10);	
-		this.GWM.bufferingFrame_update(this.getWorldUpdateBuffer());
-		this.frameCountRewind--;
 		//TESTING
 		console.log('apply updates', this.frameCountRewind)
+		
+		//calculate miliseconds for current frame, if 60fps arg will be 0.016
+		//tick 1 frame forward
+		this.world.stepSimulation( deltaTime ,10);	
+		this.GWM.bufferingFrame_update(this.getWorldUpdateBuffer(),1);
+		this.frameCountRewind--;
+	
 	}
 	
 };
@@ -417,6 +419,7 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			this.lastUpdateTime_serverTime = ts;
 			
 			//how many frames to go backwards and update?
+			//example: rewind = 30frame * 0.5sec -> this means rewind will be 15, so need to go back 15 frames
 			this.frameCountRewind = this.frameRate * this.serverUpdateTimeDelta | 0; //truncate decimal need whole number as will be used for array index
 						
 			//lag update - although this isn't really lag...
@@ -428,8 +431,7 @@ physicsWorldManager.prototype.applyServerUpdates = function (binaryData) {
 			var bytesPerObj = (Object.keys(structObj)).length * 4;
 		
 			
-			//first 8 bytes of binaryData are the time stamp, skip
-			//server updates are ALWAYS from the past.  This means the prepared grapics buffer also needs adjustments
+			//first 8 bytes of binaryData are the time stamp, skip 
 			for (var obj = 8;obj<allData;obj += bytesPerObj) {
 				
 				//slice the buffer section for this object
@@ -638,8 +640,6 @@ physicsWorldManager.prototype.getWorldUpdateBuffer = function() {
 		
 		//for every ACTIVE object, get it's current world state data (position, rotation, velocity, etc.)
 		for(var object in this.rigidBodiesMasterObject){
-			
-		//	console.log(object," X,Y,Z ",this.rigidBodiesMasterObject[object].x(),this.rigidBodiesMasterObject[object].y(),this.rigidBodiesMasterObject[object].z())
 			
 			//check activation state
 			if(this.rigidBodiesMasterObject[object].physics.isActive()){

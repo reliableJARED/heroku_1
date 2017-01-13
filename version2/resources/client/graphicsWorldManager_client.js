@@ -104,7 +104,6 @@ var graphicsWorldManager = function (config) {
 
 graphicsWorldManager.prototype.Buffering = function(ArrayOfObjectData){
 		
-		//CONSIDER!!! does this need to be closure? worth the extra memory?
 		var stillBuffering = true;
 		
 		if(this.bufferingFrame === this.totalFramesInBuffer || this.bufferingFrame >= this.totalFramesInBuffer){
@@ -132,23 +131,28 @@ graphicsWorldManager.prototype.bufferingFrame_update = function (ArrayOfObjectDa
 	//they send the update as a float32 array whos first index is ID
 	//the remaining 13 array index positions hold position, orientation and velocity info
 	//ArrayOfObjectData is ALL data from the physics simulation for objects that are ACTIVE in the form of a 2D array. [[obj1Array],[Obj2Array],...] 
-	//If an object is in an ACTIVE state, it 'likly' requires an rendering update. 
-	//so we update it's grahic to be drawn again in the new location.  NOTE: ACTIVE objects might not be in motion, but they will go to DEACTIVE state soon so just redraw to keep simple.
+	//If an object is in an ACTIVE state, it 'likely' requires an rendering update. 
+	//so we update it's graphic to be drawn again in the new location.  NOTE: ACTIVE objects might not be in motion, but they will go to DEACTIVE state soon so just redraw to keep simple.
 	
-	//console.log("load buffer with:", ArrayOfObjectData)
+	
 	if (typeof frameShift === 'undefined') {
-		this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
-	}else {
 		
+		this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+	
+	}else {
 		//check we are not drawing beyond the buffer array 
 		if((this.bufferingFrame + frameShift) < this.totalFramesInBuffer){
-			this.bufferingFrame += frameShift;
-			this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+			console.log('rewind buffering:',this.bufferingFrame+frameShift);
+			//this.bufferingFrame += frameShift;
+			//this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+			this.renderingBuffer[this.bufferingFrame+frameShift] = ArrayOfObjectData;
 		}
 		//if we will end up drawing beyond buffer array, loop back to start		
 		else {
-			this.bufferingFrame = frameShift - 1;
-			this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+			console.log('rewind buffering loop:',frameShift - 1);
+		//	this.bufferingFrame = frameShift - 1;
+		//	this.renderingBuffer[this.bufferingFrame] = ArrayOfObjectData;
+			this.renderingBuffer[frameShift - 1] = ArrayOfObjectData;
 		}
 	}
 }
@@ -308,6 +312,7 @@ graphicsWorldManager.prototype.drawFromBuffer = function () {
 	var serverIndexLoc = this.physics_indexLocations;
 	
 	//load the data
+	console.log('GWM draw from',this.renderingFrame)
 	var AllDataForFrame = this.renderingBuffer[this.renderingFrame];
 	
 	//loop through the array of updates for the objects
@@ -318,12 +323,10 @@ graphicsWorldManager.prototype.drawFromBuffer = function () {
 
 		//get the graphic for the objects data
 		var objToUpdate = this.graphicsMasterObject[objUpdateData[serverIndexLoc.id]];
-		//console.log("update ",objToUpdate," with ",objUpdateData)
+		
 		//update the graphic		
 		objToUpdate.position.set(objUpdateData[serverIndexLoc.x], objUpdateData[serverIndexLoc.y], objUpdateData[serverIndexLoc.z] );
-		objToUpdate.quaternion.set(objUpdateData[serverIndexLoc.Rx], objUpdateData[serverIndexLoc.Ry], objUpdateData[serverIndexLoc.Rz], objUpdateData[serverIndexLoc.Rw] );
-		
-	
+		objToUpdate.quaternion.set(objUpdateData[serverIndexLoc.Rx], objUpdateData[serverIndexLoc.Ry], objUpdateData[serverIndexLoc.Rz], objUpdateData[serverIndexLoc.Rw] );	
 	}
 	
 	//since the arrays are filled and emptied, just set to empty
@@ -331,29 +334,26 @@ graphicsWorldManager.prototype.drawFromBuffer = function () {
 	
 	//update the renderer to know what frame from buffer should be drawn next
 	//it should always be ONE frame ahead so that after looping around the renderingBuffer is one buffer rotation behind the current bufferingFrame
-	this.moveRenderingBufferIndexes();
+	this.renderingFrame = this.moveRenderingBufferIndexes(this.renderingFrame);
+	this.bufferingFrame = this.moveRenderingBufferIndexes(this.bufferingFrame);
 	
 }
 
 
-graphicsWorldManager.prototype.moveRenderingBufferIndexes = function(){
+graphicsWorldManager.prototype.moveRenderingBufferIndexes = function(frameIndex){
 	
 	//bufferingFrame should always be 1 index BEHIND renderingFrame
 	//this way by the time we render the frame that was just buffered we have gone through one loop of the whole buffer
 	
 	//end of array, loop back to start
-	if(this.renderingFrame === (this.totalFramesInBuffer-1)) {
-		this.renderingFrame =  0;
-		this.bufferingFrame = this.totalFramesInBuffer-1;
-	}else if(this.bufferingFrame === (this.totalFramesInBuffer-1)){
-			this.bufferingFrame = 0;
-			this.renderingFrame += 1;
+	if(frameIndex === (this.totalFramesInBuffer-1)) {
+		frameIndex =  0;
 	}else{
-			this.bufferingFrame +=1;
-			this.renderingFrame += 1;
+			frameIndex += 1;
 		}
+		
+		return frameIndex;
 }
-
 
 graphicsWorldManager.prototype.displayInHTMLElementId = function(elementID){
 	
